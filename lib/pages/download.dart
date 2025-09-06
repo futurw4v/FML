@@ -1,9 +1,9 @@
-
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fml/pages/download/download_game.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:fml/function/log.dart';
 
 class DownloadPage extends StatefulWidget {
   const DownloadPage({super.key});
@@ -106,7 +106,7 @@ class DownloadPageState extends State<DownloadPage> {
         const SnackBar(content: Text('请先选择下载目录')),
       );
     } else {
-      debugPrint('选择了版本: $id - URL: $url');
+      LogUtil.log('选择了版本: $id - URL: $url', level: 'INFO');
       Navigator.push(
         context,
         MaterialPageRoute(

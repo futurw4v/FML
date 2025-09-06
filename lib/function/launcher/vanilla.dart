@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:fml/function/log.dart';
 
 // library获取
 Future<List<String>> loadLibraryArtifactPaths(String versionJsonPath, String gamePath) async {
@@ -11,7 +11,7 @@ Future<List<String>> loadLibraryArtifactPaths(String versionJsonPath, String gam
   try {
     root = jsonDecode(await file.readAsString());
   } catch (e) {
-    debugPrint('JSON 解析失败: $e');
+    LogUtil.log('JSON 解析失败: $e', level: 'ERROR');
     return [];
   }
   final libs = root is Map ? root['libraries'] : null;
@@ -109,10 +109,10 @@ Future<void> vanillaLauncher() async {
     '--height', cfg[3],
     if (cfg[1] == '1') '--fullscreen'
   ];
-  debugPrint(args.join("\n"));
+  LogUtil.log(args.join("\n"), level: 'INFO');
   final proc = await Process.start(java, args, workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game');
-  proc.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => debugPrint('[OUT] $l'));
-  proc.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => debugPrint('[ERR] $l'));
+  proc.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => LogUtil.log('[MINECRAFT] $l', level: 'INFO'));
+  proc.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => LogUtil.log('[MINECRAFT] $l', level: 'ERROR'));
   final code = await proc.exitCode;
-  debugPrint('退出码: $code');
+  LogUtil.log('退出码: $code', level: 'INFO');
 }

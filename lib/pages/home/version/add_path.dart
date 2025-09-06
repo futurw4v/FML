@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fml/function/log.dart';
 
 class AddPathPage extends StatefulWidget {
   const AddPathPage({super.key});
@@ -44,26 +45,26 @@ class AddPathPageState extends State<AddPathPage> {
   Future<void> _createDirectory() async {
     await _selectDirectory(); // 等待用户选择目录
     if (_dirPath.isEmpty) {
-      debugPrint('未选择路径，取消创建');
+      LogUtil.log('未选择路径，取消创建', level: 'WARNING');
       return;
     }
     final directory = Directory(_dirPath);
     if (await directory.exists()) {
-      debugPrint('文件夹已存在');
+      LogUtil.log('文件夹已存在', level: 'INFO');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('文件夹已存在')));
     } else {
       try {
         await directory.create(recursive: true);
-        debugPrint('文件夹创建成功');
+        LogUtil.log('文件夹创建成功', level: 'INFO');
         final launcherProfilesFile = File('$_dirPath${Platform.pathSeparator}launcher_profiles.json');
         const launcherProfilesContent = '{"profiles": {"(Default)": {"name": "(Default)"}}, "selectedProfileName": "(Default)"}';
         await launcherProfilesFile.writeAsString(launcherProfilesContent);
-        debugPrint('launcher_profiles.json 已创建');
+        LogUtil.log('launcher_profiles.json 已创建', level: 'INFO');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('文件夹和配置文件已创建')));
       } catch (e) {
-        debugPrint('创建文件夹失败: $e');
+        LogUtil.log('创建文件夹失败: $e', level: 'ERROR');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('创建文件夹失败: $e')));
       }

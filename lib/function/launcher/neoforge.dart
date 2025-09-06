@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
+import 'package:fml/function/log.dart';
 
 // library获取
 Future<Set<String>> loadLibraryArtifactPaths(String versionJsonPath, String gamePath) async {
@@ -12,7 +12,7 @@ Future<Set<String>> loadLibraryArtifactPaths(String versionJsonPath, String game
   try {
     root = jsonDecode(await file.readAsString());
   } catch (e) {
-    debugPrint('JSON 解析失败: $e');
+    LogUtil.log('JSON 解析失败: $e', level: 'ERROR');
     return {};
   }
   final libs = root is Map ? root['libraries'] : null;
@@ -118,7 +118,7 @@ Future<Map<String, dynamic>?> loadNeoForgeConfig(String gamePath, String game) a
   final neoForgeJsonPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}NeoForge.json';
   final file = File(neoForgeJsonPath);
   if (!await file.exists()) {
-    debugPrint('找不到NeoForge配置: $neoForgeJsonPath');
+    LogUtil.log('找不到NeoForge配置: $neoForgeJsonPath', level: 'ERROR');
     return null;
   }
   try {
@@ -126,7 +126,7 @@ Future<Map<String, dynamic>?> loadNeoForgeConfig(String gamePath, String game) a
     final config = jsonDecode(jsonContent) as Map<String, dynamic>;
     return config;
   } catch (e) {
-    debugPrint('解析NeoForge.json失败: $e');
+    LogUtil.log('解析NeoForge.json失败: $e', level: 'ERROR');
     return null;
   }
 }
@@ -153,7 +153,7 @@ Future<void> neoforgeLauncher() async {
   final jsonPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}$game.json';
   // 加载NeoForge配置
   final neoForgeConfig = await loadNeoForgeConfig(gamePath, game);
-  debugPrint('NeoForge配置加载${neoForgeConfig != null ? "成功" : "失败"}');
+  LogUtil.log('NeoForge配置加载${neoForgeConfig != null ? "成功" : "失败"}', level: 'INFO');
   // 变量映射，用于替换配置中的占位符
   final variables = {
     'library_directory': '$gamePath${Platform.pathSeparator}libraries',
@@ -179,8 +179,8 @@ Future<void> neoforgeLauncher() async {
         librariesMap[identifier] = fullPath;
       }
     }
-    debugPrint(librariesMap.toString());
-    debugPrint('从NeoForge.json加载了 ${librariesMap.length} 个库');
+    LogUtil.log(librariesMap.toString(), level: 'INFO');
+    LogUtil.log('从NeoForge.json加载了 ${librariesMap.length} 个库', level: 'INFO');
   }
   final versionLibs = await loadLibraryArtifactPaths(jsonPath, gamePath);
   for (final lib in versionLibs) {
@@ -194,8 +194,8 @@ Future<void> neoforgeLauncher() async {
   final classPath = sortedLibraries.join(separator);
   final cp = '$classPath$separator$gameJar';
   String mainClass = neoForgeConfig?['mainClass'] as String? ?? 'net.neoforged.fancymodloader.bootstraplauncher.BootstrapLauncher';
-  debugPrint('使用mainClass: $mainClass');
-  debugPrint('类路径库数量: ${libraries.length}');
+  LogUtil.log('使用mainClass: $mainClass', level: 'INFO');
+  LogUtil.log('类路径库数量: ${libraries.length}', level: 'INFO');
   final account = prefs.getString('SelectedAccount') ?? '';
   final accountInfo = prefs.getStringList('Account_$account') ?? [];
   final assetIndex = await getAssetIndex(jsonPath) ?? '';
@@ -225,7 +225,7 @@ Future<void> neoforgeLauncher() async {
         jvmArgs.add(processedArg);
       }
     }
-    debugPrint('添加了 ${jvmArgsList.length} 个来自NeoForge.json的JVM参数');
+    LogUtil.log('添加了 ${jvmArgsList.length} 个来自NeoForge.json的JVM参数', level: 'INFO');
   }
   jvmArgs.addAll(['-cp', cp]);
   final gameArgs = <String>[
@@ -253,14 +253,14 @@ Future<void> neoforgeLauncher() async {
         gameArgs.add(processedArg);
       }
     }
-    debugPrint('添加了 ${gameArgsList.length} 个来自NeoForge.json的游戏参数');
+    LogUtil.log('添加了 ${gameArgsList.length} 个来自NeoForge.json的游戏参数', level: 'INFO');
   }
   final args = [...jvmArgs, mainClass, ...gameArgs];
-  debugPrint('启动命令: ${args.join(" ")}');
-  debugPrint('主类: $mainClass');
+  LogUtil.log('启动命令: ${args.join(" ")}', level: 'INFO');
+  LogUtil.log('主类: $mainClass', level: 'INFO');
   final proc = await Process.start(java, args, workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game');
-  proc.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => debugPrint('[OUT] $l'));
-  proc.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => debugPrint('[ERR] $l'));
+  proc.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => LogUtil.log('[MINECRAFT] $l', level: 'INFO'));
+  proc.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => LogUtil.log('[MINECRAFT] $l', level: 'ERROR'));
   final code = await proc.exitCode;
-  debugPrint('退出码: $code');
+  LogUtil.log('退出码: $code', level: 'INFO');
 }

@@ -112,7 +112,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     final directory = Directory('$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}');
     if (!await directory.exists()) {
       await directory.create(recursive: true);
-      debugPrint('创建目录: $gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}');
       await LogUtil.log('创建目录: $gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}', level: 'INFO');
     }
   }
@@ -121,7 +120,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
   Future<void> saveLoaderToJson(String jsonPath) async {
     try {
       if (widget.fabricLoader == null) {
-        debugPrint('fabricLoader为空，无法保存');
         await LogUtil.log('fabricLoader为空，无法保存', level: 'ERROR');
         return;
       }
@@ -131,20 +129,16 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
       final Directory directory = Directory(dirPath);
       if (!await directory.exists()) {
         await directory.create(recursive: true);
-        debugPrint('已创建目录: $dirPath');
         await LogUtil.log('已创建目录: $dirPath', level: 'INFO');
       }
       // 创建文件并写入JSON内容
       final File file = File(filePath);
       await file.writeAsString(jsonString);
-      debugPrint('已成功将fabricLoader保存到: $filePath');
       await LogUtil.log('已成功将fabricLoader保存到: $filePath');
-      debugPrint('fabricLoader内容: $jsonString');
       setState(() {
         _saveFabricJson = true;
       });
     } catch (e) {
-      debugPrint('保存JSON时出错: $e');
       await _showNotification('保存JSON时出错', e.toString());
       await LogUtil.log('保存JSON时出错: $e', level: 'ERROR');
     }
@@ -191,16 +185,13 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
             }
           }
         }
-        debugPrint('找到 ${librariesPath.length} 个库文件路径');
         await LogUtil.log('找到 ${librariesPath.length} 个库文件路径', level: 'INFO');
-        debugPrint('找到 ${librariesURL.length} 个库文件URL');
         await LogUtil.log('找到 ${librariesURL.length} 个库文件URL', level: 'INFO');
       }
       setState(() {
         _parseGameJson = true;
       });
     } catch (e) {
-      debugPrint('解析JSON失败: $e');
       await _showNotification('解析JSON失败', e.toString());
       await LogUtil.log('解析JSON失败: $e', level: 'ERROR');
       setState(() {
@@ -228,13 +219,11 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
           _assetHash.add(info['hash']);
         }
       });
-      debugPrint('已解析 ${_assetHash.length} 个资产哈希值');
       await LogUtil.log('已解析 ${_assetHash.length} 个资产哈希值', level: 'INFO');
       setState(() {
         _parseAssetJson = true;
       });
     } catch (e) {
-      debugPrint('解析资产索引失败: $e');
       await _showNotification('解析资产索引失败', e.toString());
       await LogUtil.log('解析资产索引失败: $e', level: 'ERROR');
     }
@@ -244,7 +233,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
   Future<void> parseFabricLoaderJson() async {
   try {
     if (widget.fabricLoader == null) {
-      debugPrint('fabricLoader为空，无法解析');
       await LogUtil.log('fabricLoader为空，无法解析', level: 'ERROR');
       await _showNotification('下载失败', 'fabricLoader为空，无法解析');
       return;
@@ -264,7 +252,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
           final String relativePath = '$group/$artifact/$version/$artifact-$version.jar';
           final String url = 'https://bmclapi2.bangbang93.com/maven/$group/$artifact/$version/$artifact-$version.jar';
           _fabricDownloadTasks.add({'url': replaceWithMirror(url), 'path': relativePath});
-          debugPrint('添加Fabric Loader: $relativePath');
           await LogUtil.log('添加Fabric Loader: $relativePath', level: 'INFO');
         }
       }
@@ -282,7 +269,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
           final String relativePath = '$group/$artifact/$version/$artifact-$version.jar';
           final String url = 'https://bmclapi2.bangbang93.com/maven/$group/$artifact/$version/$artifact-$version.jar';
           _fabricDownloadTasks.add({'url': replaceWithMirror(url), 'path': relativePath});
-          debugPrint('添加Intermediary: $relativePath');
           await LogUtil.log('添加Intermediary: $relativePath', level: 'INFO');
         }
       }
@@ -319,13 +305,11 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
         _parseFabricJson = true;
       });
     }
-    debugPrint('找到 ${_fabricDownloadTasks.length} 个Fabric文件需要下载');
     await LogUtil.log('找到 ${_fabricDownloadTasks.length} 个Fabric文件需要下载', level: 'INFO');
     setState(() {
       _parseFabricJson = true;
     });
   } catch (e) {
-    debugPrint('解析Fabric Loader JSON失败: $e');
     await _showNotification('解析Fabric Loader JSON失败', e.toString());
     await LogUtil.log('解析Fabric Loader JSON失败: $e', level: 'ERROR');
     setState(() {
@@ -337,7 +321,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
   // 下载库
   Future<void> _downloadLibraries({int concurrentDownloads = 20}) async {
     if (librariesURL.isEmpty || librariesPath.isEmpty) {
-      debugPrint('库文件列表为空');
       await _showNotification('库文件列表为空', '无法下载库文件');
       await LogUtil.log('库文件列表为空，无法下载库文件', level: 'ERROR');
       return;
@@ -350,7 +333,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     List<Map<String, String>> downloadTasks = [];
     if (_isRetrying && _failedLibraries.isNotEmpty) {
-      debugPrint('正在重试下载 ${_failedLibraries.length} 个失败的库文件');
       await LogUtil.log('正在重试下载 ${_failedLibraries.length} 个失败的库文件', level: 'INFO');
       downloadTasks = _failedLibraries;
     } else {
@@ -366,7 +348,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     }
     final totalLibraries = downloadTasks.length;
     if (totalLibraries == 0) {
-      debugPrint('所有库文件已存在，无需下载');
       await LogUtil.log('所有库文件已存在，无需下载', level: 'INFO');
       setState(() {
         _downloadLibrary = true;
@@ -380,7 +361,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
         _progress = completedLibraries / totalLibraries;
       });
     }
-    debugPrint('开始下载 $totalLibraries 个库文件，并发数: $concurrentDownloads');
     await LogUtil.log('开始下载 $totalLibraries 个库文件，并发数: $concurrentDownloads', level: 'INFO');
     for (int i = 0; i < downloadTasks.length; i += concurrentDownloads) {
       int end = i + concurrentDownloads;
@@ -401,34 +381,29 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
               onError: (error) async{
                 completedLibraries++;
                 newFailedList.add(task);
-                debugPrint('下载库文件失败: $error, URL: ${task['url']}');
                 await LogUtil.log('下载库文件失败: $error, URL: ${task['url']}', level: 'ERROR');
               }
             );
           } catch (e) {
             completedLibraries++;
             newFailedList.add(task);
-            debugPrint('下载库文件异常: $e, URL: ${task['url']}');
             await LogUtil.log('下载库文件异常: $e, URL: ${task['url']}', level: 'ERROR');
           }
         }());
       }
       await Future.wait(batch);
       updateProgress();
-      debugPrint('已完成: $completedLibraries/$totalLibraries, 失败: ${newFailedList.length}');
       await LogUtil.log('已完成: $completedLibraries/$totalLibraries, 失败: ${newFailedList.length}');
     }
     _failedLibraries = newFailedList;
     if (newFailedList.isNotEmpty && _currentRetryCount < _maxRetries) {
       _currentRetryCount++;
-      debugPrint('准备重试下载 ${newFailedList.length} 个失败的库文件 (第 $_currentRetryCount 次重试)');
       await LogUtil.log('准备重试下载 ${newFailedList.length} 个失败的库文件 (第 $_currentRetryCount 次重试)');
       setState(() {
         _isRetrying = true;
       });
       await _downloadLibraries(concurrentDownloads: concurrentDownloads);
     } else if (newFailedList.isNotEmpty) {
-      debugPrint('已达最大并发重试次数，开始单线程无限重试 ${newFailedList.length} 个库文件');
       await LogUtil.log('已达最大并发重试次数，开始单线程无限重试 ${newFailedList.length} 个库文件', level: 'WARNING');
       await _singleThreadRetryDownload(newFailedList, "库文件", (progress) {
         setState(() {
@@ -473,14 +448,12 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     }
     final totalAssets = downloadTasks.length;
     if (totalAssets == 0) {
-      debugPrint('所有资源文件已存在，无需下载');
       await LogUtil.log('所有资源文件已存在，无需下载', level: 'INFO');
       setState(() {
         _downloadAsset = true;
       });
       return;
     }
-    debugPrint('需要下载 $totalAssets 个资源文件，并发数: $concurrentDownloads');
     await LogUtil.log('需要下载 $totalAssets 个资源文件，并发数: $concurrentDownloads', level: 'INFO');
     int completedAssets = 0;
     List<Map<String, String>> newFailedList = [];
@@ -511,7 +484,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
                 completedAssets++;
                 newFailedList.add(task);
                 if (newFailedList.length % 10 == 0) {
-                  debugPrint('已有 ${newFailedList.length} 个资源文件下载失败');
                   await LogUtil.log('已有 ${newFailedList.length} 个资源文件下载失败: $error, URL: ${task['url']}', level: 'ERROR');
                 }
               }
@@ -524,20 +496,17 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
       }
       await Future.wait(batch);
       updateProgress();
-      debugPrint('已完成: $completedAssets/$totalAssets, 失败: ${newFailedList.length}');
       await LogUtil.log('已完成: $completedAssets/$totalAssets, 失败: ${newFailedList.length}', level: 'INFO');
     }
     _failedAssets = newFailedList;
     if (newFailedList.isNotEmpty && _currentRetryCount < _maxRetries) {
       _currentRetryCount++;
-      debugPrint('准备重试下载 ${newFailedList.length} 个失败的资源文件 (第 $_currentRetryCount 次重试)');
       await LogUtil.log('准备重试下载 ${newFailedList.length} 个失败的资源文件 (第 $_currentRetryCount 次重试)', level: 'INFO');
       setState(() {
         _isRetrying = true;
       });
       await _downloadAssets(concurrentDownloads: concurrentDownloads);
     } else if (newFailedList.isNotEmpty) {
-      debugPrint('已达最大并发重试次数，开始单线程重试 ${newFailedList.length} 个资源文件');
       await LogUtil.log('已达最大并发重试次数，开始单线程重试 ${newFailedList.length} 个资源文件', level: 'WARNING');
       await _singleThreadRetryDownload(newFailedList, "资源文件", (progress) {
         setState(() {
@@ -558,7 +527,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     final pathsList = <String>[];
     final file = File(jsonFilePath);
     if (!await file.exists()) {
-      debugPrint('版本JSON文件不存在: $jsonFilePath');
       await LogUtil.log('版本JSON文件不存在: $jsonFilePath', level: 'ERROR');
       await _showNotification('版本JSON文件不存在', jsonFilePath);
       setState(() {
@@ -572,7 +540,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     try {
       root = jsonDecode(await file.readAsString());
     } catch (e) {
-      debugPrint('JSON 解析失败: $e');
       await LogUtil.log('JSON 解析失败: $e', level: 'ERROR');
       await _showNotification('JSON 解析失败', e.toString());
       setState(() {
@@ -584,7 +551,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     }
     final libs = root is Map ? root['libraries'] : null;
     if (libs is! List) {
-      debugPrint('JSON中没有libraries字段或格式错误');
       await LogUtil.log('JSON中没有libraries字段或格式错误', level: 'ERROR');
       await _showNotification('JSON中没有libraries字段或格式错误', jsonFilePath);
       setState(() {
@@ -615,11 +581,9 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
         String nativePath = path.replaceAll('/', Platform.pathSeparator);
         final fullPath = ('$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}$nativePath');
         pathsList.add(fullPath);
-        debugPrint('找到LWJGL库: $fileName, 路径: $fullPath');
         await LogUtil.log('找到LWJGL库: $fileName, 路径: $fullPath', level: 'INFO');
       }
     }
-    debugPrint('总共找到${namesList.length}个LWJGL本地库');
     await LogUtil.log('总共找到${namesList.length}个LWJGL本地库', level: 'INFO');
     setState(() {
       lwjglNativeNames = namesList;
@@ -631,7 +595,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
   // 提取LWJGL Natives
   Future<void> _extractLwjglNatives() async {
     if (lwjglNativePaths.isEmpty || lwjglNativeNames.isEmpty) {
-      debugPrint('没有找到LWJGL本地库，跳过提取');
       await LogUtil.log('没有找到LWJGL本地库，跳过提取', level: 'WARNING');
       setState(() {
         _extractedLwjglNativesPath = true;
@@ -645,10 +608,8 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     final nativesDirObj = Directory(nativesDir);
     if (!await nativesDirObj.exists()) {
       await nativesDirObj.create(recursive: true);
-      debugPrint('创建natives目录: $nativesDir');
       await LogUtil.log('创建natives目录: $nativesDir', level: 'INFO');
     }
-    debugPrint('开始提取LWJGL本地库到: $nativesDir');
     await LogUtil.log('开始提取LWJGL本地库到: $nativesDir', level: 'INFO');
     int successCount = 0;
     List<String> extractedFiles = [];
@@ -657,24 +618,19 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
       final fileName = lwjglNativeNames[i];
       try {
         final jarDir = fullPath.substring(0, fullPath.lastIndexOf(Platform.pathSeparator));
-        debugPrint('提取: $fileName 从 $jarDir 到 $nativesDir');
         await LogUtil.log('提取: $fileName 从 $jarDir 到 $nativesDir', level: 'INFO');
         // 调用extractNatives函数提取本地库
         final extracted = await extractNatives(jarDir, fileName, nativesDir);
         if (extracted.isNotEmpty) {
           successCount++;
           extractedFiles.addAll(extracted);
-          debugPrint('成功从 $fileName 提取了 ${extracted.length} 个文件');
           await LogUtil.log('成功从 $fileName 提取了 ${extracted.length} 个文件');
         }
       } catch (e) {
-        debugPrint('提取 $fileName 时出错: $e');
         await LogUtil.log('提取 $fileName 时出错: $e', level: 'ERROR');
       }
     }
-    debugPrint('完成LWJGL本地库提取, 共处理 ${lwjglNativePaths.length} 个文件, 成功: $successCount');
     await LogUtil.log('完成LWJGL本地库提取, 共处理 ${lwjglNativePaths.length} 个文件, 成功: $successCount', level: 'INFO');
-    debugPrint('提取的文件: ${extractedFiles.join(', ')}');
     await LogUtil.log('提取的文件: ${extractedFiles.join(', ')}', level: 'INFO');
     setState(() {
       _extractedLwjglNatives = true;
@@ -684,7 +640,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
   // 下载Fabric
   Future<void> _downloadFabricLibraries({int concurrentDownloads = 20}) async {
     if (_fabricDownloadTasks.isEmpty) {
-      debugPrint('Fabric库文件列表为空');
       await _showNotification('Fabric库文件列表为空', '无法下载Fabric库文件');
       await LogUtil.log('Fabric库文件列表为空，无法下载Fabric库文件', level: 'ERROR');
       setState(() {
@@ -718,15 +673,13 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     }
     final totalTasks = downloadTasks.length;
     if (totalTasks == 0) {
-      debugPrint('所有Fabric库文件已存在，无需下载');
-      await LogUtil.log('所有Fabric库文件已存在，无需下载', level: 'INFO');
+      await LogUtil.log('所有Fabric库文件已存在,无需下载', level: 'INFO');
       setState(() {
         _downloadFabric = true;
       });
       return;
     }
-    debugPrint('需要下载 $totalTasks 个Fabric文件，并发数: $concurrentDownloads');
-    await LogUtil.log('需要下载 $totalTasks 个Fabric文件，并发数: $concurrentDownloads', level: 'INFO');
+    await LogUtil.log('需要下载 $totalTasks 个Fabric文件,并发数: $concurrentDownloads', level: 'INFO');
     int completedTasks = 0;
     List<Map<String, String>> newFailedList = [];
     void updateProgress() {
@@ -753,34 +706,29 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
               onError: (error) async{
                 completedTasks++;
                 newFailedList.add(task);
-                debugPrint('下载Fabric文件失败: $error, URL: ${task['url']}');
                 await LogUtil.log('下载Fabric文件失败: $error, URL: ${task['url']}', level: 'ERROR');
               }
             );
           } catch (e) {
             completedTasks++;
             newFailedList.add(task);
-            debugPrint('下载Fabric文件异常: $e, URL: ${task['url']}');
             await LogUtil.log('下载Fabric文件异常: $e, URL: ${task['url']}', level: 'ERROR');
           }
         }());
       }
       await Future.wait(batch);
       updateProgress();
-      debugPrint('已完成: $completedTasks/$totalTasks, 失败: ${newFailedList.length}');
       await LogUtil.log('已完成: $completedTasks/$totalTasks, 失败: ${newFailedList.length}', level: 'INFO');
     }
     _failedFabricFiles = newFailedList;
     if (newFailedList.isNotEmpty && _currentRetryCount < _maxRetries) {
       _currentRetryCount++;
-      debugPrint('准备重试下载 ${newFailedList.length} 个失败的Fabric文件 (第 $_currentRetryCount 次重试)');
       await LogUtil.log('准备重试下载 ${newFailedList.length} 个失败的Fabric文件 (第 $_currentRetryCount 次重试)', level: 'INFO');
       setState(() {
         _isRetrying = true;
       });
       await _downloadFabricLibraries(concurrentDownloads: concurrentDownloads);
     } else if (newFailedList.isNotEmpty) {
-      debugPrint('已达最大并发重试次数，开始单线程重试 ${newFailedList.length} 个Fabric文件');
       await LogUtil.log('已达最大并发重试次数，开始单线程重试 ${newFailedList.length} 个Fabric文件', level: 'INFO');
       await _singleThreadRetryDownload(newFailedList, "Fabric文件", (progress) {
         setState(() {
@@ -809,7 +757,7 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
         while (!success) {
           try {
             retryCount++;
-            debugPrint('正在尝试下载$fileType: ${task['url']} (第 $retryCount 次尝试)');
+            LogUtil.log('正在尝试下载$fileType: ${task['url']} (第 $retryCount 次尝试)', level: 'INFO');
             bool downloadComplete = false;
             await DownloadUtils.downloadFile(
               url: task['url']!,
@@ -817,11 +765,9 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
               onProgress: (_) {},
               onSuccess: () async{
                 downloadComplete = true;
-                debugPrint('$fileType下载成功: ${task['url']}');
                 await LogUtil.log('$fileType下载成功: ${task['url']}', level: 'INFO');
               },
               onError: (error) async{
-                debugPrint('$fileType下载失败: $error, URL: ${task['url']}');
                 await LogUtil.log('$fileType下载失败: $error, URL: ${task['url']}', level: 'ERROR');
               }
             );
@@ -829,14 +775,12 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
               success = true;
               completed++;
               updateProgressCallback(completed / total);
-              debugPrint('已完成: $completed/$total $fileType');
               await LogUtil.log('已完成: $completed/$total $fileType', level: 'INFO');
             } else {
               // 短暂延迟后再重试
               await Future.delayed(Duration(milliseconds: 500));
             }
           } catch (e) {
-            debugPrint('$fileType下载异常: $e, URL: ${task['url']}');
             await LogUtil.log('$fileType下载异常: $e, URL: ${task['url']}', level: 'ERROR');
             await Future.delayed(Duration(seconds: 1));
           }
@@ -844,7 +788,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
       }
       currentFailedList = nextRetryList;
     }
-    debugPrint('所有$fileType已成功下载');
     await LogUtil.log('所有$fileType已成功下载', level: 'INFO');
   }
 
@@ -892,7 +835,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     await prefs.setStringList(key, defaultConfig);
     gameList.add(widget.name);
     await prefs.setStringList('Game_$_name', gameList);
-    debugPrint('已将 ${widget.name} 添加到游戏列表，当前列表: $gameList');
     await LogUtil.log('已将 ${widget.name} 添加到游戏列表，当前列表: $gameList', level: 'INFO');
     await LogUtil.log('安装以完成,详细请查看install.log', level: 'INFO');
     setState(() {

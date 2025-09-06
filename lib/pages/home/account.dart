@@ -43,7 +43,9 @@ class AccountPageState extends State<AccountPage> {
       context,
       MaterialPageRoute(builder: (context) => const NewAccountPage()),
     );
+    if (mounted) {
     _loadAccounts();
+  }
   }
 
   @override

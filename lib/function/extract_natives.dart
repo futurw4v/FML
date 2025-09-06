@@ -3,6 +3,7 @@ import 'package:archive/archive.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
 import 'package:system_info2/system_info2.dart';
+import 'package:fml/function/log.dart';
 
 Future<List<String>> extractNatives(String jarDir, String jarName, String outDir) async {
   final os = Platform.operatingSystem.toLowerCase();
@@ -32,9 +33,9 @@ Future<List<String>> extractNatives(String jarDir, String jarName, String outDir
     }
   }
   if (matches) {
-    debugPrint('"$jarName" 平台符合 (os=$os, arch=$kernelArch)');
+    LogUtil.log('"$jarName" 平台符合 (os=$os, arch=$kernelArch)', level: 'INFO');
   } else {
-    debugPrint('$jarName" 平台不符合 (os=$os, arch=$kernelArch)');
+    LogUtil.log('$jarName" 平台不符合 (os=$os, arch=$kernelArch)', level: 'ERROR');
     return <String>[];
   }
   final jarPath = p.join(jarDir, jarName);

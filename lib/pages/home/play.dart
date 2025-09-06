@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:fml/function/log.dart';
 import 'package:fml/function/launcher/fabric.dart';
 import 'package:fml/function/launcher/vanilla.dart';
 import 'package:fml/function/launcher/neoforge.dart';
@@ -22,8 +23,8 @@ class PlayPageState extends State<PlayPage> {
     String? SelectedGame = prefs.getString('SelectedGame');
     List<String>? GameConfig = prefs.getStringList('Config_${SelectedPath}_$SelectedGame');
     String? type = GameConfig != null ? GameConfig[4] : null;
-    debugPrint(GameConfig.toString());
-    debugPrint(type);
+    LogUtil.log(GameConfig.toString(), level: 'INFO');
+    LogUtil.log(type.toString(), level: 'INFO');
     setState(() {
       _GameType = type ?? '';
     });

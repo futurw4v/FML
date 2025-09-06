@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
+import 'package:fml/function/log.dart';
 
 // library获取
 Future<List<String>> loadLibraryArtifactPaths(String versionJsonPath, String gamePath) async {
@@ -12,7 +12,7 @@ Future<List<String>> loadLibraryArtifactPaths(String versionJsonPath, String gam
   try {
     root = jsonDecode(await file.readAsString());
   } catch (e) {
-    debugPrint('JSON 解析失败: $e');
+    LogUtil.log('JSON 解析失败: $e', level: 'ERROR');
     return [];
   }
   final libs = root is Map ? root['libraries'] : null;
@@ -28,7 +28,7 @@ Future<List<String>> loadLibraryArtifactPaths(String versionJsonPath, String gam
     if (path is String && path.isNotEmpty) {
       // 排除冲突的ASM组件
       if (path.contains('org/ow2/asm/asm')) {
-        debugPrint('排除冲突的ASM组件: $path');
+        LogUtil.log('排除冲突的ASM组件: $path', level: 'INFO');
         continue;
       }
       final fullPath = p.joinAll([gamePath, 'libraries', ...path.split('/')]);
@@ -152,7 +152,7 @@ Future<Map<String, dynamic>> getFabricInfoFromFabricJson(String gamePath, String
   final fabricJsonPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}fabric.json';
   final file = File(fabricJsonPath);
   if (!await file.exists()) {
-    debugPrint('fabric.json 不存在: $fabricJsonPath');
+    LogUtil.log('fabric.json 不存在: $fabricJsonPath', level: 'ERROR');
     return {
       'loader': null,
       'intermediary': null,
@@ -221,7 +221,7 @@ Future<Map<String, dynamic>> getFabricInfoFromFabricJson(String gamePath, String
       'asm': asmVersions,
     };
   } catch (e) {
-    debugPrint('解析fabric.json失败: $e');
+    LogUtil.log('解析fabric.json失败: $e', level: 'ERROR');
     return {
       'loader': null,
       'intermediary': null,
@@ -276,7 +276,7 @@ Future<void> fabricLauncher() async {
               final version = libParts[i-1];
               if (version != fabricAsmVersions[asmComponent]) {
                 shouldExclude = true;
-                debugPrint('排除冲突的ASM组件: $lib (版本 $version 与Fabric提供的版本 ${fabricAsmVersions[asmComponent]} 冲突)');
+                LogUtil.log('排除冲突的ASM组件: $lib (版本 $version 与Fabric提供的版本 ${fabricAsmVersions[asmComponent]} 冲突)', level: 'INFO');
                 break;
               }
             }
@@ -296,11 +296,11 @@ Future<void> fabricLauncher() async {
     cp += '$separator$lib';
   }
   // 检查关键文件是否存在
-  debugPrint('Fabric Loader 文件存在: ${File(fabricLoader).existsSync()}');
-  debugPrint('Intermediary 文件存在: ${File(intermediary).existsSync()}');
+  LogUtil.log('Fabric Loader 文件存在: ${File(fabricLoader).existsSync()}', level: 'INFO');
+  LogUtil.log('Intermediary 文件存在: ${File(intermediary).existsSync()}', level: 'INFO');
   for (final lib in fabricLibraryPaths) {
     if (lib.contains('sponge-mixin')) {
-      debugPrint('Sponge Mixin 文件存在: ${File(lib).existsSync()}');
+      LogUtil.log('Sponge Mixin 文件存在: ${File(lib).existsSync()}', level: 'INFO');
     }
   }
   final args = <String>[
@@ -334,11 +334,11 @@ Future<void> fabricLauncher() async {
     '--height', cfg[3],
     if (cfg[1] == '1') '--fullscreen'
   ];
-  debugPrint('fab=$fabricLoader, intermediary=$intermediary');
-  debugPrint(args.join("\n"));
+  LogUtil.log('fab=$fabricLoader, intermediary=$intermediary', level: 'INFO');
+  LogUtil.log(args.join("\n"), level: 'INFO');
   final proc = await Process.start(java, args, workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game');
-  proc.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => debugPrint('[OUT] $l'));
-  proc.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => debugPrint('[ERR] $l'));
+  proc.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => LogUtil.log('[MINECRAFT] $l', level: 'INFO'));
+  proc.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => LogUtil.log('[MINECRAFT] $l', level: 'ERROR'));
   final code = await proc.exitCode;
-  debugPrint('退出码: $code');
+  LogUtil.log('退出码: $code', level: 'INFO');
 }

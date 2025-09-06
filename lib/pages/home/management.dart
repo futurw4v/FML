@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fml/function/log.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
@@ -173,7 +174,7 @@ class ManagementPageState extends State<ManagementPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('发生错误: $e')),
       );
-      debugPrint(e.toString());
+      LogUtil.log(e.toString(), level: 'ERROR');
     }
   }
 

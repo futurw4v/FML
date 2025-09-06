@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import 'dart:math';
 
+import 'package:fml/function/log.dart';
 import 'package:fml/pages/download/loader/download_vanilla.dart';
 import 'package:fml/pages/download/loader/download_fabric.dart';
 import 'package:fml/pages/download/loader/download_neoforge.dart';
@@ -71,7 +72,7 @@ class DownloadGamePageState extends State<DownloadGamePage> {
 
   // 读取Fabric版本列表
   Future<void> _loadFabricList() async {
-    debugPrint('加载${widget.version}Fabric版本列表');
+    LogUtil.log('加载${widget.version}Fabric版本列表', level: 'INFO');
     await _loadAppVersion();
     try {
       final options = Options(
@@ -100,13 +101,13 @@ class DownloadGamePageState extends State<DownloadGamePage> {
         });
       }
     } catch (e) {
-      debugPrint('请求出错: $e');
+      LogUtil.log('请求出错: $e', level: 'ERROR');
     }
   }
 
   // 加载NeoForge
   Future<void> _loadNeoForgeList() async {
-    debugPrint('加载${widget.version}NeoForge版本列表');
+    LogUtil.log('加载${widget.version}NeoForge版本列表', level: 'INFO');
     await _loadAppVersion();
     try {
       final options = Options(
@@ -143,7 +144,7 @@ class DownloadGamePageState extends State<DownloadGamePage> {
             mcVersionPrefix = versionWithoutPrefix;
           }
         } catch (e) {
-          debugPrint('版本号解析错误: $e');
+          LogUtil.log('版本号解析错误: $e', level: 'ERROR');
         }
         // 过滤版本
         if (mcVersionPrefix.isNotEmpty) {
@@ -163,7 +164,7 @@ class DownloadGamePageState extends State<DownloadGamePage> {
         });
       }
     } catch (e) {
-      debugPrint('请求出错: $e');
+      LogUtil.log('请求出错: $e', level: 'ERROR');
     }
   }
 
