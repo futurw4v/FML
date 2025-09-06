@@ -76,18 +76,20 @@ class DownloadPageState extends State<DownloadPage> {
     }
   }
 
-  // 添加打开URL
-  Future<void> _launchURL() async {
+  // 打开URL
+  Future<void> _launchURL(String url) async {
     try {
-      final Uri uri = Uri.parse('https://bmclapidoc.bangbang93.com/');
+      final Uri uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
+        if (!mounted) return; // 添加 mounted 检查
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('无法打开链接: https://bmclapidoc.bangbang93.com/')),
+          SnackBar(content: Text('无法打开链接: $url')),
         );
       }
     } catch (e) {
+      if (!mounted) return; // 添加 mounted 检查
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('发生错误: $e')),
       );
@@ -95,9 +97,10 @@ class DownloadPageState extends State<DownloadPage> {
   }
 
   // 检查选择目录
-  Future<void> _CheckSelectedPath(id, url, type) async {
+  Future<void> _checkSelectedPath(id, url, type) async {
     final prefs = await SharedPreferences.getInstance();
     final selectedDir = prefs.getString('SelectedPath');
+    if (!mounted) return;
     if (selectedDir == null || selectedDir.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请先选择下载目录')),
@@ -160,7 +163,7 @@ class DownloadPageState extends State<DownloadPage> {
                     subtitle: const Text('赞助 BMCLAPI 喵~ 赞助 BMCLAPI 谢谢喵~ '),
                     leading: const Icon(Icons.info),
                     trailing: const Icon(Icons.open_in_new),
-                    onTap: _launchURL,
+                    onTap: () => _launchURL('https://bmclapi.bangbang93.com/'),
                   ),
                 ),
                 Card(
@@ -185,7 +188,7 @@ class DownloadPageState extends State<DownloadPage> {
                         version['type'] == 'release' ? Icons.check_circle : Icons.science,
                       ),
                       onTap: () {
-                        _CheckSelectedPath(version['id'], version['url'], version['type']);
+                        _checkSelectedPath(version['id'], version['url'], version['type']);
                       },
                     ),
                   ),

@@ -75,6 +75,7 @@ class AccountPageState extends State<AccountPage> {
                         onTap: () async {
                           final prefs = await SharedPreferences.getInstance();
                           await prefs.setString('SelectedAccount', _accounts[index]);
+                          if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('已切换账号: ${_accounts[index]}')),
                           );
@@ -82,13 +83,16 @@ class AccountPageState extends State<AccountPage> {
                         },
                     trailing: IconButton(
                       icon: const Icon(Icons.edit),
-                      onPressed: () {
-                        Navigator.push(
+                      onPressed: () async{
+                        await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => AccountManagementPage(accountName: _accounts[index]),
                           ),
-                        ).then((_) => _loadAccounts());
+                        );
+                        if (mounted) {
+                          _loadAccounts();
+                        }
                       },
                     ),
                   ),

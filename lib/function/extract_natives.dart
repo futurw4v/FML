@@ -4,7 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
 import 'package:system_info2/system_info2.dart';
 
-Future<List<String>> ExtractNatives(String jarDir, String jarName, String outDir) async {
+Future<List<String>> extractNatives(String jarDir, String jarName, String outDir) async {
   final os = Platform.operatingSystem.toLowerCase();
   final kernelArch = SysInfo.kernelArchitecture.name.toLowerCase();
   final lowerName = jarName.toLowerCase();

@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/home.dart';
@@ -10,29 +11,28 @@ import 'package:fml/pages/download.dart';
 import 'package:fml/pages/setting.dart';
 
 // 软件版本
-const String version = '1.0.1';
-const int buildVersion= 2;
+late String appVersion;
+late int buildNumber;
+Future<void> initVersionInfo() async {
+  final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+  appVersion = packageInfo.version;
+  buildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
+  // 将版本信息保存到 SharedPreferences
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('version', appVersion);
+  await prefs.setInt('build', buildNumber);
+}
 
 // 日志
-Future<void> initLogPath() async {
-  final prefs = await SharedPreferences.getInstance();
-  final selectedGamePath = prefs.getString('SelectedPath') ?? '';
-  if (selectedGamePath.isEmpty) {
-    await LogUtil.setLogPath('');
-    return;
-  }
-  final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
-  final logPath = '$gamePath/fml.log';
-  final logFile = File(logPath);
-  if (await logFile.exists()) {
-    await logFile.delete();
-  }
-  await LogUtil.setLogPath(logPath);
+initLogs() async {
+  await LogUtil.clearLogs();
+  await LogUtil.log('启动FML,版本: $appVersion,构建号: $buildNumber', level: 'INFO');
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initLogPath();
+  await initVersionInfo();
+  await initLogs();
   runApp(const MyApp());
 }
 
@@ -69,6 +69,15 @@ class MyAppState extends State<MyApp> {
     final prefs = await SharedPreferences.getInstance();
     final modeStr = prefs.getString('themeMode');
     final colorInt = prefs.getInt('themeColor');
+    if (colorInt != null) {
+      // 从存储的整数值创建颜色对象
+      _themeColor = Color.fromARGB(
+        (colorInt >> 24) & 0xFF,
+        (colorInt >> 16) & 0xFF,
+        (colorInt >> 8) & 0xFF,
+        colorInt & 0xFF,
+      );
+    }
     if (modeStr != null) {
       switch (modeStr) {
         case 'dark':
@@ -80,9 +89,6 @@ class MyAppState extends State<MyApp> {
         default:
           _themeMode = ThemeMode.system;
       }
-    }
-    if (colorInt != null) {
-      _themeColor = Color(colorInt);
     }
     if (mounted) setState(() {});
   }
@@ -111,7 +117,11 @@ class MyAppState extends State<MyApp> {
       _themeColor = color;
     });
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('themeColor', color.value);
+    int colorValue = (((color.a * 255.0).round() & 0xFF) << 24) |
+                (((color.r * 255.0).round() & 0xFF) << 16) |
+                (((color.g * 255.0).round() & 0xFF) << 8) |
+                ((color.b * 255.0).round() & 0xFF);
+    await prefs.setInt('themeColor', colorValue);
   }
 
   // ===== 可变字体权重统一处理 =====
@@ -181,35 +191,26 @@ class MyAppState extends State<MyApp> {
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  MyHomePageState createState() => MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class MyHomePageState extends State<MyHomePage> {
   int _selectedIndex = 0;
   bool? _javaInstalled;
 
   @override
   void initState() {
     super.initState();
-    _startLog();
     _writeVersionInfo();
     _checkJavaInstalled();
     _checkUpdate();
   }
 
-  // 启动信息
-  Future<void> _startLog() async {
-    final prefs = await SharedPreferences.getInstance();
-    final version = prefs.getString('version') ?? '未知';
-    final build = prefs.getInt('build') ?? 0;
-    await LogUtil.info('启动信息: 版本 $version, 构建 $build');
-  }
-
   // 写入版本信息
   Future<void> _writeVersionInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('version', version);
-    await prefs.setInt('build', buildVersion);
+    await prefs.setString('version', appVersion);
+    await prefs.setInt('build', buildNumber);
   }
 
   Widget _buildPage(int index) {
@@ -268,11 +269,13 @@ class _MyHomePageState extends State<MyHomePage> {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
+        if (!mounted) return; // 添加 mounted 检查
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('无法打开链接: $url')),
         );
       }
     } catch (e) {
+      if (!mounted) return; // 添加 mounted 检查
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('发生错误: $e')),
       );
@@ -282,16 +285,16 @@ class _MyHomePageState extends State<MyHomePage> {
   // 检查更新
   Future<void> _checkUpdate() async {
     try {
-      debugPrint('检查更新...,ua FML/$version');
+      debugPrint('检查更新...,ua FML/$appVersion');
       final dio = Dio();
-      dio.options.headers['User-Agent'] = 'FML/$version';
+      dio.options.headers['User-Agent'] = 'FML/$appVersion';
       final response = await dio.get('https://lapi.lxdklp.top/FML/version');
       debugPrint('status: ${response.statusCode}');
       debugPrint('data: ${response.data}');
       if (response.statusCode == 200) {
-        final int latestVersion = int.tryParse(response.data.toString()) ?? buildVersion;
+        final int latestVersion = int.tryParse(response.data.toString()) ?? buildNumber;
         debugPrint('最新版本: $latestVersion');
-        if (latestVersion > buildVersion) {
+        if (latestVersion > buildNumber && mounted) {
           _showUpdateDialog(latestVersion.toString());
         }
       }
