@@ -20,15 +20,18 @@ class ManagementPageState extends State<ManagementPage> {
   String _width = '854';
   String _height = '480';
   String _gamePath = '';
-  bool _resourcepacks = false;
-  bool _mods = false;
-  bool _shaderpacks = false;
-  bool _schematics = false;
+  String _logsPath = '';
   String _savesPath = '';
   String _resourcepacksPath = '';
   String _modsPath = '';
   String _shaderpacksPath = '';
   String _schematicsPath = '';
+  bool _save = false;
+  bool _logs = false;
+  bool _resourcepacks = false;
+  bool _mods = false;
+  bool _shaderpacks = false;
+  bool _schematics = false;
 
   @override
   void initState() {
@@ -113,7 +116,16 @@ class ManagementPageState extends State<ManagementPage> {
     final savesExists = await checkDirectoryFuture('$path${Platform.pathSeparator}saves');
     if (savesExists) {
       setState(() {
+        _save = true;
         _savesPath = '$_gamePath${Platform.pathSeparator}saves';
+      });
+    }
+    // 检查日志文件夹
+    final logsExists = await checkDirectoryFuture('$path${Platform.pathSeparator}logs');
+    if (logsExists) {
+      setState(() {
+        _logs = true;
+        _logsPath = '$_gamePath${Platform.pathSeparator}logs';
       });
     }
     // 检查资源包文件夹
@@ -131,13 +143,16 @@ class ManagementPageState extends State<ManagementPage> {
         _mods = true;
         _modsPath = '$_gamePath${Platform.pathSeparator}mods';
       });
-    }final shaderpacksExists = await checkDirectoryFuture('$path${Platform.pathSeparator}shaderpacks');
+    }
+    // 检查光影文件夹
+    final shaderpacksExists = await checkDirectoryFuture('$path${Platform.pathSeparator}shaderpacks');
     if (shaderpacksExists) {
       setState(() {
         _shaderpacks = true;
         _shaderpacksPath = '$_gamePath${Platform.pathSeparator}shaderpacks';
       });
     }
+    // 检查原理图文件夹
     final schematicsExists = await checkDirectoryFuture('$path${Platform.pathSeparator}schematics');
     if (schematicsExists) {
       setState(() {
@@ -253,7 +268,7 @@ class ManagementPageState extends State<ManagementPage> {
                         onTap: () => _launchURL(_gamePath),
                       ),
                     ),
-                  if (_resourcepacks)
+                  if (_save)
                     Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: ListTile(
@@ -261,6 +276,15 @@ class ManagementPageState extends State<ManagementPage> {
                         subtitle: Text(_savesPath),
                         trailing: const Icon(Icons.open_in_new),
                         onTap: () => _launchURL(_savesPath),
+                      ),
+                    ),if (_logs)
+                    Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: ListTile(
+                        title: const Text('打开日志文件夹'),
+                        subtitle: Text(_logsPath),
+                        trailing: const Icon(Icons.open_in_new),
+                        onTap: () => _launchURL(_logsPath),
                       ),
                     ),if (_resourcepacks)
                     Card(

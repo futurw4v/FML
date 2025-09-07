@@ -89,15 +89,15 @@ class AboutPageState extends State<AboutPage> {
                     Text(
                       'Flutter Minecraft Launcher Version $_appVersion',
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 17,
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.center,
                     ),
                     Text(
-                      'Code by lxdklp\n',
+                      'Copyright (c) 2025 lxdklp\n',
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.center,
@@ -127,6 +127,15 @@ class AboutPageState extends State<AboutPage> {
           ),
           Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: ListTile(
+              title: const Text('BUG反馈与建议'),
+              subtitle: const Text('https://github.com/lxdklp/FML/issues'),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () => _launchURL('https://github.com/lxdklp/FML/issues'),
+            ),
+          ),
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Column(
               children: [
                 const ListTile(
@@ -150,6 +159,12 @@ class AboutPageState extends State<AboutPage> {
                   subtitle: const Text('软件字体\nhttps://github.com/notofonts/noto-cjk'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/notofonts/noto-cjk'),
+                ),
+                ListTile(
+                  title: const Text('GNU General Public License Version 3'),
+                  subtitle: const Text('开源协议\nhttps://www.gnu.org/licenses/gpl-3.0.html'),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://www.gnu.org/licenses/gpl-3.0.html'),
                 ),
                 const ListTile(
                   title: Text('本项目使用的开源库'),
@@ -245,6 +260,11 @@ class AboutPageState extends State<AboutPage> {
                   subtitle: const Text('https://github.com/tekartik/synchronized.dart/tree/master/synchronized'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/tekartik/synchronized.dart/tree/master/synchronized'),
+                ),ListTile(
+                  title: const Text('package_info_plus'),
+                  subtitle: const Text('https://github.com/fluttercommunity/plus_plugins/tree/main/packages/package_info_plus/package_info_plus'),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://github.com/fluttercommunity/plus_plugins/tree/main/packages/package_info_plus/package_info_plus'),
                 ),
                 const ListTile(
                   title: Text('Github的各位'),

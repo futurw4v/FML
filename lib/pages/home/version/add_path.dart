@@ -26,7 +26,7 @@ class AddPathPageState extends State<AddPathPage> {
     super.dispose();
   }
 
-  // 文件选择器
+  // 文件夹选择器
   Future<void> _selectDirectory() async {
     final path = await FilePicker.platform.getDirectoryPath(
       dialogTitle: '选择版本路径');

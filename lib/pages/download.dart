@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fml/pages/download/download_game.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -26,6 +27,7 @@ class DownloadPageState extends State<DownloadPage> {
     _loadAppVersion();
   }
 
+  // 读取App版本
   Future<void> _loadAppVersion() async {
     final prefs = await SharedPreferences.getInstance();
     final version = prefs.getString('version') ?? "1.0.0";
@@ -35,42 +37,79 @@ class DownloadPageState extends State<DownloadPage> {
     fetchVersionManifest();
   }
 
+  // 获取版本清单
   Future<void> fetchVersionManifest() async {
     try {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
       final options = Options(
         headers: {
           'User-Agent': 'FML/$_appVersion',
         },
+        // 明确指定响应类型为纯文本，我们将手动解析
+        responseType: ResponseType.plain,
       );
-
-      // FML UA请求BMCLAPI
+      LogUtil.log('开始请求版本清单', level: 'INFO');
       final response = await dio.get(
         'https://bmclapi2.bangbang93.com/mc/game/version_manifest.json',
         options: options,
       );
       if (response.statusCode == 200) {
-      final data = response.data;
-      if (data is Map && data['versions'] is List) {
-        setState(() {
-          _versionList = data['versions'];
-          _isLoading = false;
-        });
+        LogUtil.log('成功获取版本清单', level: 'INFO');
+        try {
+          final rawData = response.data;
+          dynamic parsedData;
+          if (rawData is String) {
+            try {
+              parsedData = jsonDecode(rawData);
+            } catch (jsonError) {
+              LogUtil.log('JSON解析失败: $jsonError', level: 'ERROR');
+              throw Exception('JSON解析失败: $jsonError');
+            }
+          } else if (rawData is Map) {
+            parsedData = rawData;
+          } else {
+            LogUtil.log('意外的数据类型: ${rawData.runtimeType}', level: 'ERROR');
+            throw Exception('意外的响应数据类型: ${rawData.runtimeType}');
+          }
+          if (parsedData == null) {
+            throw Exception('解析后的数据为空');
+          }
+          if (!parsedData.containsKey('versions')) {
+            LogUtil.log('数据缺少versions字段', level: 'ERROR');
+            throw Exception('返回数据中缺少versions字段');
+          }
+          final versions = parsedData['versions'];
+          if (versions is! List) {
+            LogUtil.log('versions不是列表类型: ${versions.runtimeType}', level: 'ERROR');
+            throw Exception('versions字段格式错误');
+          }
+          LogUtil.log('成功解析版本数据，共${versions.length}个版本', level: 'INFO');
+          setState(() {
+            _versionList = versions;
+            _isLoading = false;
+          });
+        } catch (parseError) {
+          LogUtil.log('解析版本清单时出错: $parseError', level: 'ERROR');
+          setState(() {
+            _error = '无法解析版本数据: $parseError 可能是网络或者服务器问题,请稍后再试';
+            _isLoading = false;
+          });
+        }
       } else {
+        LogUtil.log('请求失败：状态码 ${response.statusCode}', level: 'ERROR');
         setState(() {
-          _error = '返回数据格式异常,请刷新重试';
+          _error = '请求失败：状态码 ${response.statusCode} 可能是网络或者服务器问题,请稍后再试';
           _isLoading = false;
         });
       }
-    } else {
-      setState(() {
-        _error = '请求失败：状态码 ${response.statusCode}';
-        _isLoading = false;
-      });
-    }
     } catch (e) {
       if (!mounted) return;
+      LogUtil.log('请求出错: $e', level: 'ERROR');
       setState(() {
-        _error = '请求出错: $e';
+        _error = '网络请求失败: $e 可能是网络或者服务器问题,请稍后再试';
         _isLoading = false;
       });
     }

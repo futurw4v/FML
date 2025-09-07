@@ -567,17 +567,32 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
   // 文件下载
   Future<void> _downloadFile(path, url) async {
     bool success = false;
-    await DownloadUtils.downloadFile(
-      url: url,
-      savePath: path,
-      onProgress: (progress) {
-        setState(() {
-          _progress = progress;
-        });
-      },
-    );
-    if (!success) {
-      throw Exception('下载失败: $url');
+    try {
+      await DownloadUtils.downloadFile(
+        url: url,
+        savePath: path,
+        onProgress: (progress) {
+          setState(() {
+            _progress = progress;
+          });
+        },
+        onSuccess: () {
+          success = true;
+        },
+        onError: (error) async {
+          await LogUtil.log('下载失败: $error, URL: $url', level: 'ERROR');
+        }
+      );
+      final file = File(path);
+      if (await file.exists()) {
+        success = true;
+      }
+      if (!success) {
+        throw Exception('下载失败: $url');
+      }
+    } catch (e) {
+      await LogUtil.log('下载异常: $e, URL: $url', level: 'ERROR');
+      throw Exception('下载出错: $e');
     }
   }
 

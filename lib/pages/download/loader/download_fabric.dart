@@ -792,16 +792,35 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
   }
 
   // 文件下载
-  Future<void> _downloadFile(path,url) async {
-    await DownloadUtils.downloadFile(
-      url: url,
-      savePath: path,
-      onProgress: (progress) {
-        setState(() {
-          _progress = progress;
-        });
-      },
-    );
+  Future<void> _downloadFile(path, url) async {
+    bool success = false;
+    try {
+      await DownloadUtils.downloadFile(
+        url: url,
+        savePath: path,
+        onProgress: (progress) {
+          setState(() {
+            _progress = progress;
+          });
+        },
+        onSuccess: () {
+          success = true;  // 正确设置成功标志
+        },
+        onError: (error) async {
+          await LogUtil.log('下载失败: $error, URL: $url', level: 'ERROR');
+        }
+      );
+      final file = File(path);
+      if (await file.exists()) {
+        success = true;
+      }
+      if (!success) {
+        throw Exception('下载失败: $url');
+      }
+    } catch (e) {
+      await LogUtil.log('下载异常: $e, URL: $url', level: 'ERROR');
+      throw Exception('下载出错: $e');
+    }
   }
 
   // 获取系统内存
