@@ -14,19 +14,19 @@ class PlayPage extends StatefulWidget {
 }
 
 class PlayPageState extends State<PlayPage> {
-  String _GameType = '';
+  String _gameType = '';
 
   // 启动类型
   Future<void> _launch() async{
     final prefs = await SharedPreferences.getInstance();
-    String? SelectedPath = prefs.getString('SelectedPath');
-    String? SelectedGame = prefs.getString('SelectedGame');
-    List<String>? GameConfig = prefs.getStringList('Config_${SelectedPath}_$SelectedGame');
-    String? type = GameConfig != null ? GameConfig[4] : null;
-    LogUtil.log(GameConfig.toString(), level: 'INFO');
+    String? selectedPath = prefs.getString('SelectedPath');
+    String? selectedGame = prefs.getString('SelectedGame');
+    List<String>? gameConfig = prefs.getStringList('Config_${selectedPath}_$selectedGame');
+    String? type = gameConfig != null ? gameConfig[4] : null;
+    LogUtil.log(gameConfig.toString(), level: 'INFO');
     LogUtil.log(type.toString(), level: 'INFO');
     setState(() {
-      _GameType = type ?? '';
+      _gameType = type ?? '';
     });
     if (type == 'Vanilla'){
       vanillaLauncher();
@@ -52,7 +52,7 @@ class PlayPageState extends State<PlayPage> {
         title: const Text('正在启动游戏'),
       ),
       body: Center(
-        child: Text('类型$_GameType'),
+        child: Text('类型$_gameType'),
       ),
     );
   }

@@ -19,6 +19,7 @@ class ManagementPageState extends State<ManagementPage> {
   bool _isFullScreen = false;
   String _width = '854';
   String _height = '480';
+  String _type = '';
   String _gamePath = '';
   String _logsPath = '';
   String _savesPath = '';
@@ -64,6 +65,7 @@ class ManagementPageState extends State<ManagementPage> {
     final isFullScreen = cfg.length > 1 ? (cfg[1] == '1') : false;
     final width = cfg.length > 2 && cfg[2].isNotEmpty ? cfg[2] : _width;
     final height = cfg.length > 3 && cfg[3].isNotEmpty ? cfg[3] : _height;
+    final type = cfg.length > 4 && cfg[4].isNotEmpty ? cfg[4] : _type;
     setState(() {
       _gameConfig
         ..clear()
@@ -74,6 +76,7 @@ class ManagementPageState extends State<ManagementPage> {
       _width = width;
       _heightController.text = height;
       _height = height;
+      _type = type;
       if (Platform.isWindows) {
         _gamePath = fullPath.substring(0,2)+fullPath.substring(3);
       }
@@ -95,8 +98,68 @@ class ManagementPageState extends State<ManagementPage> {
       _isFullScreen ? '1' : '0',
       _widthController.text,
       _heightController.text,
-      'Fabric',
+      _type,
     ]);
+  }
+
+    // 删除版本提示框
+  void _showDeleteDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('删除版本'),
+        content: Text('确定删除版本 $_gamePath 吗？文件将会全部消失'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+            TextButton(
+            onPressed: _deleteVersion,
+            child: const Text('删除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 删除版本
+  Future<void> _deleteVersion() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final path = prefs.getString('SelectedPath') ?? '';
+      final game = prefs.getString('SelectedGame') ?? '';
+      final gamePath = prefs.getString('Path_$path') ?? '';
+      final gameName = '_$game';
+      await prefs.remove('Config_$path$gameName');
+      final gamesList = prefs.getStringList('Game_$path') ?? [];
+      if (gamesList.contains(game)) {
+        gamesList.remove(game);
+        await prefs.setStringList('Game_$path', gamesList);
+      }
+      final versionPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game';
+      final directory = Directory(versionPath);
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+        LogUtil.log('已删除版本文件夹: $versionPath', level: 'INFO');
+      } else {
+        LogUtil.log('版本文件夹不存在: $versionPath', level: 'WARN');
+      }
+      await prefs.setString('SelectedGame', '未选择版本');
+      LogUtil.log('已清空 SelectedGame', level: 'INFO');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('版本已成功删除')),
+        );
+      }
+    } catch (e) {
+      LogUtil.log('删除版本时出错: ${e.toString()}', level: 'ERROR');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('删除版本时出错: ${e.toString()}')),
+        );
+      }
+    } finally {
+      Navigator.pop(context);
+      Navigator.pop(context);
+    }
   }
 
   // 文件夹检查功能
@@ -326,23 +389,37 @@ class ManagementPageState extends State<ManagementPage> {
                 ],
               ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          if (_xmxController.text.isEmpty || _widthController.text.isEmpty || _heightController.text.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('请填写所有字段')),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: "save",
+            onPressed: () {
+              if (_xmxController.text.isEmpty || _widthController.text.isEmpty || _heightController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请填写所有字段')),
             );
-            return;
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('配置已保存')),
-            );
-            _saveGameConfig();
-            Navigator.of(context).pop();
-          }
-        },
-        child: const Icon(Icons.save),
-      ),
+              return;
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('配置已保存')),
+              );
+              _saveGameConfig();
+              Navigator.of(context).pop();
+            }
+          },
+            child: const Icon(Icons.save),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton(
+            heroTag: 'delete',
+            onPressed: () {
+              _showDeleteDialog();
+            },
+            child: const Icon(Icons.delete),
+          ),
+        ],
+      )
     );
   }
 }

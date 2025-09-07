@@ -19,7 +19,7 @@ class NewAccountPageState extends State<NewAccountPage> {
 // 保存账号
   Future<void> _saveAccountName(String name, String uuid, bool online) async {
     String isCustomUUID = '0';
-    String CustomUUID = '';
+    String customUUID = '';
     final prefs = await SharedPreferences.getInstance();
     List<String> accounts = prefs.getStringList('AccountsList') ?? [];
     if (accounts.contains(name)) {
@@ -32,7 +32,7 @@ class NewAccountPageState extends State<NewAccountPage> {
       accounts.add(name);
       await prefs.setStringList('AccountsList', accounts);
     }
-    await prefs.setStringList('Account_$name', [uuid, online.toString(), isCustomUUID, CustomUUID]);
+    await prefs.setStringList('Account_$name', [uuid, online.toString(), isCustomUUID, customUUID]);
   }
 
   @override
