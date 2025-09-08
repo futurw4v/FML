@@ -5,6 +5,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fml/function/log.dart';
+import 'package:fml/pages/download/modrinth/type/mod.dart';
+import 'package:fml/pages/download/modrinth/type/modpack.dart';
+import 'package:fml/pages/download/modrinth/type/resourcepack.dart';
+import 'package:fml/pages/download/modrinth/type/shader.dart';
 
 class InfoPage extends StatefulWidget {
   final String slug;
@@ -313,7 +317,8 @@ class InfoPageState extends State<InfoPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+      ),
       body: isLoading
         ? const Center(child: CircularProgressIndicator())
         : error != null
@@ -409,6 +414,56 @@ class InfoPageState extends State<InfoPage> {
                 ),
               ),
             ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          if (projectDetails['project_type'] == 'mod') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ModPage(
+                  projectId: projectDetails['id'] ?? '',
+                  projectName: projectDetails['title'] ?? '',
+                ),
+              ),
+            );
+          } else if (projectDetails['project_type'] == 'modpack') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ModpackPage(
+                  projectId: projectDetails['id'] ?? '',
+                  projectName: projectDetails['title'] ?? '',
+                ),
+              ),
+            );
+          } else if (projectDetails['project_type'] == 'resourcepack') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ResourcepackPage(
+                  projectId: projectDetails['id'] ?? '',
+                  projectName: projectDetails['title'] ?? '',
+                ),
+              ),
+            );
+          } else if (projectDetails['project_type'] == 'shader') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ShaderPage(
+                  projectId: projectDetails['id'] ?? '',
+                  projectName: projectDetails['title'] ?? '',
+                ),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('未知的项目类型，无法下载')),
+            );
+          }
+        },
+        child: const Icon(Icons.download),
+      ),
     );
   }
 }

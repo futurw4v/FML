@@ -1,0 +1,78 @@
+Date : 2025-09-08 21:39:24
+Directory : /Users/lxdklp/Code/FML/lib
+Total : 34 files,  9469 codes, 364 comments, 398 blanks, all 10231 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| Dart     |         34 |      9,469 |        364 |        398 |     10,231 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                     | files      | code       | comment    | blank      | total      |
++------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                        |         34 |      9,469 |        364 |        398 |     10,231 |
+| . (Files)                                                                                |          1 |        324 |         11 |         27 |        362 |
+| function                                                                                 |          7 |        840 |         84 |         32 |        956 |
+| function (Files)                                                                         |          2 |         88 |          8 |          3 |         99 |
+| function/download                                                                        |          2 |        106 |         18 |          2 |        126 |
+| function/launcher                                                                        |          3 |        646 |         58 |         27 |        731 |
+| pages                                                                                    |         26 |      8,305 |        269 |        339 |      8,913 |
+| pages (Files)                                                                            |          4 |        313 |          2 |         23 |        338 |
+| pages/download                                                                           |         11 |      6,338 |        222 |        215 |      6,775 |
+| pages/download (Files)                                                                   |          2 |        609 |         13 |         25 |        647 |
+| pages/download/download_version                                                          |          4 |      3,382 |        147 |         90 |      3,619 |
+| pages/download/download_version (Files)                                                  |          1 |        367 |          8 |         13 |        388 |
+| pages/download/download_version/loader                                                   |          3 |      3,015 |        139 |         77 |      3,231 |
+| pages/download/modrinth                                                                  |          5 |      2,347 |         62 |        100 |      2,509 |
+| pages/download/modrinth (Files)                                                          |          1 |        437 |         15 |         17 |        469 |
+| pages/download/modrinth/type                                                             |          4 |      1,910 |         47 |         83 |      2,040 |
+| pages/home                                                                               |          8 |      1,223 |         40 |         79 |      1,342 |
+| pages/home (Files)                                                                       |          4 |        639 |         23 |         40 |        702 |
+| pages/home/account                                                                       |          2 |        309 |          9 |         18 |        336 |
+| pages/home/version                                                                       |          2 |        275 |          8 |         21 |        304 |
+| pages/setting                                                                            |          3 |        431 |          5 |         22 |        458 |
++------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                                                 | language | code       | comment    | blank      | total      |
++------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| /Users/lxdklp/Code/FML/lib/function/download/bmclapi_download.dart                       | Dart     |         53 |          9 |          1 |         63 |
+| /Users/lxdklp/Code/FML/lib/function/download/modrinth_download.dart                      | Dart     |         53 |          9 |          1 |         63 |
+| /Users/lxdklp/Code/FML/lib/function/extract_natives.dart                                 | Dart     |         61 |          4 |          2 |         67 |
+| /Users/lxdklp/Code/FML/lib/function/launcher/fabric.dart                                 | Dart     |        303 |         28 |         14 |        345 |
+| /Users/lxdklp/Code/FML/lib/function/launcher/neoforge.dart                               | Dart     |        234 |         24 |          9 |        267 |
+| /Users/lxdklp/Code/FML/lib/function/launcher/vanilla.dart                                | Dart     |        109 |          6 |          4 |        119 |
+| /Users/lxdklp/Code/FML/lib/function/log.dart                                             | Dart     |         27 |          4 |          1 |         32 |
+| /Users/lxdklp/Code/FML/lib/main.dart                                                     | Dart     |        324 |         11 |         27 |        362 |
+| /Users/lxdklp/Code/FML/lib/pages/download.dart                                           | Dart     |         47 |          0 |          6 |         53 |
+| /Users/lxdklp/Code/FML/lib/pages/download/download_modrinth.dart                         | Dart     |        377 |          9 |         16 |        402 |
+| /Users/lxdklp/Code/FML/lib/pages/download/download_version.dart                          | Dart     |        232 |          4 |          9 |        245 |
+| /Users/lxdklp/Code/FML/lib/pages/download/download_version/download_game.dart            | Dart     |        367 |          8 |         13 |        388 |
+| /Users/lxdklp/Code/FML/lib/pages/download/download_version/loader/download_fabric.dart   | Dart     |      1,076 |         49 |         25 |      1,150 |
+| /Users/lxdklp/Code/FML/lib/pages/download/download_version/loader/download_neoforge.dart | Dart     |      1,127 |         53 |         29 |      1,209 |
+| /Users/lxdklp/Code/FML/lib/pages/download/download_version/loader/download_vanilla.dart  | Dart     |        812 |         37 |         23 |        872 |
+| /Users/lxdklp/Code/FML/lib/pages/download/modrinth/info.dart                             | Dart     |        437 |         15 |         17 |        469 |
+| /Users/lxdklp/Code/FML/lib/pages/download/modrinth/type/mod.dart                         | Dart     |        490 |         12 |         21 |        523 |
+| /Users/lxdklp/Code/FML/lib/pages/download/modrinth/type/modpack.dart                     | Dart     |        490 |         12 |         21 |        523 |
+| /Users/lxdklp/Code/FML/lib/pages/download/modrinth/type/resourcepack.dart                | Dart     |        440 |         11 |         20 |        471 |
+| /Users/lxdklp/Code/FML/lib/pages/download/modrinth/type/shader.dart                      | Dart     |        490 |         12 |         21 |        523 |
+| /Users/lxdklp/Code/FML/lib/pages/home.dart                                               | Dart     |        117 |          0 |          7 |        124 |
+| /Users/lxdklp/Code/FML/lib/pages/home/account.dart                                       | Dart     |        101 |          3 |          8 |        112 |
+| /Users/lxdklp/Code/FML/lib/pages/home/account/account_management.dart                    | Dart     |        201 |          7 |         13 |        221 |
+| /Users/lxdklp/Code/FML/lib/pages/home/account/new_account.dart                           | Dart     |        108 |          2 |          5 |        115 |
+| /Users/lxdklp/Code/FML/lib/pages/home/management.dart                                    | Dart     |        397 |         14 |         14 |        425 |
+| /Users/lxdklp/Code/FML/lib/pages/home/play.dart                                          | Dart     |         51 |          1 |          7 |         59 |
+| /Users/lxdklp/Code/FML/lib/pages/home/version.dart                                       | Dart     |         90 |          5 |         11 |        106 |
+| /Users/lxdklp/Code/FML/lib/pages/home/version/add_path.dart                              | Dart     |        134 |          3 |         10 |        147 |
+| /Users/lxdklp/Code/FML/lib/pages/home/version/selected_game.dart                         | Dart     |        141 |          5 |         11 |        157 |
+| /Users/lxdklp/Code/FML/lib/pages/setting.dart                                            | Dart     |        131 |          2 |          7 |        140 |
+| /Users/lxdklp/Code/FML/lib/pages/setting/about.dart                                      | Dart     |        281 |          1 |          8 |        290 |
+| /Users/lxdklp/Code/FML/lib/pages/setting/java.dart                                       | Dart     |         46 |          0 |          6 |         52 |
+| /Users/lxdklp/Code/FML/lib/pages/setting/theme.dart                                      | Dart     |        104 |          4 |          8 |        116 |
+| /Users/lxdklp/Code/FML/lib/pages/test.dart                                               | Dart     |         18 |          0 |          3 |         21 |
+| Total                                                                                    |          |      9,469 |        364 |        398 |     10,231 |
++------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+

@@ -5,12 +5,17 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:system_info2/system_info2.dart';
 
-import 'package:fml/function/download.dart';
+import 'package:fml/function/download/bmclapi_download.dart';
 import 'package:fml/function/extract_natives.dart';
 import 'package:fml/function/log.dart';
 
 class DownloadVanillaPage extends StatefulWidget {
-  const DownloadVanillaPage({super.key, required this.version, required this.url, required this.name});
+  const DownloadVanillaPage({
+    super.key,
+    required this.version,
+    required this.url,
+    required this.name
+  });
 
   final String version;
   final String url;
