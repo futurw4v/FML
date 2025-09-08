@@ -18,7 +18,7 @@ class DownloadVersionState extends State<DownloadVersion> {
   List<dynamic> _versionList = [];
   bool _isLoading = true;
   String? _error;
-  String _appVersion = "unknown";
+  String _appVersion = '';
   bool _showSnapshots = false;
   bool _showOld = false;
 
@@ -158,20 +158,6 @@ class DownloadVersionState extends State<DownloadVersion> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              setState(() {
-                _isLoading = true;
-                _error = null;
-              });
-              fetchVersionManifest();
-            },
-          )
-        ],
-      ),
       body: _isLoading
         ? const Center(child: CircularProgressIndicator())
         : _error != null

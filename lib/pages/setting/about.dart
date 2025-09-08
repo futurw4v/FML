@@ -265,6 +265,11 @@ class AboutPageState extends State<AboutPage> {
                   subtitle: const Text('https://github.com/fluttercommunity/plus_plugins/tree/main/packages/package_info_plus/package_info_plus'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/fluttercommunity/plus_plugins/tree/main/packages/package_info_plus/package_info_plus'),
+                ),ListTile(
+                  title: const Text('flutter_markdown'),
+                  subtitle: const Text('https://github.com/xushengs/flutter_markdown_latex'),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://github.com/xushengs/flutter_markdown_latex'),
                 ),
                 const ListTile(
                   title: Text('Github的各位'),

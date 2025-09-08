@@ -328,7 +328,7 @@ class MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Flutter MInecraft Launcher')),
+      appBar: AppBar(title: const Text('Flutter Minecraft Launcher')),
       body: Row(
         children: [
           NavigationRail(
