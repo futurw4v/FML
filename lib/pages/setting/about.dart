@@ -95,7 +95,7 @@ class AboutPageState extends State<AboutPage> {
                       textAlign: TextAlign.center,
                     ),
                     Text(
-                      'Copyright (c) 2025 lxdklp\n',
+                      'Copyright © 2025 lxdklp. All rights reserved\n',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,

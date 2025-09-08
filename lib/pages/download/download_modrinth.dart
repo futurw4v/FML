@@ -18,12 +18,31 @@ class DownloadModrinthState extends State<DownloadModrinth> {
   bool _isLoading = true;
   String? _error;
   String _appVersion = '';
-  String _randomCount = '20';
+  String _count = '20';
+
+  // 搜索相关
+  final TextEditingController _searchController = TextEditingController();
+  String? _selectedProjectType;
+  bool _isSearching = false;
+
+  // 项目类型映射
+  final Map<String, String> projectTypeNames = {
+    'mod': '模组',
+    'modpack': '整合包',
+    'resourcepack': '资源包',
+    'shader': '光影',
+  };
 
   @override
   void initState() {
     super.initState();
     _loadAppVersion();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   // 读取App版本
@@ -43,7 +62,6 @@ class DownloadModrinthState extends State<DownloadModrinth> {
         _isLoading = true;
         _error = null;
       });
-
       final options = Options(
         headers: {
           'User-Agent': 'lxdklp/FML/$_appVersion (fml.lxdklp.top)',
@@ -51,7 +69,7 @@ class DownloadModrinthState extends State<DownloadModrinth> {
       );
       LogUtil.log('开始请求Modrinth随机项目', level: 'INFO');
       final response = await dio.get(
-        'https://api.modrinth.com/v2/projects_random?count=$_randomCount',
+        'https://api.modrinth.com/v2/projects_random?count=$_count',
         options: options,
       );
       if (response.statusCode == 200) {
@@ -78,89 +96,271 @@ class DownloadModrinthState extends State<DownloadModrinth> {
     }
   }
 
+  // 搜索
+  Future<void> _searchProjects(String query) async {
+    if (query.isEmpty && _selectedProjectType == null) {
+      _fetchProjects();
+      return;
+    }
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+        _isSearching = true;
+      });
+      final Map<String, dynamic> queryParams = {
+        'query': query,
+        'limit': _count,
+      };
+      if (_selectedProjectType != null) {
+        queryParams['facets'] = '[["project_type:$_selectedProjectType"]]';
+      }
+      final options = Options(
+        headers: {
+          'User-Agent': 'lxdklp/FML/$_appVersion (fml.lxdklp.top)',
+        },
+      );
+      LogUtil.log('搜索Modrinth项目: $query, 类型: $_selectedProjectType', level: 'INFO');
+      final response = await dio.get(
+        'https://api.modrinth.com/v2/search',
+        queryParameters: queryParams,
+        options: options,
+      );
+      if (response.statusCode == 200) {
+        LogUtil.log('成功获取搜索结果', level: 'INFO');
+        setState(() {
+          _projectsList = response.data['hits'] ?? [];
+          _isLoading = false;
+        });
+      } else {
+        LogUtil.log('搜索失败：状态码 ${response.statusCode}', level: 'ERROR');
+        setState(() {
+          _error = '搜索失败：服务器返回状态码 ${response.statusCode}';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      LogUtil.log('搜索出错: $e', level: 'ERROR');
+      if (mounted) {
+        setState(() {
+          _error = '搜索失败: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // 清除搜索
+  void _clearSearch() {
+    setState(() {
+      _searchController.clear();
+      _selectedProjectType = null;
+      _isSearching = false;
+    });
+    _fetchProjects();
+  }
+
+  // 类型标签
+  Widget _buildTypeChip(String? type) {
+    if (type == null || !projectTypeNames.containsKey(type)) {
+      return const SizedBox.shrink();
+    }
+    return Chip(
+      label: Text(projectTypeNames[type]!),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      labelStyle: const TextStyle(fontSize: 10),
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
+  // 搜索框
+  Widget _buildSearchBar() {
+    return Card(
+      margin: const EdgeInsets.all(8.0),
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.0),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: '在Modrinth搜索',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: _clearSearch,
+                    )
+                  : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+              ),
+              onSubmitted: (value) => _searchProjects(value),
+              textInputAction: TextInputAction.search,
+            ),
+            const SizedBox(height: 12.0),
+            const Text('项目类型', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 4.0),
+            DropdownButton<String>(
+              isExpanded: true,
+              hint: const Text('选择项目类型'),
+              value: _selectedProjectType,
+              underline: Container(
+                height: 1,
+              ),
+              items: [
+                const DropdownMenuItem<String>(
+                  value: null,
+                  child: Text('全部类型'),
+                ),
+                ...projectTypeNames.entries.map(
+                  (entry) => DropdownMenuItem<String>(
+                    value: entry.key,
+                    child: Text(entry.value),
+                  ),
+                ),
+              ],
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedProjectType = newValue;
+                });
+                _searchProjects(_searchController.text);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : _error != null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(_error!),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _fetchProjects,
-                    child: const Text('重试'),
-                  ),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _fetchProjects,
-              child: ListView.builder(
-                itemCount: _projectsList.length,
-                itemBuilder: (context, index) {
-                  final project = _projectsList[index];
-                  return Card(
-                    margin: const EdgeInsets.all(8.0),
-                    child: ListTile(
-                      leading: project['icon_url'] != null
-                        ? Image.network(
-                            project['icon_url'],
-                            width: 50,
-                            height: 50,
-                            errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.extension, size: 50),
-                          )
-                        : const Icon(Icons.extension, size: 50),
-                      title: Text(
-                        project['title'] ?? 'Unknown Title',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Column(
+        children: [
+          _buildSearchBar(),
+          Expanded(
+            child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(_error!),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () => _isSearching
+                            ? _searchProjects(_searchController.text)
+                            : _fetchProjects(),
+                          child: const Text('重试'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _projectsList.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            project['description'] ?? 'No description available',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Wrap(
-                            spacing: 4,
-                            children: [
-                              ...?project['categories']?.map<Widget>((category) =>
-                                Chip(
-                                  label: Text(category),
-                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  labelStyle: const TextStyle(fontSize: 10),
-                                  padding: EdgeInsets.zero,
-                                  visualDensity: VisualDensity.compact,
-                                )
-                              ),
-                            ],
+                          const Text('未找到相关项目'),
+                          const SizedBox(height: 20),
+                          ElevatedButton(
+                            onPressed: _clearSearch,
+                            child: const Text('清除搜索'),
                           ),
                         ],
                       ),
-                      isThreeLine: true,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => InfoPage(
-                            slug: project['slug'] ?? '',
-                            projectInfo: project,
-                          ),
-                        ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: () => _isSearching
+                        ? _searchProjects(_searchController.text)
+                        : _fetchProjects(),
+                      child: ListView.builder(
+                        itemCount: _projectsList.length,
+                        itemBuilder: (context, index) {
+                          final project = _projectsList[index];
+                          return Card(
+                            margin: const EdgeInsets.all(8.0),
+                            child: ListTile(
+                              leading: project['icon_url'] != null
+                                ? Image.network(
+                                    project['icon_url'],
+                                    width: 50,
+                                    height: 50,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                      const Icon(Icons.extension, size: 50),
+                                  )
+                                : const Icon(Icons.extension, size: 50),
+                              title: Row(
+                                children: [
+                                  if (project['project_type'] != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 8.0),
+                                      child: _buildTypeChip(project['project_type']),
+                                    ),
+                                  Expanded(
+                                    child: Text(
+                                      project['title'] ?? 'Unknown Title',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    project['description'] ?? 'No description available',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Wrap(
+                                    spacing: 4,
+                                    children: [
+                                      ...?project['categories']?.map<Widget>((category) =>
+                                        Chip(
+                                          label: Text(category),
+                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          labelStyle: const TextStyle(fontSize: 10),
+                                          padding: EdgeInsets.zero,
+                                          visualDensity: VisualDensity.compact,
+                                        )
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              isThreeLine: true,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => InfoPage(
+                                    slug: project['slug'] ?? '',
+                                    projectInfo: project,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _fetchProjects,
+        onPressed: _clearSearch,
         child: const Icon(Icons.refresh),
       ),
     );

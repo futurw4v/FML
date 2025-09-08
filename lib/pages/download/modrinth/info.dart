@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:fml/function/log.dart';
 
 class InfoPage extends StatefulWidget {
@@ -23,10 +25,39 @@ class InfoPageState extends State<InfoPage> {
   bool isLoading = true;
   Map<String, dynamic> projectDetails = {};
   String? error;
+  String _appVersion = '';
+
+  // 项目类型映射
+  final Map<String, String> projectTypeNames = {
+    'mod': '模组',
+    'modpack': '整合包',
+    'resourcepack': '资源包',
+    'shader': '光影',
+  };
 
   @override
   void initState() {
     super.initState();
+    _loadAppVersion();
+  }
+
+  // 获取格式化的标题
+  String _getFormattedTitle() {
+    final title = projectDetails['title'] ?? widget.projectInfo['title'] ?? '未知项目';
+    final projectType = projectDetails['project_type'];
+    if (projectType != null && projectTypeNames.containsKey(projectType)) {
+      return '[${projectTypeNames[projectType]}] $title';
+    }
+    return title;
+  }
+
+  // 读取App版本
+  Future<void> _loadAppVersion() async {
+    final prefs = await SharedPreferences.getInstance();
+    final version = prefs.getString('version') ?? "UnknownVersion";
+    setState(() {
+      _appVersion = version;
+    });
     _fetchProjectDetails();
   }
 
@@ -40,9 +71,15 @@ class InfoPageState extends State<InfoPage> {
       return;
     }
     try {
+      final options = Options(
+        headers: {
+          'User-Agent': 'lxdklp/FML/$_appVersion (fml.lxdklp.top)',
+        },
+      );
       LogUtil.log('正在获取模组详情: ${widget.slug}', level: 'INFO');
       final response = await dio.get(
         'https://api.modrinth.com/v2/project/${widget.slug}',
+        options: options,
       );
       if (response.statusCode == 200) {
         setState(() {
@@ -172,7 +209,6 @@ class InfoPageState extends State<InfoPage> {
                 Chip(
                   label: Text(category.toString()),
                   labelStyle: const TextStyle(fontSize: 12),
-                  backgroundColor: Colors.blue.shade100,
                 )
               ).toList(),
             ),
@@ -186,7 +222,6 @@ class InfoPageState extends State<InfoPage> {
                 Chip(
                   label: Text(loader.toString()),
                   labelStyle: const TextStyle(fontSize: 12),
-                  backgroundColor: Colors.green.shade100,
                 )
               ).toList(),
             ),
@@ -278,9 +313,7 @@ class InfoPageState extends State<InfoPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(projectDetails['title'] ?? widget.projectInfo['title'] ?? '模组详情'),
-      ),
+      appBar: AppBar(),
       body: isLoading
         ? const Center(child: CircularProgressIndicator())
         : error != null
@@ -323,7 +356,7 @@ class InfoPageState extends State<InfoPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                projectDetails['title'] ?? '无标题',
+                                _getFormattedTitle(),
                                 style: Theme.of(context).textTheme.headlineSmall,
                               ),
                               const SizedBox(height: 4),
