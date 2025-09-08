@@ -142,7 +142,7 @@ class ManagementPageState extends State<ManagementPage> {
       } else {
         LogUtil.log('版本文件夹不存在: $versionPath', level: 'WARN');
       }
-      await prefs.setString('SelectedGame', '未选择版本');
+      await prefs.remove('SelectedGame');
       LogUtil.log('已清空 SelectedGame', level: 'INFO');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

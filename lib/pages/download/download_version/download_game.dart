@@ -4,9 +4,9 @@ import 'package:dio/dio.dart';
 import 'dart:math';
 
 import 'package:fml/function/log.dart';
-import 'package:fml/pages/download/loader/download_vanilla.dart';
-import 'package:fml/pages/download/loader/download_fabric.dart';
-import 'package:fml/pages/download/loader/download_neoforge.dart';
+import 'package:fml/pages/download/download_version/loader/download_vanilla.dart';
+import 'package:fml/pages/download/download_version/loader/download_fabric.dart';
+import 'package:fml/pages/download/download_version/loader/download_neoforge.dart';
 
 class DownloadGamePage extends StatefulWidget {
   const DownloadGamePage({super.key, required this.type, required this.version, required this.url});

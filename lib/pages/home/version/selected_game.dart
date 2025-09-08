@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fml/function/log.dart';
 
 class SelectedGamePage extends StatefulWidget {
   final String path;
@@ -46,9 +47,30 @@ class SelectedGamePageState extends State<SelectedGamePage> {
     Navigator.pop(context);
   }
 
-  // 删除路径
+  // 删除提示框
+    void _showDeleteDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('删除文件夹'),
+        content: Text('确定删除文件夹 ${widget.path} 吗？文件将会全部消失'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          TextButton(
+            onPressed: _deletePath,
+            child: const Text('删除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 删除文件夹
   Future<void> _deletePath() async {
+    try {
     final prefs = await SharedPreferences.getInstance();
+    final path = prefs.getString('SelectedPath') ?? '';
+    final gamePath = prefs.getString('Path_$path') ?? '';
     final pathList = prefs.getStringList('PathList') ?? [];
     pathList.remove(widget.path);
     await prefs.setStringList('PathList', pathList);
@@ -62,31 +84,31 @@ class SelectedGamePageState extends State<SelectedGamePage> {
       await prefs.remove('SelectedPath');
       await prefs.remove('SelectedGame');
     }
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('已删除文件夹: ${widget.path}')),
-    );
+      final directory = Directory(gamePath);
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+        LogUtil.log('已删除版本文件夹: $gamePath', level: 'INFO');
+      } else {
+        LogUtil.log('版本文件夹不存在: $gamePath', level: 'WARN');
+      }
+      await prefs.remove('SelectedGame');
+      LogUtil.log('已清空 SelectedGame', level: 'INFO');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('版本已成功删除')),
+        );
+      }
+    } catch (e) {
+      LogUtil.log('删除版本时出错: ${e.toString()}', level: 'ERROR');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('删除版本时出错: ${e.toString()}')),
+        );
+      }
+    } 
     Navigator.pop(context);
     Navigator.pop(context);
     Navigator.pop(context);
-  }
-
-  // 删除提示框
-    void _showDeleteDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('删除文件夹'),
-        content: Text('确定删除文件夹 ${widget.path} ？\n这个操作不会删除你的本地文件'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-          TextButton(
-            onPressed: _deletePath,
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
