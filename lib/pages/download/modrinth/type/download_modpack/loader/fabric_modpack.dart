@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fml/function/download/bmclapi_download.dart';
+import 'package:fml/function/download/modrinth_download.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:io';
