@@ -6,7 +6,7 @@ import 'dart:convert';
 import 'package:system_info2/system_info2.dart';
 import 'package:archive/archive.dart';
 
-import 'package:fml/function/download/bmclapi_download.dart';
+import 'package:fml/function/download/download.dart';
 import 'package:fml/function/extract_natives.dart';
 import 'package:fml/function/log.dart';
 
@@ -238,7 +238,7 @@ class DownloadNeoForgePageState extends State<DownloadNeoForgePage> {
     }
     final totalLibraries = downloadTasks.length;
     if (totalLibraries == 0) {
-      await LogUtil.log('所有库文件已存在，无需下载', level: 'INFO');
+      await LogUtil.log('所有库文件已存在,无需下载', level: 'INFO');
       setState(() {
         _downloadLibrary = true;
       });
@@ -251,7 +251,7 @@ class DownloadNeoForgePageState extends State<DownloadNeoForgePage> {
         _progress = completedLibraries / totalLibraries;
       });
     }
-    await LogUtil.log('开始下载 $totalLibraries 个库文件，并发数: $concurrentDownloads', level: 'INFO');
+    await LogUtil.log('开始下载 $totalLibraries 个库文件,并发数: $concurrentDownloads', level: 'INFO');
     for (int i = 0; i < downloadTasks.length; i += concurrentDownloads) {
       int end = i + concurrentDownloads;
       if (end > downloadTasks.length) end = downloadTasks.length;
@@ -294,7 +294,7 @@ class DownloadNeoForgePageState extends State<DownloadNeoForgePage> {
       });
       await _downloadLibraries(concurrentDownloads: concurrentDownloads);
     } else if (newFailedList.isNotEmpty) {
-      await LogUtil.log('已达最大并发重试次数，开始单线程重试 ${newFailedList.length} 个库文件', level: 'WARNING');
+      await LogUtil.log('已达最大并发重试次数,开始单线程重试 ${newFailedList.length} 个库文件', level: 'WARNING');
       await _singleThreadRetryDownload(newFailedList, "库文件", (progress) {
         setState(() {
           _progress = progress;
@@ -338,13 +338,13 @@ class DownloadNeoForgePageState extends State<DownloadNeoForgePage> {
     }
     final totalAssets = downloadTasks.length;
     if (totalAssets == 0) {
-      await LogUtil.log('所有资源文件已存在，无需下载', level: 'INFO');
+      await LogUtil.log('所有资源文件已存在,无需下载', level: 'INFO');
       setState(() {
         _downloadAsset = true;
       });
       return;
     }
-    await LogUtil.log('需要下载 $totalAssets 个资源文件，并发数: $concurrentDownloads', level: 'INFO');
+    await LogUtil.log('需要下载 $totalAssets 个资源文件,并发数: $concurrentDownloads', level: 'INFO');
     int completedAssets = 0;
     List<Map<String, String>> newFailedList = [];
     void updateProgress() {
@@ -397,7 +397,7 @@ class DownloadNeoForgePageState extends State<DownloadNeoForgePage> {
       });
       await _downloadAssets(concurrentDownloads: concurrentDownloads);
     } else if (newFailedList.isNotEmpty) {
-      await LogUtil.log('已达最大并发重试次数，开始单线程重试 ${newFailedList.length} 个资源文件', level: 'WARNING');
+      await LogUtil.log('已达最大并发重试次数,开始单线程重试 ${newFailedList.length} 个资源文件', level: 'WARNING');
       await _singleThreadRetryDownload(newFailedList, "资源文件", (progress) {
         setState(() {
           _progress = progress;
@@ -564,7 +564,7 @@ class DownloadNeoForgePageState extends State<DownloadNeoForgePage> {
     try {
       final json = jsonDecode(_installerJson);
       if (json['libraries'] != null && json['libraries'] is List) {
-        await LogUtil.log('找到NeoForge libraries，开始解析...', level: 'INFO');
+        await LogUtil.log('找到NeoForge libraries,开始解析...', level: 'INFO');
         for (var lib in json['libraries']) {
           if (lib['downloads'] != null && lib['downloads']['artifact'] != null) {
             final artifact = lib['downloads']['artifact'];
@@ -706,7 +706,7 @@ class DownloadNeoForgePageState extends State<DownloadNeoForgePage> {
       });
       await _downloadNeoForgeLibraries(concurrentDownloads: concurrentDownloads);
     } else if (newFailedList.isNotEmpty) {
-      await LogUtil.log('已达最大并发重试次数，开始单线程重试 ${newFailedList.length} 个NeoForge库文件', level: 'WARNING');
+      await LogUtil.log('已达最大并发重试次数,开始单线程重试 ${newFailedList.length} 个NeoForge库文件', level: 'WARNING');
       await _singleThreadRetryDownload(newFailedList, "NeoForge库文件", (progress) {
         setState(() {
           _progress = progress;
@@ -879,7 +879,7 @@ class DownloadNeoForgePageState extends State<DownloadNeoForgePage> {
     await prefs.setStringList(key, defaultConfig);
     gameList.add(widget.name);
     await prefs.setStringList('Game_$_name', gameList);
-    await LogUtil.log('已将 ${widget.name} 添加到游戏列表，当前列表: $gameList', level: 'INFO');
+    await LogUtil.log('已将 ${widget.name} 添加到游戏列表,当前列表: $gameList', level: 'INFO');
     setState(() {
       _writeConfig = true;
     });
@@ -894,113 +894,113 @@ class DownloadNeoForgePageState extends State<DownloadNeoForgePage> {
   }
 
   // 下载逻辑
-void _startDownload() async {
-  LogUtil.log('开始下载: ${widget.name} NeoForge', level: 'INFO');
-  final prefs = await SharedPreferences.getInstance();
-  final selectedGamePath = prefs.getString('SelectedPath') ?? '';
-  final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
-  final versionPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}';
-  final gameJsonURL = replaceWithMirror(widget.url);
-  final neoForgeURL = 'https://bmclapi2.bangbang93.com/maven/net/neoforged/neoforge/${widget.neoforgeVersion}/neoforge-${widget.neoforgeVersion}-installer.jar';
-  try {
-    await LogUtil.log('开始下载 ${widget.name} 版本', level: 'INFO');
-    await _showNotification('开始下载', '正在下载 ${widget.name} 版本\n你可以将启动器置于后台,安装完成将有通知提醒');
-    // 创建文件夹
-    await _createGameDirectories();
-    // 下载版本json
+  Future<void> _startDownload() async {
+    LogUtil.log('开始下载: ${widget.name} NeoForge', level: 'INFO');
+    final prefs = await SharedPreferences.getInstance();
+    final selectedGamePath = prefs.getString('SelectedPath') ?? '';
+    final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
+    final versionPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}';
+    final gameJsonURL = replaceWithMirror(widget.url);
+    final neoForgeURL = 'https://bmclapi2.bangbang93.com/maven/net/neoforged/neoforge/${widget.neoforgeVersion}/neoforge-${widget.neoforgeVersion}-installer.jar';
     try {
-      await _downloadFile('$versionPath${Platform.pathSeparator}${widget.name}.json', gameJsonURL);
-      setState(() {
-        _downloadJson = true;
-      });
+      await LogUtil.log('开始下载 ${widget.name} 版本', level: 'INFO');
+      await _showNotification('开始下载', '正在下载 ${widget.name} 版本\n你可以将启动器置于后台,安装完成将有通知提醒');
+      // 创建文件夹
+      await _createGameDirectories();
+      // 下载版本json
+      try {
+        await _downloadFile('$versionPath${Platform.pathSeparator}${widget.name}.json', gameJsonURL);
+        setState(() {
+          _downloadJson = true;
+        });
+      } catch (e) {
+        await _showNotification('下载失败', '版本Json下载失败\n$e');
+        setState(() {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('下载版本Json失败: $e')),
+          );
+        });
+        return;
+      }
+      // 解析游戏Json
+      await parseGameJson('$versionPath${Platform.pathSeparator}${widget.name}.json');
+      // 下载资产索引文件
+      if (assetIndexURL != null) {
+        final assetIndexDir = '$gamePath${Platform.pathSeparator}assets${Platform.pathSeparator}indexes';
+        final assetIndexPath = '$assetIndexDir${Platform.pathSeparator}$assetIndexId.json';
+        try {
+          await _downloadFile('$gamePath${Platform.pathSeparator}assets${Platform.pathSeparator}indexes${Platform.pathSeparator}$assetIndexId.json', assetIndexURL!);
+          setState(() {
+            _downloadAssetJson = true;
+          });
+        } catch (e) {
+          setState(() {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('下载资产索引失败: $e')),
+            );
+          });
+          return;
+        }
+        // 解析资源索引
+        await parseAssetIndex(assetIndexPath);
+        // 下载客户端
+        try {
+          await _downloadFile('$versionPath${Platform.pathSeparator}${widget.name}.jar', clientURL);
+          setState(() {
+            _downloadClient = true;
+          });
+        } catch (e) {
+          setState(() {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('下载客户端失败: $e')),
+            );
+          });
+          return;
+        }
+        // 下载库文件
+        await _downloadLibraries(concurrentDownloads: 30);
+        // 下载资源
+        await _downloadAssets(concurrentDownloads: 30);
+        // 提取LWJGL本地库路径
+        await _extractLwjglNativeLibrariesPath('$versionPath${Platform.pathSeparator}${widget.name}.json', gamePath);
+        // 提取LWJGL Natives
+        await _extractLwjglNatives();
+        // 下载NeoForge安装器
+        LogUtil.log('开始下载: $versionPath,$neoForgeURL', level: 'INFO');
+        try {
+          await _downloadFile('$versionPath${Platform.pathSeparator}neoforge-installer.jar',neoForgeURL);
+          setState(() {
+            _downloadNeoForge = true;
+          });
+        } catch (e) {
+          setState(() {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('下载NeoForge失败: $e')),
+            );
+          });
+          return;
+        }
+        // 提取NeoForge安装器
+        await _extractNeoForgeInstaller();
+        // 解析NeoForge安装器JSON
+        await _parseNeoForgeInstallerJson();
+        // 下载NeoForge库文件
+        await _downloadNeoForgeLibraries();
+        // 执行NeoForge安装器
+        await _executeNeoForgeInstaller();
+        // 写入游戏配置文件
+        await _writeGameConfig();
+        // 完成通知
+        await _showNotification('完成下载', '点击查看详细');
+      }
     } catch (e) {
-      await _showNotification('下载失败', '版本Json下载失败\n$e');
       setState(() {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('下载版本Json失败: $e')),
+          SnackBar(content: Text('发生错误: $e')),
         );
       });
-      return;
     }
-    // 解析游戏Json
-    await parseGameJson('$versionPath${Platform.pathSeparator}${widget.name}.json');
-    // 下载资产索引文件
-    if (assetIndexURL != null) {
-      final assetIndexDir = '$gamePath${Platform.pathSeparator}assets${Platform.pathSeparator}indexes';
-      final assetIndexPath = '$assetIndexDir${Platform.pathSeparator}$assetIndexId.json';
-      try {
-        await _downloadFile('$gamePath${Platform.pathSeparator}assets${Platform.pathSeparator}indexes${Platform.pathSeparator}$assetIndexId.json', assetIndexURL!);
-        setState(() {
-          _downloadAssetJson = true;
-        });
-      } catch (e) {
-        setState(() {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('下载资产索引失败: $e')),
-          );
-        });
-        return;
-      }
-      // 解析资源索引
-      await parseAssetIndex(assetIndexPath);
-      // 下载客户端
-      try {
-        await _downloadFile('$versionPath${Platform.pathSeparator}${widget.name}.jar', clientURL);
-        setState(() {
-          _downloadClient = true;
-        });
-      } catch (e) {
-        setState(() {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('下载客户端失败: $e')),
-          );
-        });
-        return;
-      }
-      // 下载库文件
-      await _downloadLibraries(concurrentDownloads: 30);
-      // 下载资源
-      await _downloadAssets(concurrentDownloads: 30);
-      // 提取LWJGL本地库路径
-      await _extractLwjglNativeLibrariesPath('$versionPath${Platform.pathSeparator}${widget.name}.json', gamePath);
-      // 提取LWJGL Natives
-      await _extractLwjglNatives();
-      // 下载NeoForge安装器
-      LogUtil.log('开始下载: $versionPath,$neoForgeURL', level: 'INFO');
-      try {
-        await _downloadFile('$versionPath${Platform.pathSeparator}neoforge-installer.jar',neoForgeURL);
-        setState(() {
-          _downloadNeoForge = true;
-        });
-      } catch (e) {
-        setState(() {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('下载NeoForge失败: $e')),
-          );
-        });
-        return;
-      }
-      // 提取NeoForge安装器
-      await _extractNeoForgeInstaller();
-      // 解析NeoForge安装器JSON
-      await _parseNeoForgeInstallerJson();
-      // 下载NeoForge库文件
-      await _downloadNeoForgeLibraries();
-      // 执行NeoForge安装器
-      await _executeNeoForgeInstaller();
-      // 写入游戏配置文件
-      await _writeGameConfig();
-      // 完成通知
-      await _showNotification('完成下载', '点击查看详细');
-    }
-  } catch (e) {
-    setState(() {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('发生错误: $e')),
-      );
-    });
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -1020,8 +1020,7 @@ void _startDownload() async {
                 ? const Icon(Icons.check)
                 : const CircularProgressIndicator(),
             ),
-          ),
-          if (_downloadJson) ...[
+          ),if (_downloadJson) ...[
             Card(
               child: ListTile(
                 title: const Text('正在解析游戏Json'),
@@ -1030,8 +1029,7 @@ void _startDownload() async {
                   ? const Icon(Icons.check)
                   : const CircularProgressIndicator(),
               ),
-            ),
-            if (_parseAssetJson) ...[
+            ),if (_parseAssetJson) ...[
               Card(
                 child: ListTile(
                   title: const Text('正在下载资源Json'),
@@ -1042,8 +1040,7 @@ void _startDownload() async {
                 ),
               ),
             ]
-          ],
-          if (_downloadAssetJson) ...[
+          ],if (_downloadAssetJson) ...[
             Card(
               child: ListTile(
                 title: const Text('正在解析资源Json'),
@@ -1053,16 +1050,24 @@ void _startDownload() async {
                   : const CircularProgressIndicator(),
               ),
             ),
-          ],
-          if (_parseAssetJson) ...[
+          ],if (_parseAssetJson) ...[
             Card(
-              child: ListTile(
-                title: const Text('正在下载客户端'),
-                subtitle: Text(_downloadClient ? '下载完成' : '下载中...'),
-                trailing: _downloadClient
-                  ? const Icon(Icons.check)
-                  : const CircularProgressIndicator(),
-              ),
+              child: Column(
+                children: [
+                  ListTile(
+                    title: const Text('正在下载客户端'),
+                    subtitle: Text(_downloadClient ? '下载完成' : '下载中... 已下载${(_progress * 100).toStringAsFixed(2)}%'),
+                    trailing: _downloadClient
+                      ? const Icon(Icons.check)
+                      : const CircularProgressIndicator()
+                  ),
+                  if (!_downloadClient)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: LinearProgressIndicator(value: _progress),
+                    ),
+                ],
+              )
             ),
           ],
           if (_downloadClient) ...[
@@ -1084,8 +1089,7 @@ void _startDownload() async {
               ],
             ),
             )
-          ],
-          if (_downloadLibrary) ...[
+          ],if (_downloadLibrary) ...[
             Card(
               child: Column(
                 children: [
@@ -1104,8 +1108,7 @@ void _startDownload() async {
                 ],
               ),
             )
-          ],
-          if (_downloadAsset) ...[
+          ],if (_downloadAsset) ...[
             Card(
               child: ListTile(
                 title: const Text('正在提取LWJGL路径'),

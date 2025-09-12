@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'package:fml/function/log.dart';
 
 class DownloadUtils {
   /// [url] 下载地址
@@ -23,20 +24,26 @@ class DownloadUtils {
     final CancelToken cancelToken = CancelToken();
     final prefs = await SharedPreferences.getInstance();
     final appVersion = prefs.getString('version') ?? 'unknown';
-    final userAgent = 'FML/$appVersion';
+    final String userAgent;
+    if (url.contains('bmclapi2.bangbang93.com')) {
+      // BMCLAPI UA
+      userAgent = 'FML/$appVersion';
+    } else {
+      // modrinth UA
+      userAgent = 'lxdklp/FML/$appVersion (fml.lxdklp.top)';
+    }
     try {
-      // 创建目录
       final directory = Directory(savePath.substring(0, savePath.lastIndexOf(Platform.pathSeparator)));
       if (!directory.existsSync()) {
         directory.createSync(recursive: true);
       }
-      // BMCLAPI要求User-Agent
       final options = Options(
         headers: {
           'User-Agent': userAgent,
         },
         responseType: ResponseType.stream,
       );
+      LogUtil.log('开始下载: $url ,UA: $userAgent', level: 'INFO');
       await dio.download(
         url,
         savePath,

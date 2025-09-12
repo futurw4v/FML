@@ -62,6 +62,7 @@ class DownloadGamePageState extends State<DownloadGamePage> {
     });
   }
 
+  // 读取App版本
   Future<void> _loadAppVersion() async {
     final prefs = await SharedPreferences.getInstance();
     final version = prefs.getString('version') ?? "1.0.0";

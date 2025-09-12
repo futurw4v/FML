@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:fml/function/log.dart';
-import 'package:fml/pages/download/modrinth/type/download_modpack/download_modpack.dart';
+import 'package:fml/pages/download/modrinth/type/download_modpack/loader/fabric_modpack.dart';
 
 class DownloadInfo extends StatefulWidget {
   const DownloadInfo(
@@ -18,12 +20,14 @@ class DownloadInfoState extends State<DownloadInfo> {
   String? _downloadUrl;
   String? _fileName;
   String? _gameName;
+  List<String> _versionList = [];
   late final TextEditingController _gameNameController;
 
   @override
   void initState() {
     super.initState();
     _extractFileInfo();
+    _loadVersionList();
     _gameNameController = TextEditingController();
     _gameNameController.text = _fileName ?? '';
     _gameName = _gameNameController.text;
@@ -44,6 +48,16 @@ class DownloadInfoState extends State<DownloadInfo> {
       });
       LogUtil.log('获取到下载地址: $_downloadUrl', level: 'INFO');
     }
+  }
+
+  // 读取版本列表
+  Future<void> _loadVersionList() async {
+    final prefs = await SharedPreferences.getInstance();
+    final selectedPath = prefs.getString('SelectedPath') ?? '';
+    final gameList = prefs.getStringList('Game_$selectedPath') ?? [];
+    setState(() {
+      _versionList = gameList;
+    });
   }
 
   @override
@@ -117,20 +131,29 @@ class DownloadInfoState extends State<DownloadInfo> {
             );
             return;
           }
+          if (_versionList.contains(_gameName)) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('该游戏名称已存在，请换一个名称')),
+            );
+            return;
+          }
           if (_downloadUrl == null || _downloadUrl!.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('下载地址获取失败')),
             );
             return;
           }
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => DownloadModpackPage(
-                gameName: _gameName!,
-                downloadUrl: _downloadUrl ?? '',
+          if (widget.version['loaders']?.join(", ") == 'fabric') {
+            LogUtil.log('开始下载模组包: $_fileName 类型: ${widget.version['loaders']}', level: 'INFO');
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => FabricModpackPage(
+                  name: _gameName!,
+                  url: _downloadUrl ?? '',
+                ),
               ),
-            ),
-          );
+            );
+          }
         },
         child: const Icon(Icons.download),
       ),

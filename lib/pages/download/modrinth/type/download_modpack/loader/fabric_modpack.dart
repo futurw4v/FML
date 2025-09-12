@@ -1,63 +1,87 @@
 import 'package:flutter/material.dart';
-import 'package:fml/function/download/bmclapi_download.dart';
-import 'package:fml/function/download/modrinth_download.dart';
+import 'package:fml/function/download/download.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:io';
 import 'dart:convert';
+import 'package:archive/archive.dart';
+import 'package:dio/dio.dart';
 import 'package:system_info2/system_info2.dart';
-import 'package:fml/function/extract_natives.dart';
+
 import 'package:fml/function/log.dart';
+import 'package:fml/function/extract_natives.dart';
 
-class DownloadFabricPage extends StatefulWidget {
-  const DownloadFabricPage({super.key, required this.version, required this.url, required this.name, required this.fabricVersion, required this.fabricLoader});
+class FabricModpackPage extends StatefulWidget {
+  const FabricModpackPage({
+    super.key,
+    required this.name,
+    required this.url,
+  });
 
-  final String version;
-  final String url;
   final String name;
-  final String fabricVersion;
-  final Map<String, dynamic>? fabricLoader;
+  final String url;
 
   @override
-  DownloadFabricPageState createState() => DownloadFabricPageState();
+  FabricModpackPageState createState() => FabricModpackPageState();
 }
 
-class DownloadFabricPageState extends State<DownloadFabricPage> {
+class FabricModpackPageState extends State<FabricModpackPage> {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-  double _progress = 0.0;
-  bool _saveFabricJson = false;
-  bool _downloadJson = false;
-  bool _parseGameJson = false;
-  bool _parseAssetJson = false;
-  bool _parseFabricJson = false;
+  final Dio dio = Dio();
+
+  bool _downloadMrpack = false;
+  bool _unzipMrpack = false;
+  bool _parseMrpack = false;
+  bool _downloadModsStatus = false;
+  bool _downloadMinecraftJson = false;
+  bool _parseGameJsonStatus = false;
   bool _downloadAssetJson = false;
+  bool _parseAssetJson = false;
   bool _downloadClient = false;
   bool _downloadLibrary = false;
   bool _downloadAsset = false;
   bool _extractedLwjglNativesPath = false;
   bool _extractedLwjglNatives = false;
+  bool _saveFabricJsonStatus = false;
+  bool _parseFabricJson = false;
   bool _downloadFabric = false;
+  bool _copyOverrides = false;
   bool _writeConfig = false;
+
+  double _progress = 0.0;
   int _mem = 1;
   String _name = '';
+
+  String _fabricVersion = '';
+  String _minecraftVersion = '';
+  String _appVersion = "unknown";
+  List<dynamic> _fabricFullJson = [];
+  Map<String, dynamic> _fabricJson = {};
+
+  int _totalMods = 0;
+  int _downloadedMods = 0;
+
+  List<String> _modsPath = [];
+  List<String> _modsUrl = [];
 
   String? assetIndexURL;
   String? clientURL;
   String? assetIndexId;
+  final List<String> _assetHash = [];
   List<String> librariesPath = [];
   List<String> librariesURL = [];
   List<String> lwjglNativeNames = [];
   List<String> lwjglNativePaths = [];
-  final List<String> _assetHash = [];
   List<Map<String, String>> _failedLibraries = [];
   List<Map<String, String>> _failedAssets = [];
   final List<Map<String, String>> _fabricDownloadTasks = [];
   List<Map<String, String>> _failedFabricFiles = [];
+
   bool _isRetrying = false;
   final int _maxRetries = 3;  // 最大重试次数
   int _currentRetryCount = 0;
 
-  // BMCLAPI 镜像
+    // BMCLAPI 镜像
   String replaceWithMirror(String url) {
     return url
       .replaceAll('piston-meta.mojang.com', 'bmclapi2.bangbang93.com')
@@ -105,6 +129,15 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     }
   }
 
+  // 读取App版本
+  Future<void> _loadAppVersion() async {
+    final prefs = await SharedPreferences.getInstance();
+    final version = prefs.getString('version') ?? "1.0.0";
+    setState(() {
+      _appVersion = version;
+    });
+  }
+
   // 文件夹创建
   Future<void> _createGameDirectories() async {
     final prefs = await SharedPreferences.getInstance();
@@ -117,36 +150,242 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     }
   }
 
-  // 添加保存Fabric JSON到本地
-  Future<void> saveLoaderToJson(String jsonPath) async {
+  // 解压Mrpack文件
+  Future<void> _unzipMrpackFile(String versionPath) async {
     try {
-      if (widget.fabricLoader == null) {
-        await LogUtil.log('fabricLoader为空，无法保存', level: 'ERROR');
-        return;
+      final mrpackFile = File('$versionPath${Platform.pathSeparator}${widget.name}.mrpack');
+      final extractPath = '$versionPath${Platform.pathSeparator}mrpack';
+      if (!await mrpackFile.exists()) {
+        throw Exception('Mrpack文件不存在: ${mrpackFile.path}');
       }
-      final String jsonString = jsonEncode(widget.fabricLoader);
-      final String dirPath = jsonPath;
-      final String filePath = '$dirPath/fabric.json';
-      final Directory directory = Directory(dirPath);
+      final bytes = await mrpackFile.readAsBytes();
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final directory = Directory(extractPath);
       if (!await directory.exists()) {
         await directory.create(recursive: true);
-        await LogUtil.log('已创建目录: $dirPath', level: 'INFO');
       }
-      // 创建文件并写入JSON内容
-      final File file = File(filePath);
-      await file.writeAsString(jsonString);
-      await LogUtil.log('已成功将fabricLoader保存到: $filePath');
+      for (final file in archive) {
+        final filename = file.name;
+        if (file.isFile) {
+          final data = file.content as List<int>;
+          final outFile = File('$extractPath${Platform.pathSeparator}$filename');
+          await outFile.parent.create(recursive: true);
+          await outFile.writeAsBytes(data);
+          await LogUtil.log('解压文件: $filename', level: 'INFO');
+        }
+      }
+      await LogUtil.log('Mrpack解压完成到: $extractPath', level: 'INFO');
       setState(() {
-        _saveFabricJson = true;
+        _unzipMrpack = true;
       });
     } catch (e) {
-      await _showNotification('保存JSON时出错', e.toString());
-      await LogUtil.log('保存JSON时出错: $e', level: 'ERROR');
+      await LogUtil.log('解压Mrpack失败: $e', level: 'ERROR');
+      await _showNotification('解压失败', '无法解压Mrpack文件: $e');
+      throw Exception('解压Mrpack失败: $e');
     }
   }
 
+  // 解析Mrpack内容
+  Future<void> _parseMrpackContent(String versionPath) async {
+    try {
+      final extractPath = '$versionPath${Platform.pathSeparator}mrpack';
+      final indexFile = File('$extractPath${Platform.pathSeparator}modrinth.index.json');
+      if (!await indexFile.exists()) {
+        throw Exception('找不到modrinth.index.json文件');
+      }
+      final Map<String, dynamic> indexJson = jsonDecode(await indexFile.readAsString());
+      if (indexJson.containsKey('dependencies')) {
+        final dependencies = indexJson['dependencies'];
+        _fabricVersion = dependencies['fabric-loader'] ?? '';
+        _minecraftVersion = dependencies['minecraft'] ?? '';
+        await LogUtil.log('检测到Fabric加载器版本: $_fabricVersion', level: 'INFO');
+        await LogUtil.log('检测到Minecraft版本: $_minecraftVersion', level: 'INFO');
+      }
+      if (indexJson.containsKey('files') && indexJson['files'] is List) {
+        final List<dynamic> filesList = indexJson['files'];
+        _totalMods = filesList.length;
+        for (var fileInfo in filesList) {
+          if (fileInfo['path'] != null) {
+            _modsPath.add(fileInfo['path']);
+          }
+          if (fileInfo['downloads'] != null &&
+              fileInfo['downloads'] is List &&
+              fileInfo['downloads'].isNotEmpty) {
+            _modsUrl.add(fileInfo['downloads'][0]);
+          } else {
+            _modsUrl.add('');
+          }
+        }
+        await LogUtil.log('解析了 ${_modsPath.length} 个文件路径和下载URL', level: 'INFO');
+      }
+      setState(() {
+        _parseMrpack = true;
+      });
+    } catch (e) {
+      await LogUtil.log('解析Mrpack内容失败: $e', level: 'ERROR');
+      await _showNotification('解析失败', '无法解析Mrpack内容: $e');
+      throw Exception('解析Mrpack内容失败: $e');
+    }
+  }
+
+  // 下载和处理模组文件
+  Future<void> _downloadMods(String versionPath) async {
+    try {
+      setState(() {
+        _downloadModsStatus = false;
+        _downloadedMods = 0;
+        _progress = 0.0;
+      });
+      final extractPath = '$versionPath${Platform.pathSeparator}mrpack';
+      await LogUtil.log('开始处理 $_totalMods 个模组文件', level: 'INFO');
+      final modsDir = Directory('$versionPath${Platform.pathSeparator}mods');
+      if (!await modsDir.exists()) {
+        await modsDir.create(recursive: true);
+      }
+      final resourcepacksDir = Directory('$versionPath${Platform.pathSeparator}resourcepacks');
+      if (!await resourcepacksDir.exists()) {
+        await resourcepacksDir.create(recursive: true);
+      }
+      for (int i = 0; i < _modsPath.length; i++) {
+        final path = _modsPath[i];
+        final url = i < _modsUrl.length ? _modsUrl[i] : '';
+        final String fileName = path.split('/').last;
+        String targetPath;
+        if (path.startsWith('mods/')) {
+          targetPath = '$versionPath${Platform.pathSeparator}mods${Platform.pathSeparator}$fileName';
+        } else if (path.startsWith('resourcepacks/')) {
+          targetPath = '$versionPath${Platform.pathSeparator}resourcepacks${Platform.pathSeparator}$fileName';
+        } else {
+          final parts = path.split('/');
+          if (parts.length > 1) {
+            final dirPath = '$versionPath${Platform.pathSeparator}${parts.sublist(0, parts.length - 1).join(Platform.pathSeparator)}';
+            final dirObj = Directory(dirPath);
+            if (!await dirObj.exists()) {
+              await dirObj.create(recursive: true);
+            }
+            targetPath = '$dirPath${Platform.pathSeparator}$fileName';
+          } else {
+            targetPath = '$versionPath${Platform.pathSeparator}$fileName';
+          }
+        }
+        final targetFile = File(targetPath);
+        if (!await targetFile.parent.exists()) {
+          await targetFile.parent.create(recursive: true);
+        }
+        bool fileHandled = false;
+        final String localFilePath = '$extractPath${Platform.pathSeparator}${path.replaceAll('/', Platform.pathSeparator)}';
+        final File localFile = File(localFilePath);
+        if (await localFile.exists()) {
+          try {
+            await localFile.copy(targetPath);
+            await LogUtil.log('复制文件 (${_downloadedMods+1}/$_totalMods): $fileName', level: 'INFO');
+            fileHandled = true;
+          } catch (e) {
+            await LogUtil.log('复制文件失败: $fileName - $e', level: 'ERROR');
+          }
+        }
+        if (!fileHandled && url.isNotEmpty) {
+          await LogUtil.log('正在下载 (${_downloadedMods+1}/$_totalMods): $fileName', level: 'INFO');
+          try {
+            await DownloadUtils.downloadFile(
+              url: url,
+              savePath: targetPath,
+              onProgress: (progress) {
+                setState(() {
+                  _progress = (_downloadedMods + progress) / _totalMods;
+                });
+              },
+              onSuccess: () async {
+                await LogUtil.log('下载成功: $fileName', level: 'INFO');
+                fileHandled = true;
+              },
+              onError: (error) async {
+                await LogUtil.log('下载失败: $fileName - $error', level: 'ERROR');
+              }
+            );
+            final downloadedFile = File(targetPath);
+            if (await downloadedFile.exists()) {
+              fileHandled = true;
+            }
+          } catch (e) {
+            await LogUtil.log('下载异常: $fileName - $e', level: 'ERROR');
+          }
+        }
+        if (!fileHandled) {
+          await LogUtil.log('无法处理文件: $fileName - 本地不存在且下载URL为空', level: 'ERROR');
+        }
+        _downloadedMods++;
+        setState(() {
+          _progress = _downloadedMods / _totalMods;
+        });
+      }
+      setState(() {
+        _downloadModsStatus = true;
+      });
+      await _showNotification('模组下载完成', '已成功下载并安装所有模组');
+      await LogUtil.log('所有模组文件处理完成', level: 'INFO');
+    } catch (e) {
+      await LogUtil.log('下载模组失败: $e', level: 'ERROR');
+      await _showNotification('模组下载失败', '无法完成模组下载: $e');
+      throw Exception('下载模组失败: $e');
+    }
+  }
+
+  // 获取游戏Json
+  Future<void> _saveMinecraftJson(String versionPath) async {
+    try {
+      final options = Options(
+        headers: {
+          'User-Agent': 'FML/$_appVersion',
+        },
+        responseType: ResponseType.plain,
+      );
+      LogUtil.log('开始请求版本清单', level: 'INFO');
+      final response = await dio.get(
+        'https://bmclapi2.bangbang93.com/mc/game/version_manifest.json',
+        options: options,
+      );
+      if (response.statusCode == 200) {
+        LogUtil.log('成功获取版本清单', level: 'INFO');
+        dynamic parsedData;
+        if (response.data is String) {
+          parsedData = jsonDecode(response.data);
+        } else {
+          parsedData = response.data;
+        }
+        if (parsedData != null && parsedData.containsKey('versions')) {
+        final versions = parsedData['versions'];
+        for (var version in versions) {
+          if (version['id'] == _minecraftVersion) {
+            final versionUrl = version['url'];
+            final gameJsonURL = replaceWithMirror(versionUrl);
+            LogUtil.log('找到版本 $_minecraftVersion 的URL: $versionUrl BMCLAPI: $gameJsonURL', level: 'INFO');
+            try {
+              await _downloadFile('$versionPath${Platform.pathSeparator}${widget.name}.json', gameJsonURL);
+              setState(() {
+                _downloadMinecraftJson = true;
+              });
+            } catch (e) {
+              await _showNotification('下载失败', '版本Json下载失败\n$e');
+              setState(() {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('下载版本Json失败: $e')),
+                );
+              });
+              return;
+            }
+          }
+        }
+      }
+      }
+    } catch (e) {
+      LogUtil.log('请求出错: $e', level: 'ERROR');
+    }
+  }
+
+
   // 游戏Json解析
-  Future<void> parseGameJson(String jsonFilePath) async {
+  Future<void> _parseGameJson(String jsonFilePath) async {
     try {
       final file = File(jsonFilePath);
       if (!file.existsSync()) {
@@ -190,19 +429,16 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
         await LogUtil.log('找到 ${librariesURL.length} 个库文件URL', level: 'INFO');
       }
       setState(() {
-        _parseGameJson = true;
+        _parseGameJsonStatus = true;
       });
     } catch (e) {
       await _showNotification('解析JSON失败', e.toString());
       await LogUtil.log('解析JSON失败: $e', level: 'ERROR');
-      setState(() {
-        _parseGameJson = false;
-      });
     }
   }
 
   // 解析Assset JSON
-  Future<void> parseAssetIndex(String assetIndexPath) async {
+  Future<void> _parseAssetIndex(String assetIndexPath) async {
     try {
       final file = File(assetIndexPath);
       if (!file.existsSync()) {
@@ -230,94 +466,6 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     }
   }
 
-  // 解析 Fabric JSON
-  Future<void> parseFabricLoaderJson() async {
-  try {
-    if (widget.fabricLoader == null) {
-      await LogUtil.log('fabricLoader为空，无法解析', level: 'ERROR');
-      await _showNotification('下载失败', 'fabricLoader为空，无法解析');
-      return;
-    }
-    _fabricDownloadTasks.clear();
-    final Map<String, dynamic> loaderJson = widget.fabricLoader!;
-    // 1. 解析 Loader
-    if (loaderJson.containsKey('loader') && loaderJson['loader'] != null) {
-      final loaderInfo = loaderJson['loader'];
-      if (loaderInfo.containsKey('maven') && loaderInfo['maven'] != null) {
-        final String loaderMaven = loaderInfo['maven'];
-        final List<String> loaderParts = loaderMaven.split(':');
-        if (loaderParts.length >= 3) {
-          final String group = loaderParts[0].replaceAll('.', '/');
-          final String artifact = loaderParts[1];
-          final String version = loaderParts[2];
-          final String relativePath = '$group/$artifact/$version/$artifact-$version.jar';
-          final String url = 'https://bmclapi2.bangbang93.com/maven/$group/$artifact/$version/$artifact-$version.jar';
-          _fabricDownloadTasks.add({'url': replaceWithMirror(url), 'path': relativePath});
-          await LogUtil.log('添加Fabric Loader: $relativePath', level: 'INFO');
-        }
-      }
-    }
-    // 2. 解析 Intermediary
-    if (loaderJson.containsKey('intermediary') && loaderJson['intermediary'] != null) {
-      final intermediaryInfo = loaderJson['intermediary'];
-      if (intermediaryInfo.containsKey('maven') && intermediaryInfo['maven'] != null) {
-        final String intermediaryMaven = intermediaryInfo['maven'];
-        final List<String> parts = intermediaryMaven.split(':');
-        if (parts.length >= 3) {
-          final String group = parts[0].replaceAll('.', '/');
-          final String artifact = parts[1];
-          final String version = parts[2];
-          final String relativePath = '$group/$artifact/$version/$artifact-$version.jar';
-          final String url = 'https://bmclapi2.bangbang93.com/maven/$group/$artifact/$version/$artifact-$version.jar';
-          _fabricDownloadTasks.add({'url': replaceWithMirror(url), 'path': relativePath});
-          await LogUtil.log('添加Intermediary: $relativePath', level: 'INFO');
-        }
-      }
-    }
-    // 3. 解析库文件
-    if (loaderJson.containsKey('launcherMeta') &&
-        loaderJson['launcherMeta'] != null &&
-        loaderJson['launcherMeta'].containsKey('libraries')) {
-      final libraries = loaderJson['launcherMeta']['libraries'];
-      // 3.1 解析通用库
-      if (libraries.containsKey('common') && libraries['common'] is List) {
-        final List<dynamic> commonLibs = libraries['common'];
-        for (var lib in commonLibs) {
-          if (lib.containsKey('name')) {
-            final String name = lib['name'];
-            String baseUrl = lib.containsKey('url') ? lib['url'] : 'https://bmclapi2.bangbang93.com/maven/';
-            final List<String> parts = name.split(':');
-            if (parts.length >= 3) {
-              final String group = parts[0].replaceAll('.', '/');
-              final String artifact = parts[1];
-              String version = parts[2];
-              // 处理可能包含额外信息的版本号
-              if (version.contains('@')) {
-                version = version.split('@')[0];
-              }
-              final String relativePath = '$group/$artifact/$version/$artifact-$version.jar';
-              final String fullUrl = '$baseUrl$group/$artifact/$version/$artifact-$version.jar';
-              _fabricDownloadTasks.add({'url': replaceWithMirror(fullUrl), 'path': relativePath});
-            }
-          }
-        }
-      }
-      setState(() {
-        _parseFabricJson = true;
-      });
-    }
-    await LogUtil.log('找到 ${_fabricDownloadTasks.length} 个Fabric文件需要下载', level: 'INFO');
-    setState(() {
-      _parseFabricJson = true;
-    });
-  } catch (e) {
-    await _showNotification('解析Fabric Loader JSON失败', e.toString());
-    await LogUtil.log('解析Fabric Loader JSON失败: $e', level: 'ERROR');
-    setState(() {
-      _parseFabricJson = false;
-    });
-  }
-}
 
   // 下载库
   Future<void> _downloadLibraries({int concurrentDownloads = 20}) async {
@@ -638,11 +786,146 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     });
   }
 
+  // Fabric Json
+  Future<void> _saveFabricJson(String versionPath) async {
+    LogUtil.log('加载$_minecraftVersion版本列表', level: 'INFO');
+    await _loadAppVersion();
+    try {
+      final options = Options(
+        headers: {
+          'User-Agent': 'FML/$_appVersion',
+        },
+      );
+      // FML UA请求BMCLAPI Fabric
+      final response = await dio.get(
+        'https://bmclapi2.bangbang93.com/fabric-meta/v2/versions/loader/$_minecraftVersion',
+        options: options,
+      );
+      if (response.statusCode == 200) {
+        _fabricFullJson = response.data;
+        LogUtil.log('获取到 ${_fabricFullJson.length} 个Fabric版本记录', level: 'INFO');
+      }
+    } catch (e) {
+      LogUtil.log('请求出错: $e', level: 'ERROR');
+    }
+    for (var loader in _fabricFullJson) {
+      if (loader['loader'] != null &&
+          loader['loader']['version'] == _fabricVersion) {
+        _fabricJson = loader;
+        break;
+      }
+    }
+    LogUtil.log('找到Fabric版本 $_fabricVersion 的Json: ${jsonEncode(_fabricJson)}', level: 'INFO');
+    try {
+      final String jsonString = jsonEncode(_fabricJson);
+      final String dirPath = versionPath;
+      final String filePath = '$dirPath${Platform.pathSeparator}fabric.json';
+      final Directory directory = Directory(dirPath);
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+        await LogUtil.log('已创建目录: $dirPath', level: 'INFO');
+      }
+      final File file = File(filePath);
+      await file.writeAsString(jsonString);
+      await LogUtil.log('已成功将fabricLoader保存到: $filePath');
+      setState(() {
+        _saveFabricJsonStatus = true;
+      });
+    } catch (e) {
+      await _showNotification('保存JSON时出错', e.toString());
+      await LogUtil.log('保存JSON时出错: $e', level: 'ERROR');
+    }
+  }
+
+  // 解析 Fabric JSON
+  Future<void> _parseFabricLoaderJson() async {
+    try {
+      _fabricDownloadTasks.clear();
+      final Map<String, dynamic> loaderJson = _fabricJson;
+      // 1. 解析 Loader
+      if (loaderJson.containsKey('loader') && loaderJson['loader'] != null) {
+        final loaderInfo = loaderJson['loader'];
+        if (loaderInfo.containsKey('maven') && loaderInfo['maven'] != null) {
+          final String loaderMaven = loaderInfo['maven'];
+          final List<String> loaderParts = loaderMaven.split(':');
+          if (loaderParts.length >= 3) {
+            final String group = loaderParts[0].replaceAll('.', '/');
+            final String artifact = loaderParts[1];
+            final String version = loaderParts[2];
+            final String relativePath = '$group/$artifact/$version/$artifact-$version.jar';
+            final String url = 'https://bmclapi2.bangbang93.com/maven/$group/$artifact/$version/$artifact-$version.jar';
+            _fabricDownloadTasks.add({'url': replaceWithMirror(url), 'path': relativePath});
+            await LogUtil.log('添加Fabric Loader: $relativePath', level: 'INFO');
+          }
+        }
+      }
+      // 2. 解析 Intermediary
+      if (loaderJson.containsKey('intermediary') && loaderJson['intermediary'] != null) {
+        final intermediaryInfo = loaderJson['intermediary'];
+        if (intermediaryInfo.containsKey('maven') && intermediaryInfo['maven'] != null) {
+          final String intermediaryMaven = intermediaryInfo['maven'];
+          final List<String> parts = intermediaryMaven.split(':');
+          if (parts.length >= 3) {
+            final String group = parts[0].replaceAll('.', '/');
+            final String artifact = parts[1];
+            final String version = parts[2];
+            final String relativePath = '$group/$artifact/$version/$artifact-$version.jar';
+            final String url = 'https://bmclapi2.bangbang93.com/maven/$group/$artifact/$version/$artifact-$version.jar';
+            _fabricDownloadTasks.add({'url': replaceWithMirror(url), 'path': relativePath});
+            await LogUtil.log('添加Intermediary: $relativePath', level: 'INFO');
+          }
+        }
+      }
+      // 3. 解析库文件
+      if (loaderJson.containsKey('launcherMeta') &&
+          loaderJson['launcherMeta'] != null &&
+          loaderJson['launcherMeta'].containsKey('libraries')) {
+        final libraries = loaderJson['launcherMeta']['libraries'];
+        // 3.1 解析通用库
+        if (libraries.containsKey('common') && libraries['common'] is List) {
+          final List<dynamic> commonLibs = libraries['common'];
+          for (var lib in commonLibs) {
+            if (lib.containsKey('name')) {
+              final String name = lib['name'];
+              String baseUrl = lib.containsKey('url') ? lib['url'] : 'https://bmclapi2.bangbang93.com/maven/';
+              final List<String> parts = name.split(':');
+              if (parts.length >= 3) {
+                final String group = parts[0].replaceAll('.', '/');
+                final String artifact = parts[1];
+                String version = parts[2];
+                // 处理可能包含额外信息的版本号
+                if (version.contains('@')) {
+                  version = version.split('@')[0];
+                }
+                final String relativePath = '$group/$artifact/$version/$artifact-$version.jar';
+                final String fullUrl = '$baseUrl$group/$artifact/$version/$artifact-$version.jar';
+                _fabricDownloadTasks.add({'url': replaceWithMirror(fullUrl), 'path': relativePath});
+              }
+            }
+          }
+        }
+        setState(() {
+          _parseFabricJson = true;
+        });
+      }
+      await LogUtil.log('找到 ${_fabricDownloadTasks.length} 个Fabric文件需要下载', level: 'INFO');
+      setState(() {
+        _parseFabricJson = true;
+      });
+    } catch (e) {
+      await _showNotification('解析Fabric Loader JSON失败', e.toString());
+      await LogUtil.log('解析Fabric Loader JSON失败: $e', level: 'ERROR');
+      setState(() {
+        _parseFabricJson = false;
+      });
+    }
+  }
+
   // 下载Fabric
   Future<void> _downloadFabricLibraries({int concurrentDownloads = 20}) async {
     if (_fabricDownloadTasks.isEmpty) {
       await _showNotification('Fabric库文件列表为空', '无法下载Fabric库文件');
-      await LogUtil.log('Fabric库文件列表为空，无法下载Fabric库文件', level: 'ERROR');
+      await LogUtil.log('Fabric库文件列表为空,无法下载Fabric库文件', level: 'ERROR');
       setState(() {
         _downloadFabric = true;
       });
@@ -730,7 +1013,7 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
       });
       await _downloadFabricLibraries(concurrentDownloads: concurrentDownloads);
     } else if (newFailedList.isNotEmpty) {
-      await LogUtil.log('已达最大并发重试次数，开始单线程重试 ${newFailedList.length} 个Fabric文件', level: 'INFO');
+      await LogUtil.log('已达最大并发重试次数,开始单线程重试 ${newFailedList.length} 个Fabric文件', level: 'INFO');
       await _singleThreadRetryDownload(newFailedList, "Fabric文件", (progress) {
         setState(() {
           _progress = progress;
@@ -743,6 +1026,7 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
       _downloadFabric = true;
     });
   }
+
 
   // 单线程重新尝试
   Future<void> _singleThreadRetryDownload(List<Map<String, String>> failedList, String fileType,
@@ -805,7 +1089,7 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
           });
         },
         onSuccess: () {
-          success = true;  // 正确设置成功标志
+          success = true;
         },
         onError: (error) async {
           await LogUtil.log('下载失败: $error, URL: $url', level: 'ERROR');
@@ -824,6 +1108,48 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     }
   }
 
+  // 复制整合包内容
+  Future<void> _copyOverridesContent(String versionPath) async {
+    try {
+      final overridesDir = Directory('$versionPath${Platform.pathSeparator}mrpack${Platform.pathSeparator}overrides');
+      if (!await overridesDir.exists()) {
+        await LogUtil.log('overrides文件夹不存在,跳过复制', level: 'INFO');
+        return;
+      }
+      await LogUtil.log('开始复制overrides文件夹内容到版本文件夹', level: 'INFO');
+      int copiedFiles = 0;
+      int copiedDirs = 0;
+      Future<void> copyDirectory(Directory source, Directory destination) async {
+        if (!await destination.exists()) {
+          await destination.create(recursive: true);
+          copiedDirs++;
+        }
+        await for (final entity in source.list(recursive: false, followLinks: false)) {
+          final String relativePath = entity.path.substring(source.path.length);
+          final String destinationPath = '${destination.path}$relativePath';
+          if (entity is File) {
+            await entity.copy(destinationPath);
+            copiedFiles++;
+            if (copiedFiles % 10 == 0) {
+              await LogUtil.log('已复制 $copiedFiles 个文件', level: 'INFO');
+            }
+          } else if (entity is Directory) {
+            await copyDirectory(entity, Directory(destinationPath));
+          }
+        }
+      }
+      await copyDirectory(overridesDir, Directory(versionPath));
+      await LogUtil.log('overrides内容复制完成,共复制 $copiedFiles 个文件和 $copiedDirs 个目录', level: 'INFO');
+      setState(() {
+        _copyOverrides = true;
+      });
+    } catch (e) {
+      await LogUtil.log('复制overrides内容失败: $e', level: 'ERROR');
+      await _showNotification('复制失败', '无法复制overrides内容: $e');
+      throw Exception('复制overrides内容失败: $e');
+    }
+  }
+
   // 获取系统内存
   void _getMemory(){
     int bytes = SysInfo.getTotalPhysicalMemory();
@@ -837,7 +1163,7 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     });
   }
 
-    // 游戏配置文件创建
+  // 游戏配置文件创建
   Future<void> _writeGameConfig() async {
     final prefs = await SharedPreferences.getInstance();
     _name = prefs.getString('SelectedPath') ?? '';
@@ -855,11 +1181,110 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     await prefs.setStringList(key, defaultConfig);
     gameList.add(widget.name);
     await prefs.setStringList('Game_$_name', gameList);
-    await LogUtil.log('已将 ${widget.name} 添加到游戏列表，当前列表: $gameList', level: 'INFO');
-    await LogUtil.log('安装以完成,详细请查看install.log', level: 'INFO');
+    await LogUtil.log('已将 ${widget.name} 添加到游戏列表,当前列表: $gameList', level: 'INFO');
+    await LogUtil.log('安装以完成', level: 'INFO');
     setState(() {
       _writeConfig = true;
     });
+  }
+
+
+  // 下载逻辑
+  Future<void> _startDownload() async {
+  final prefs = await SharedPreferences.getInstance();
+  final selectedGamePath = prefs.getString('SelectedPath') ?? '';
+  final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
+  final versionPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}';
+  try{
+    await LogUtil.log('正在下载整合包 ${widget.name}', level: 'INFO');
+    await _showNotification('开始下载', '正在下载 ${widget.name} \n你可以将启动器置于后台,安装完成将有通知提醒');
+    // 创建文件夹
+    await _createGameDirectories();
+    // 下载整合包信息
+    try {
+      await _downloadFile('$versionPath${Platform.pathSeparator}${widget.name}.mrpack', widget.url);
+      setState(() {
+        _downloadMrpack= true;
+      });
+    } catch (e) {
+      setState(() {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('下载整合包信息失败: $e')),
+        );
+      });
+      return;
+    }
+    // 解压整合包信息
+    await _unzipMrpackFile(versionPath);
+    // 解析整合包内容
+    await _parseMrpackContent(versionPath);
+    // 下载模组文件
+    await _downloadMods(versionPath);
+    // 保存Minecraft Json
+    await _saveMinecraftJson(versionPath);
+    // 解析游戏Json
+    await _parseGameJson('$versionPath${Platform.pathSeparator}${widget.name}.json');
+    // 下载资产索引文件
+      if (assetIndexURL != null) {
+        final assetIndexDir = '$gamePath${Platform.pathSeparator}assets${Platform.pathSeparator}indexes';
+        final assetIndexPath = '$assetIndexDir${Platform.pathSeparator}$assetIndexId.json';
+        try {
+          await _downloadFile('$gamePath${Platform.pathSeparator}assets${Platform.pathSeparator}indexes${Platform.pathSeparator}$assetIndexId.json', assetIndexURL!);
+          setState(() {
+            _downloadAssetJson = true;
+          });
+        } catch (e) {
+          setState(() {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('下载资产索引失败: $e')),
+            );
+          });
+          return;
+        }
+        // 解析资产索引文件
+        await _parseAssetIndex(assetIndexPath);
+        // 下载客户端
+        try {
+          await _downloadFile('$versionPath${Platform.pathSeparator}${widget.name}.jar', clientURL);
+          setState(() {
+            _downloadClient = true;
+          });
+        } catch (e) {
+          setState(() {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('下载客户端失败: $e')),
+            );
+          });
+          return;
+        }
+        // 下载库文件
+        await _downloadLibraries(concurrentDownloads: 30);
+        // 下载资源文件
+        await _downloadAssets(concurrentDownloads: 30);
+        // 提取LWJGL本地库路径
+        await extractLwjglNativeLibrariesPath('$versionPath${Platform.pathSeparator}${widget.name}.json',gamePath);
+        // 提取LWJGL Natives
+        await _extractLwjglNatives();
+        // Fabric Json
+        await _saveFabricJson(versionPath);
+        // 解析Fabric Json
+        await _parseFabricLoaderJson();
+        // 下载Fabric库文件
+        await _downloadFabricLibraries(concurrentDownloads: 30);
+        // 复制整合包文件
+        await _copyOverridesContent(versionPath);
+        // 写入游戏配置
+        await _writeGameConfig();
+        // 完成通知
+        await _showNotification('完成下载', '点击查看详细');
+      }
+  } catch (e) {
+    setState(() {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('发生错误: $e')),
+      );
+    });
+  }
   }
 
   @override
@@ -870,181 +1295,149 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
     _startDownload();
   }
 
-  // 下载逻辑
-void _startDownload() async {
-  final prefs = await SharedPreferences.getInstance();
-  final selectedGamePath = prefs.getString('SelectedPath') ?? '';
-  final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
-  final versionPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}';
-  final gameJsonURL = replaceWithMirror(widget.url);
-  try {
-    await LogUtil.log('正在下载 ${widget.version} + Fabric ${widget.fabricVersion}', level: 'INFO');
-    await _showNotification('开始下载', '正在下载 ${widget.name} 版本\n你可以将启动器置于后台,安装完成将有通知提醒');
-    // 创建文件夹
-    await _createGameDirectories();
-    // 下载版本json
-    try {
-      await _downloadFile('$versionPath${Platform.pathSeparator}${widget.name}.json', gameJsonURL);
-      setState(() {
-        _downloadJson = true;
-      });
-    } catch (e) {
-      await _showNotification('下载失败', '版本Json下载失败\n$e');
-      setState(() {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('下载版本Json失败: $e')),
-        );
-      });
-      return;
-    }
-    // 保存Fabric JSON到本地
-    await saveLoaderToJson(versionPath);
-    // 解析游戏Json
-    await parseGameJson('$versionPath${Platform.pathSeparator}${widget.name}.json');
-    // 下载资产索引文件
-    if (assetIndexURL != null) {
-      final assetIndexDir = '$gamePath${Platform.pathSeparator}assets${Platform.pathSeparator}indexes';
-      final assetIndexPath = '$assetIndexDir${Platform.pathSeparator}$assetIndexId.json';
-      try {
-        await _downloadFile('$gamePath${Platform.pathSeparator}assets${Platform.pathSeparator}indexes${Platform.pathSeparator}$assetIndexId.json', assetIndexURL!);
-        setState(() {
-          _downloadAssetJson = true;
-        });
-      } catch (e) {
-        setState(() {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('下载资产索引失败: $e')),
-          );
-        });
-        return;
-      }// 解析资源索引
-      await parseAssetIndex(assetIndexPath);
-      // 解析Fabric Json
-      await parseFabricLoaderJson();
-      // 下载客户端
-      try {
-        await _downloadFile('$versionPath${Platform.pathSeparator}${widget.name}.jar', clientURL);
-        setState(() {
-          _downloadClient = true;
-        });
-      } catch (e) {
-        setState(() {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('下载客户端失败: $e')),
-          );
-        });
-        return;
-      }
-      // 下载库文件
-      await _downloadLibraries(concurrentDownloads: 30);
-      // 下载资源文件
-      await _downloadAssets(concurrentDownloads: 30);
-      // 提取LWJGL本地库路径
-      await extractLwjglNativeLibrariesPath('$versionPath${Platform.pathSeparator}${widget.name}.json',gamePath);
-      // 提取LWJGL Natives
-      await _extractLwjglNatives();
-      // 下载 Fabric
-      await _downloadFabricLibraries(concurrentDownloads: 30);
-      // 写入游戏配置
-      await _writeGameConfig();
-      // 完成通知
-      await _showNotification('完成下载', '点击查看详细');
-    }
-  } catch (e) {
-    setState(() {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('发生错误: $e')),
-      );
-    });
-  }
-}
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('正在下载 ${widget.version} + Fabric ${widget.fabricVersion}'),
-        automaticallyImplyLeading: false,
+        title: Text('下载整合包 ${widget.name}'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
           Card(
             child: ListTile(
-              title: const Text('正在下载游戏Json'),
-              subtitle: Text(_downloadJson ? '下载完成' : '下载中...'),
-              trailing: _downloadJson
+              title: const Text('正在下载整合包信息'),
+              subtitle: Text(_downloadMrpack ? '下载完成' : '下载中...'),
+              trailing: _downloadMrpack
                 ? const Icon(Icons.check)
                 : const CircularProgressIndicator(),
             ),
           ),
-          if (_downloadJson) ...[
+          if (_downloadMrpack) ...[
             Card(
               child: ListTile(
-                title: const Text('正在保存Fabric Json'),
-                subtitle: Text(_saveFabricJson ? '保存完成' : '保存中...'),
-                trailing: _saveFabricJson
+                title: const Text('正在解压整合包信息'),
+                subtitle: Text(_unzipMrpack ? '解压完成' : '解压中...'),
+                trailing: _unzipMrpack
                   ? const Icon(Icons.check)
                   : const CircularProgressIndicator(),
               ),
             ),
-            if (_saveFabricJson) ...[
-              Card(
-                child: ListTile(
-                  title: const Text('正在解析游戏Json'),
-                  subtitle: Text(_parseGameJson ? '解析完成' : '解析中...'),
-                  trailing: _parseGameJson
-                    ? const Icon(Icons.check)
-                    : const CircularProgressIndicator(),
-                ),
-              ),
-            ],
-            if (_parseGameJson) ...[
-              Card(
-                child: ListTile(
-                  title: const Text('正在下载资源Json'),
-                  subtitle: Text(_downloadAssetJson ? '下载完成' : '下载中...'),
-                  trailing: _downloadAssetJson
-                    ? const Icon(Icons.check)
-                    : const CircularProgressIndicator(),
-                ),
-              ),
-            ]
-          ],
-          if (_downloadAssetJson) ...[
+          ],if (_unzipMrpack) ...[
             Card(
               child: ListTile(
-                title: const Text('正在解析资源Json'),
-                subtitle: Text(_parseAssetJson ? '解析完成' : '解析中...'),
-                trailing: _parseAssetJson
+                title: const Text('正在解析整合包信息'),
+                subtitle: Text(_parseMrpack ? '解析完成' : '解析中...'),
+                trailing: _parseMrpack
                   ? const Icon(Icons.check)
                   : const CircularProgressIndicator(),
               ),
             ),
-          ],
-          if (_parseAssetJson) ...[
+          ],if (_unzipMrpack) ...[
             Card(
               child: ListTile(
-                title: const Text('正在解析Fabric Json'),
-                subtitle: Text(_parseFabricJson ? '解析完成' : '解析中...'),
-                trailing: _parseFabricJson
+                title: const Text('正在解析整合包信息'),
+                subtitle: Text(_parseMrpack ? '解析完成' : '解析中...'),
+                trailing: _parseMrpack
                   ? const Icon(Icons.check)
                   : const CircularProgressIndicator(),
               ),
             ),
-          ],
-          if (_parseFabricJson) ...[
+          ],if (_parseMrpack) ...[
             Card(
-              child: ListTile(
-                title: const Text('正在下载客户端'),
-                subtitle: Text(_downloadClient ? '下载完成' : '下载中...'),
-                trailing: _downloadClient
-                  ? const Icon(Icons.check)
-                  : const CircularProgressIndicator(),
-              ),
+              child: Column(
+                children: [
+                  ListTile(
+                    title: const Text('正在下载模组文件'),
+                    subtitle: Text(_downloadModsStatus ? '下载完成' : '下载中... 已下载${(_progress * 100).toStringAsFixed(2)}%'),
+                    trailing: _downloadModsStatus
+                      ? const Icon(Icons.check)
+                      : const CircularProgressIndicator()
+                  ),
+                  if (!_downloadModsStatus)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: LinearProgressIndicator(value: _progress),
+                    ),
+                ],
+              )
             ),
-          ],
-          if (_downloadClient) ...[
+          ],if (_downloadModsStatus) ...[
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    title: const Text('正在获取游戏Json'),
+                    subtitle: Text(_downloadMinecraftJson ? '获取完成' : '获取中...'),
+                    trailing: _downloadMinecraftJson
+                      ? const Icon(Icons.check)
+                      : const CircularProgressIndicator()
+                  ),
+                ],
+              )
+            ),
+          ],if (_downloadMinecraftJson) ...[
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    title: const Text('正在解析游戏Json'),
+                    subtitle: Text(_parseGameJsonStatus ? '解析完成' : '解析中...'),
+                    trailing: _parseGameJsonStatus
+                      ? const Icon(Icons.check)
+                      : const CircularProgressIndicator()
+                  ),
+                ],
+              )
+            ),
+          ],if (_parseGameJsonStatus) ...[
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    title: const Text('正在获取资源Json'),
+                    subtitle: Text(_downloadAssetJson ? '获取完成' : '获取中...'),
+                    trailing: _downloadAssetJson
+                      ? const Icon(Icons.check)
+                      : const CircularProgressIndicator()
+                  ),
+                ],
+              )
+            ),
+          ],if (_downloadAssetJson) ...[
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    title: const Text('正在解析资源Json'),
+                    subtitle: Text(_parseAssetJson ? '解析完成' : '解析中...'),
+                    trailing: _parseAssetJson
+                      ? const Icon(Icons.check)
+                      : const CircularProgressIndicator()
+                  ),
+                ],
+              )
+            ),
+          ],if (_parseAssetJson) ...[
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    title: const Text('正在下载客户端'),
+                    subtitle: Text(_downloadClient ? '下载完成' : '下载中... 已下载${(_progress * 100).toStringAsFixed(2)}%'),
+                    trailing: _downloadClient
+                      ? const Icon(Icons.check)
+                      : const CircularProgressIndicator()
+                  ),
+                  if (!_downloadClient)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: LinearProgressIndicator(value: _progress),
+                    ),
+                ],
+              )
+            ),
+          ],if (_downloadClient) ...[
             Card(
               child: Column(
                 children: [
@@ -1063,8 +1456,7 @@ void _startDownload() async {
               ],
             ),
             )
-          ],
-          if (_downloadLibrary) ...[
+          ],if (_downloadLibrary) ...[
             Card(
               child: Column(
                 children: [
@@ -1083,8 +1475,7 @@ void _startDownload() async {
                 ],
               ),
             )
-          ],
-          if (_downloadAsset) ...[
+          ],if (_downloadAsset) ...[
             Card(
               child: ListTile(
                 title: const Text('正在提取LWJGL路径'),
@@ -1093,8 +1484,8 @@ void _startDownload() async {
                   ? const Icon(Icons.check)
                   : const CircularProgressIndicator(),
               ),
-            )],
-            if (_extractedLwjglNativesPath) ...[
+            )
+          ],if (_extractedLwjglNativesPath) ...[
             Card(
               child: ListTile(
                 title: const Text('正在提取LWJGL'),
@@ -1104,8 +1495,27 @@ void _startDownload() async {
                   : const CircularProgressIndicator(),
               ),
             )
-          ],
-          if (_extractedLwjglNatives) ...[
+          ],if (_extractedLwjglNatives) ...[
+            Card(
+              child: ListTile(
+                title: const Text('正在获取Fabric Json'),
+                subtitle: Text(_saveFabricJsonStatus ? '获取完成' : '获取中...'),
+                trailing: _saveFabricJsonStatus
+                  ? const Icon(Icons.check)
+                  : const CircularProgressIndicator(),
+              ),
+            )
+          ],if (_saveFabricJsonStatus) ...[
+            Card(
+              child: ListTile(
+                title: const Text('正在解析Fabric Json'),
+                subtitle: Text(_parseFabricJson ? '解析完成' : '解析中...'),
+                trailing: _parseFabricJson
+                  ? const Icon(Icons.check)
+                  : const CircularProgressIndicator(),
+              ),
+            )
+          ],if (_extractedLwjglNatives) ...[
             Card(
               child: Column(
                 children: [
@@ -1115,8 +1525,7 @@ void _startDownload() async {
                     trailing: _downloadFabric
                       ? const Icon(Icons.check)
                       : const CircularProgressIndicator(),
-                  ),
-                  if (!_downloadFabric)
+                  ),if (!_downloadFabric)
                     Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: LinearProgressIndicator(value: _progress),
@@ -1124,8 +1533,17 @@ void _startDownload() async {
                 ],
               ),
             )
-          ],
-          if (_downloadFabric) ...[
+          ],if (_downloadFabric) ...[
+            Card(
+              child: ListTile(
+                title: const Text('正在复制整合包文件'),
+                subtitle: Text(_copyOverrides ? '复制完成' : '复制中...'),
+                trailing: _copyOverrides
+                  ? const Icon(Icons.check)
+                  : const CircularProgressIndicator(),
+              ),
+            )
+          ],if (_copyOverrides) ...[
             Card(
               child: ListTile(
                 title: const Text('正在写入配置文件'),
