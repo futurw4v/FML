@@ -69,7 +69,9 @@ class DownloadNeoForgePageState extends State<DownloadNeoForgePage> {
       .replaceAll('launcher.mojang.com', 'bmclapi2.bangbang93.com')
       .replaceAll('launchermeta.mojang.com', 'bmclapi2.bangbang93.com')
       .replaceAll('libraries.minecraft.net', 'bmclapi2.bangbang93.com/maven')
-      .replaceAll('resources.download.minecraft.net', 'bmclapi2.bangbang93.com/assets');
+      .replaceAll('resources.download.minecraft.net', 'bmclapi2.bangbang93.com/assets')
+      .replaceAll('https://maven.neoforged.net/releases/net/neoforged/forge', 'https://bmclapi2.bangbang93.com/maven/net/neoforged/forge')
+      .replaceAll('https://maven.neoforged.net/releases/net/neoforged/neoforge', 'https://bmclapi2.bangbang93.com/maven/net/neoforged/neoforge');
   }
 
     // 初始化通知

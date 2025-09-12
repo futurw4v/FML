@@ -89,7 +89,9 @@ class FabricModpackPageState extends State<FabricModpackPage> {
       .replaceAll('launcher.mojang.com', 'bmclapi2.bangbang93.com')
       .replaceAll('launchermeta.mojang.com', 'bmclapi2.bangbang93.com')
       .replaceAll('libraries.minecraft.net', 'bmclapi2.bangbang93.com/maven')
-      .replaceAll('resources.download.minecraft.net', 'bmclapi2.bangbang93.com/assets');
+      .replaceAll('resources.download.minecraft.net', 'bmclapi2.bangbang93.com/assets')
+      .replaceAll('https://meta.fabricmc.net', 'https://bmclapi2.bangbang93.com/fabric-meta')
+      .replaceAll('https://maven.fabricmc.net', 'https://bmclapi2.bangbang93.com/maven');
   }
 
   // 初始化通知
@@ -322,7 +324,6 @@ class FabricModpackPageState extends State<FabricModpackPage> {
       setState(() {
         _downloadModsStatus = true;
       });
-      await _showNotification('模组下载完成', '已成功下载并安装所有模组');
       await LogUtil.log('所有模组文件处理完成', level: 'INFO');
     } catch (e) {
       await LogUtil.log('下载模组失败: $e', level: 'ERROR');
@@ -789,7 +790,6 @@ class FabricModpackPageState extends State<FabricModpackPage> {
   // Fabric Json
   Future<void> _saveFabricJson(String versionPath) async {
     LogUtil.log('加载$_minecraftVersion版本列表', level: 'INFO');
-    await _loadAppVersion();
     try {
       final options = Options(
         headers: {
@@ -1291,6 +1291,7 @@ class FabricModpackPageState extends State<FabricModpackPage> {
   void initState() {
     super.initState();
     _initNotifications();
+    _loadAppVersion();
     _getMemory();
     _startDownload();
   }

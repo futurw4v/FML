@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/download/modrinth/type/download_modpack/loader/fabric_modpack.dart';
+import 'package:fml/pages/download/modrinth/type/download_modpack/loader/neoforge_modpack.dart';
 
 class DownloadInfo extends StatefulWidget {
   const DownloadInfo(
@@ -148,6 +149,16 @@ class DownloadInfoState extends State<DownloadInfo> {
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) => FabricModpackPage(
+                  name: _gameName!,
+                  url: _downloadUrl ?? '',
+                ),
+              ),
+            );
+          }if (widget.version['loaders']?.join(", ") == 'neoforge') {
+            LogUtil.log('开始下载模组包: $_fileName 类型: ${widget.version['loaders']}', level: 'INFO');
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => NeoForgeModpackPage(
                   name: _gameName!,
                   url: _downloadUrl ?? '',
                 ),

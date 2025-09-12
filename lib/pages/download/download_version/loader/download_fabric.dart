@@ -65,7 +65,9 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
       .replaceAll('launcher.mojang.com', 'bmclapi2.bangbang93.com')
       .replaceAll('launchermeta.mojang.com', 'bmclapi2.bangbang93.com')
       .replaceAll('libraries.minecraft.net', 'bmclapi2.bangbang93.com/maven')
-      .replaceAll('resources.download.minecraft.net', 'bmclapi2.bangbang93.com/assets');
+      .replaceAll('resources.download.minecraft.net', 'bmclapi2.bangbang93.com/assets')
+      .replaceAll('https://meta.fabricmc.net', 'https://bmclapi2.bangbang93.com/fabric-meta')
+      .replaceAll('https://maven.fabricmc.net', 'https://bmclapi2.bangbang93.com/maven');
   }
 
   // 初始化通知
