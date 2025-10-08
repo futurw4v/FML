@@ -24,7 +24,7 @@ Future<void> initVersionInfo() async {
 }
 
 // 日志
-initLogs() async {
+Future<void> initLogs() async {
   await LogUtil.clearLogs();
   await LogUtil.log('启动FML,版本: $appVersion,构建号: $buildNumber', level: 'INFO');
 }

@@ -213,11 +213,11 @@ class DownloadVersionState extends State<DownloadVersion> {
                   ),
                 ),
                 ..._versionList
-                    .where((version) =>
+                    .where((dynamic version) =>
                     _showSnapshots || version['type'] != 'snapshot' &&
                     (_showOld || (version['type'] != 'old_alpha' && version['type'] != 'old_beta')))
                     .map(
-                      (version) => Card(
+                      (dynamic version) => Card(
                         child: ListTile(
                           title: Text(version['id']),
                           subtitle: Text('类型: ${version['type']} - 发布时间: ${_formatDate(version['releaseTime'])}'),

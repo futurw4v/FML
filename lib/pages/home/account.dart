@@ -28,13 +28,30 @@ class AccountPageState extends State<AccountPage> {
   }
 
 // 账号信息
-  Future<Map<String, String>> _getAccountInfo(String name) async {
+  Future<Map<String, dynamic>> _getAccountInfo(String name) async {
     final prefs = await SharedPreferences.getInstance();
-    final uuid = prefs.getStringList('Account_$name')?[0] ?? '';
-    final online = prefs.getStringList('Account_$name')?[1] ?? '';
-    final isCustomUUID = prefs.getStringList('Account_$name')?[2] ?? '';
-    final customUUID = prefs.getStringList('Account_$name')?[3] ?? '';
-    return {'uuid': uuid, 'online': online, 'isCustomUUID': isCustomUUID, 'customUUID': customUUID};
+    final accountData = prefs.getStringList('Account_$name') ?? [];
+    if (accountData.isEmpty) {
+      return {'error': '找不到账号数据'};
+    }
+    final uuid = accountData[0];
+    final loginMode = accountData[1]; // '0'离线, '1'正版, '2'外置
+    final isCustomUUID = accountData[2];
+    final customUUID = accountData[3];
+    // 基本信息
+    Map<String, dynamic> info = {
+      'uuid': uuid,
+      'loginMode': loginMode,
+      'isCustomUUID': isCustomUUID,
+      'customUUID': customUUID,
+    };
+    // 外置登录
+    if (loginMode == '2' && accountData.length >= 8) {
+      info['serverUrl'] = accountData[4];
+      info['username'] = accountData[5];
+      info['accessToken'] = accountData[7];
+    }
+    return info;
   }
 
 // 跳转添加账号页并在返回后刷新
@@ -44,8 +61,18 @@ class AccountPageState extends State<AccountPage> {
       MaterialPageRoute(builder: (context) => const NewAccountPage()),
     );
     if (mounted) {
-    _loadAccounts();
+      _loadAccounts();
+    }
   }
+
+  // 获取登录模式显示文本
+  String _getLoginModeText(String loginMode) {
+    switch (loginMode) {
+      case '0': return '离线登录';
+      case '1': return '正版登录';
+      case '2': return '外置登录(authlib-injector)';
+      default: return '未知类型';
+    }
   }
 
   @override
@@ -59,21 +86,40 @@ class AccountPageState extends State<AccountPage> {
           : ListView.builder(
               itemCount: _accounts.length,
               itemBuilder: (context, index) {
-                return FutureBuilder<Map<String, String>>(
+                return FutureBuilder<Map<String, dynamic>>(
                   future: _getAccountInfo(_accounts[index]),
                   builder: (context, snapshot) {
-                    String uuid = snapshot.data?['uuid'] ?? '';
-                    String online = snapshot.data?['online'] ?? '';
-                    String isCustomUUID = snapshot.data?['isCustomUUID'] ?? '';
-                    String customUUID = snapshot.data?['customUUID'] ?? '';
+                    if (!snapshot.hasData || snapshot.data?.containsKey('error') == true) {
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: ListTile(
+                          leading: const Icon(Icons.error),
+                          title: Text(_accounts[index]),
+                          subtitle: Text(snapshot.data?['error'] ?? '加载账号信息失败'),
+                        ),
+                      );
+                    }
+                    final data = snapshot.data!;
+                    final uuid = data['uuid'] ?? '';
+                    final loginMode = data['loginMode'] ?? '';
+                    final isCustomUUID = data['isCustomUUID'] ?? '';
+                    final customUUID = data['customUUID'] ?? '';
+                    String subtitle = '';
+                    if (isCustomUUID == '1') {
+                      subtitle += '已启用自定义UUID: $customUUID\n';
+                    } else {
+                      subtitle += 'UUID: $uuid\n';
+                    }
+                    subtitle += _getLoginModeText(loginMode);
+                    if (loginMode == '2') {
+                      subtitle += '\n服务器: ${data['serverUrl'] ?? ''}';
+                    }
+                    // 显示账号信息
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: ListTile(
-                        leading: const Icon(Icons.account_circle),
                         title: Text(_accounts[index]),
-                        subtitle: Text('生成UUID: $uuid\n'
-                            '${isCustomUUID == '1' ? '已启用自定义UUID: $customUUID' : '未启用自定义UUID'}\n'
-                            '${online == 'true' ? '正版账号' : '离线账号'}'),
+                        subtitle: Text(subtitle),
                         onTap: () async {
                           final prefs = await SharedPreferences.getInstance();
                           await prefs.setString('SelectedAccount', _accounts[index]);
@@ -83,23 +129,23 @@ class AccountPageState extends State<AccountPage> {
                           );
                           Navigator.pop(context);
                         },
-                    trailing: IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () async{
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AccountManagementPage(accountName: _accounts[index]),
-                          ),
-                        );
-                        if (mounted) {
-                          _loadAccounts();
-                        }
-                      },
-                    ),
-                  ),
-                );
-                },
+                        trailing: IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () async{
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AccountManagementPage(accountName: _accounts[index]),
+                              ),
+                            );
+                            if (mounted) {
+                              _loadAccounts();
+                            }
+                          },
+                        ),
+                      ),
+                    );
+                  },
                 );
               },
             ),
