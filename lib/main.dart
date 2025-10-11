@@ -282,26 +282,29 @@ class MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  // 检查更新
-  Future<void> _checkUpdate() async {
-    try {
-      LogUtil.log('检查更新...,ua FML/$appVersion', level: 'INFO');
-      final dio = Dio();
-      dio.options.headers['User-Agent'] = 'FML/$appVersion';
-      final response = await dio.get('https://lapi.lxdklp.top/FML/version');
-      LogUtil.log('status: ${response.statusCode}', level: 'INFO');
-      LogUtil.log('data: ${response.data}', level: 'INFO');
-      if (response.statusCode == 200) {
-        final int latestVersion = int.tryParse(response.data.toString()) ?? buildNumber;
-        LogUtil.log('最新版本: $latestVersion');
-        if (latestVersion > buildNumber && mounted) {
-          _showUpdateDialog(latestVersion.toString());
-        }
+// 检查更新
+Future<void> _checkUpdate() async {
+  try {
+    LogUtil.log('检查更新...,ua FML/$appVersion', level: 'INFO');
+    final dio = Dio();
+    dio.options.headers['User-Agent'] = 'FML/$appVersion';
+    final response = await dio.get('https://api.lxdklp.top/v1/fml/get_version');
+    LogUtil.log('status: ${response.statusCode}', level: 'INFO');
+    LogUtil.log('data: ${response.data}', level: 'INFO');
+    if (response.statusCode == 200) {
+      String rawVersionData = response.data.toString();
+      String cleanedVersionString = rawVersionData.replaceAll("[", "").replaceAll("]", "");
+      final int latestVersion = int.tryParse(cleanedVersionString) ?? buildNumber;
+      LogUtil.log('最新版本: $latestVersion');
+      if (latestVersion > buildNumber && mounted) {
+        _showUpdateDialog(latestVersion.toString());
       }
-    } catch (e) {
-      LogUtil.log(e.toString(), level: 'ERROR');
     }
+  } catch (e) {
+    LogUtil.log(e.toString(), level: 'ERROR');
   }
+}
+
 
   void _showUpdateDialog(String latestVersion) {
     showDialog(
