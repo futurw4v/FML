@@ -22,13 +22,23 @@
 | Path_$name | 版本路径 | list(string) |
 | Game_$name | 版本列表 | list(string) |
 
-账号配置 Account_$name list(string)
+离线账号配置 Account_$name list(string)
 | 序号 | 值 |
 | -- | -- |
-| 0 | 生成UUID |
-| 1 | 登录模式(2外置,1正版,0离线) |
+| 0 | 登录模式(0) |
+| 1 | 生成UUID |
 | 2 | 是否启用自定义UUID(1启用,0禁用) |
 | 3 | 自定义UUID |
+
+外置登录账号配置 Account_$name list(string)
+| 序号 | 值 |
+| -- | -- |
+| 0 | 登录模式(2) |
+| 1 | UUID |
+| 2 | 验证服务器URL |
+| 3 | 服务器用户名 |
+| 4 | 服务器密码 |
+| 5 | 令牌 |
 
 版本配置 Config_${path}_$game list(string)
 | 序号 | 值 |

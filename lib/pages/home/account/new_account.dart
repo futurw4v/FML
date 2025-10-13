@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:path/path.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:crypto/crypto.dart';
-import 'dart:convert';
-// 导入外置登录模块
-import 'package:fml/function/account/authlib_injector.dart' as auth_lib;
+// 账号模块
+import 'package:fml/function/account/offline.dart' as offline_lib;
+import 'package:fml/function/account/authlib_injector.dart' as authlib_injector_lib;
 
 class NewAccountPage extends StatefulWidget {
   const NewAccountPage({super.key});
@@ -16,7 +13,6 @@ class NewAccountPage extends StatefulWidget {
 class NewAccountPageState extends State<NewAccountPage> {
   // 登录模式
   String _loginMode = 'offline';
-  String _uuid = '';
   static const String defaultAuthServer = 'https://littleskin.cn/api/yggdrasil';
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _serverUrlController = TextEditingController();
@@ -49,32 +45,6 @@ class NewAccountPageState extends State<NewAccountPage> {
     setState(() {
       _obscurePassword = !_obscurePassword;
     });
-  }
-
-  // 保存账号
-  Future<void> _saveAccountName(String name, String uuid, String loginMode) async {
-    String isCustomUUID = '0';
-    String customUUID = '';
-    final prefs = await SharedPreferences.getInstance();
-    List<String> accounts = prefs.getStringList('AccountsList') ?? [];
-    if (accounts.contains(name)) {
-      ScaffoldMessenger.of(context as BuildContext).showSnackBar(
-        SnackBar(content: Text('账号 $name 已存在')),
-      );
-      return;
-    }
-    if (!accounts.contains(name)) {
-      accounts.add(name);
-      await prefs.setStringList('AccountsList', accounts);
-    }
-    if (loginMode == 'online') {
-      await prefs.setStringList('Account_$name',
-        [uuid, '1', isCustomUUID, customUUID]);
-    }
-    else {
-      await prefs.setStringList('Account_$name',
-        [uuid, '0', isCustomUUID, customUUID]);
-    }
   }
 
   @override
@@ -212,21 +182,22 @@ class NewAccountPageState extends State<NewAccountPage> {
             }
             final String serverUrl = _serverUrlController.text.isEmpty ?
               defaultAuthServer : _serverUrlController.text;
-            await auth_lib.saveAuthLibInjectorAccount(
-              context, serverUrl, _usernameController.text, _passwordController.text);
+            await authlib_injector_lib.saveAuthLibInjectorAccount(
+              context,
+              serverUrl,
+              _usernameController.text,
+              _passwordController.text
+              );
             return;
           }
-          // 处理其他登录方式
-          String loginModeText = _loginMode == 'online' ? '正版账号' : '离线账号';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('正在添加$loginModeText: ${_nameController.text}')),
-          );
           // 离线UUID生成
           if (_loginMode == 'offline') {
-            _uuid = md5.convert(utf8.encode('OfflinePlayer:${_nameController.text}')).toString();
+            offline_lib.saveOffineAccount(
+              context,
+              _nameController.text
+              );
+            return;
           }
-          _saveAccountName(_nameController.text, _uuid, _loginMode);
-          Navigator.pop(context);
         },
         child: const Icon(Icons.check),
       ),

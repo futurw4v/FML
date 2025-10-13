@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
-import '../log.dart';
+import 'package:fml/function/log.dart';
 
 // 认证响应模型
 class AuthResponse {
@@ -168,13 +168,9 @@ Future<void> _saveAccount(
   } else {
     LogUtil.log('账号已存在，更新账号信息: $name', level: 'INFO');
   }
-  String isCustomUUID = '0';
-  String customUUID = '';
   await prefs.setStringList('Account_$name', [
-    uuid,
     '2',
-    isCustomUUID,
-    customUUID,
+    uuid,
     serverUrl,
     username,
     password,

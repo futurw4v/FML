@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fml/pages/home/account/new_account.dart';
-import 'package:fml/pages/home/account/account_management.dart';
+import 'package:fml/pages/home/account/offline_account_management.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -34,22 +34,22 @@ class AccountPageState extends State<AccountPage> {
     if (accountData.isEmpty) {
       return {'error': '找不到账号数据'};
     }
-    final uuid = accountData[0];
-    final loginMode = accountData[1]; // '0'离线, '1'正版, '2'外置
-    final isCustomUUID = accountData[2];
-    final customUUID = accountData[3];
     // 基本信息
     Map<String, dynamic> info = {
-      'uuid': uuid,
-      'loginMode': loginMode,
-      'isCustomUUID': isCustomUUID,
-      'customUUID': customUUID,
+      'loginMode': accountData[0],
+      'uuid': accountData[1],
     };
+    // 离线登录
+    if (accountData[0] == '0') {
+      info['isCustomUUID'] = accountData[2];
+      info['customUUID'] = accountData[3];
+      if (accountData[2] == '1' && accountData[3].isNotEmpty) {
+        info['uuid'] = accountData[3];
+      }
+    }
     // 外置登录
-    if (loginMode == '2' && accountData.length >= 8) {
-      info['serverUrl'] = accountData[4];
-      info['username'] = accountData[5];
-      info['accessToken'] = accountData[7];
+    if (accountData[0] == '2') {
+      info['serverUrl'] = accountData[2];
     }
     return info;
   }
@@ -73,6 +73,44 @@ class AccountPageState extends State<AccountPage> {
       case '2': return '外置登录(authlib-injector)';
       default: return '未知类型';
     }
+  }
+
+  // 删除账号
+  Future<void> _deleteAccount(name) async {
+    final prefs = await SharedPreferences.getInstance();
+    final accounts = prefs.getStringList('AccountsList') ?? [];
+    accounts.remove(name);
+    await prefs.setStringList('AccountsList', accounts);
+    await prefs.remove('Account_$name}');
+    if (name == prefs.getString('SelectedAccount')) {
+      await prefs.remove('SelectedAccount');
+    }
+    if (!mounted) return;
+    Navigator.pop(context);
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已删除账号: $name')),
+    );
+  }
+
+  // 删除账号提示框
+  Future<void> _showDeleteDialog(name) async{
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('删除账号'),
+        content: Text('确定删除账号 $name ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+            TextButton(
+            onPressed: () async {
+              _deleteAccount(name);
+            },
+            child: const Text('删除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -101,20 +139,59 @@ class AccountPageState extends State<AccountPage> {
                     }
                     final data = snapshot.data!;
                     final uuid = data['uuid'] ?? '';
-                    final loginMode = data['loginMode'] ?? '';
-                    final isCustomUUID = data['isCustomUUID'] ?? '';
-                    final customUUID = data['customUUID'] ?? '';
+                    final loginMode = data['loginMode'] ?? '3';
                     String subtitle = '';
-                    if (isCustomUUID == '1') {
-                      subtitle += '已启用自定义UUID: $customUUID\n';
+                    if (loginMode == '0') {
+                      subtitle += _getLoginModeText(loginMode);
+                      if (data['isCustomUUID'] == '1') {
+                        subtitle += '\n已启用自定义UUID: ${data['customUUID']}\n';
+                      } else {
+                        subtitle += '\nUUID: $uuid';
+                      }
+                    } else if (loginMode == '1') {
+                      subtitle += _getLoginModeText(loginMode);
+                      subtitle += '\nUUID: $uuid\n';
+                    } else if (loginMode == '2') {
+                      subtitle += _getLoginModeText(loginMode);
+                      subtitle += '\nUUID: $uuid\n';
+                      subtitle += '服务器URL: ${data['serverUrl'] ?? '错误'}';
                     } else {
-                      subtitle += 'UUID: $uuid\n';
+                      subtitle += _getLoginModeText(loginMode);
                     }
-                    subtitle += _getLoginModeText(loginMode);
-                    if (loginMode == '2') {
-                      subtitle += '\n服务器: ${data['serverUrl'] ?? ''}';
+                    // 显示离线账号信息
+                    if (loginMode == '0') {
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: ListTile(
+                          title: Text(_accounts[index]),
+                          subtitle: Text(subtitle),
+                          onTap: () async {
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setString('SelectedAccount', _accounts[index]);
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('已切换账号: ${_accounts[index]}')),
+                            );
+                            Navigator.pop(context);
+                          },
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () async{
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => OfflineAccountManagementPage(accountName: _accounts[index]),
+                                ),
+                              );
+                              if (mounted) {
+                                _loadAccounts();
+                              }
+                            },
+                          ),
+                        ),
+                      );
                     }
-                    // 显示账号信息
+                    // 显示其它账号信息
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: ListTile(
@@ -130,19 +207,11 @@ class AccountPageState extends State<AccountPage> {
                           Navigator.pop(context);
                         },
                         trailing: IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () async{
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AccountManagementPage(accountName: _accounts[index]),
-                              ),
-                            );
-                            if (mounted) {
-                              _loadAccounts();
-                            }
+                          icon: const Icon(Icons.delete),
+                          onPressed: () async {
+                            _showDeleteDialog(_accounts[index]);
                           },
-                        ),
+                        )
                       ),
                     );
                   },

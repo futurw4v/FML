@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class AccountManagementPage extends StatefulWidget {
+class OfflineAccountManagementPage extends StatefulWidget {
   final String accountName;
-  const AccountManagementPage({super.key, required this.accountName});
+  const OfflineAccountManagementPage({super.key, required this.accountName});
 
   @override
-  AccountManagementPageState createState() => AccountManagementPageState();
+  OfflineAccountManagementPageState createState() => OfflineAccountManagementPageState();
 }
 
-class AccountManagementPageState extends State<AccountManagementPage> {
+class OfflineAccountManagementPageState extends State<OfflineAccountManagementPage> {
   String _uuid = '';
   bool _online = false;
   bool _isCustomUUID = false;
@@ -44,8 +44,7 @@ class AccountManagementPageState extends State<AccountManagementPage> {
       list.add('');
     }
     return {
-      'uuid': list[0],
-      'online': list[1],
+      'uuid': list[1],
       'isCustomUUID': list[2],
       'customUUID': list[3],
     };
@@ -54,7 +53,6 @@ class AccountManagementPageState extends State<AccountManagementPage> {
     final info = await _getAccountInfo(widget.accountName);
     setState(() {
       _uuid = info['uuid'] ?? '';
-      _online = (info['online'] == 'true');
       _isCustomUUID = (info['isCustomUUID'] == '1');
       _customUUID = info['customUUID'] ?? '';
       if (_isCustomUUID) {
@@ -87,20 +85,20 @@ class AccountManagementPageState extends State<AccountManagementPage> {
       await prefs.remove('SelectedAccount');
     }
     if (!mounted) return;
-    Navigator.pop(context); // 关闭对话框
-    Navigator.pop(context); // 返回上一页
+    Navigator.pop(context);
+    Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('已删除账号: ${widget.accountName}')),
     );
   }
 
   // 删除账号提示框
-  void _showDeleteDialog() {
+  Future<void> _showDeleteDialog() async {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('删除账号'),
-        content: Text('确定删除账号 ${widget.accountName} ？'),
+        content: Text('确定删除账号 ${widget.accountName} ?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
             TextButton(
