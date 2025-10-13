@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/home.dart';
@@ -17,7 +18,6 @@ Future<void> initVersionInfo() async {
   final PackageInfo packageInfo = await PackageInfo.fromPlatform();
   appVersion = packageInfo.version;
   buildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
-  // 将版本信息保存到 SharedPreferences
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString('version', appVersion);
   await prefs.setInt('build', buildNumber);
@@ -26,7 +26,11 @@ Future<void> initVersionInfo() async {
 // 日志
 Future<void> initLogs() async {
   await LogUtil.clearLogs();
-  await LogUtil.log('启动FML,版本: $appVersion,构建号: $buildNumber', level: 'INFO');
+  if (kDebugMode) {
+    await LogUtil.log('启动FML,平台:${Platform.operatingSystem},版本: $appVersion,构建号: $buildNumber,debug模式', level: 'INFO');
+  } else {
+    await LogUtil.log('启动FML,平台:${Platform.operatingSystem},版本: $appVersion,构建号: $buildNumber', level: 'INFO');
+  }
 }
 
 void main() async {
@@ -49,7 +53,6 @@ class MyApp extends StatefulWidget {
 class MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.system;
   Color _themeColor = Colors.blue;
-  // 字体可变权重参数（可按需调高/调低）
   static const double bodyWght = 520;     // 正文
   static const double labelWght = 520;    // 标签/按钮
   static const double titleWght = 700;    // 标题
@@ -124,7 +127,7 @@ class MyAppState extends State<MyApp> {
     await prefs.setInt('themeColor', colorValue);
   }
 
-  // ===== 可变字体权重统一处理 =====
+  // 可变字体权重
   TextTheme _withVariableWeights(TextTheme base) {
     TextStyle setW(TextStyle? s, double w) => (s ?? const TextStyle()).copyWith(
           fontFamily: 'NotoSans',
@@ -160,7 +163,6 @@ class MyAppState extends State<MyApp> {
     return ThemeData(
       useMaterial3: true,
       fontFamily: 'NotoSans',
-      fontFamilyFallback: const ['Microsoft YaHei', 'Segoe UI', 'Arial'],
       colorScheme: scheme,
       textTheme: textTheme,
       appBarTheme: AppBarTheme(
@@ -213,6 +215,7 @@ class MyHomePageState extends State<MyHomePage> {
     await prefs.setInt('build', buildNumber);
   }
 
+  // 构建页面
   Widget _buildPage(int index) {
     switch (index) {
       case 1:
@@ -243,7 +246,8 @@ class MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  void _showJavaNotFoundDialog() {
+  // 显示Java未找到的对话框
+  Future<void> _showJavaNotFoundDialog() async{
     WidgetsBinding.instance.addPostFrameCallback((_) {
       showDialog(
         context: context,
@@ -282,31 +286,35 @@ class MyHomePageState extends State<MyHomePage> {
     }
   }
 
-// 检查更新
-Future<void> _checkUpdate() async {
-  try {
-    LogUtil.log('检查更新...,ua FML/$appVersion', level: 'INFO');
-    final dio = Dio();
-    dio.options.headers['User-Agent'] = 'FML/$appVersion';
-    final response = await dio.get('https://api.lxdklp.top/v1/fml/get_version');
-    LogUtil.log('status: ${response.statusCode}', level: 'INFO');
-    LogUtil.log('data: ${response.data}', level: 'INFO');
-    if (response.statusCode == 200) {
-      String rawVersionData = response.data.toString();
-      String cleanedVersionString = rawVersionData.replaceAll("[", "").replaceAll("]", "");
-      final int latestVersion = int.tryParse(cleanedVersionString) ?? buildNumber;
-      LogUtil.log('最新版本: $latestVersion');
-      if (latestVersion > buildNumber && mounted) {
-        _showUpdateDialog(latestVersion.toString());
+  // 检查更新
+  Future<void> _checkUpdate() async {
+    try {
+      LogUtil.log('正在检查更新', level: 'INFO');
+      final dio = Dio();
+      if (kDebugMode) {
+        dio.options.headers['User-Agent'] = 'FML/${Platform.operatingSystem}/$appVersion debug';
+      } else {
+        dio.options.headers['User-Agent'] = 'FML/${Platform.operatingSystem}/$appVersion';
       }
+      final response = await dio.get('https://api.lxdklp.top/v1/fml/get_version');
+      LogUtil.log('status: ${response.statusCode}', level: 'INFO');
+      LogUtil.log('data: ${response.data}', level: 'INFO');
+      if (response.statusCode == 200) {
+        String rawVersionData = response.data.toString();
+        String cleanedVersionString = rawVersionData.replaceAll("[", "").replaceAll("]", "");
+        final int latestVersion = int.tryParse(cleanedVersionString) ?? buildNumber;
+        LogUtil.log('最新版本: $latestVersion');
+        if (latestVersion > buildNumber && mounted) {
+          _showUpdateDialog(latestVersion.toString());
+        }
+      }
+    } catch (e) {
+      LogUtil.log(e.toString(), level: 'ERROR');
     }
-  } catch (e) {
-    LogUtil.log(e.toString(), level: 'ERROR');
   }
-}
 
-
-  void _showUpdateDialog(String latestVersion) {
+  // 显示更新对话框
+  Future<void> _showUpdateDialog(String latestVersion) async{
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
