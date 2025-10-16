@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fml/function/log.dart';
 
 class OfflineAccountManagementPage extends StatefulWidget {
   final String accountName;
@@ -72,8 +73,8 @@ class OfflineAccountManagementPageState extends State<OfflineAccountManagementPa
       _isCustomUUID ? _customUUIDController.text : '',
     ];
     await prefs.setStringList('Account_${widget.accountName}', list);
+    LogUtil.log('保存${widget.accountName}', level: 'INFO');
   }
-
   // 删除账号
   Future<void> _deleteAccount() async {
     final prefs = await SharedPreferences.getInstance();
@@ -84,6 +85,7 @@ class OfflineAccountManagementPageState extends State<OfflineAccountManagementPa
     if (widget.accountName == prefs.getString('SelectedAccount')) {
       await prefs.remove('SelectedAccount');
     }
+    LogUtil.log('已删除账号: ${widget.accountName}', level: 'INFO');
     if (!mounted) return;
     Navigator.pop(context);
     Navigator.pop(context);

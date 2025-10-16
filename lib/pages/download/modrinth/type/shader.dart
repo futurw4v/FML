@@ -6,7 +6,7 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fml/function/log.dart';
-import 'package:fml/function/download/download.dart';
+import 'package:fml/function/download.dart';
 
 class ShaderPage extends StatefulWidget {
   const ShaderPage({required this.projectId, this.projectName, super.key});

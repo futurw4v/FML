@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fml/function/log.dart';
 import 'package:fml/pages/home/account/new_account.dart';
 import 'package:fml/pages/home/account/offline_account_management.dart';
 
@@ -85,6 +86,7 @@ class AccountPageState extends State<AccountPage> {
     if (name == prefs.getString('SelectedAccount')) {
       await prefs.remove('SelectedAccount');
     }
+    LogUtil.log('已删除账号: $name', level: 'INFO');
     if (!mounted) return;
     Navigator.pop(context);
     Navigator.pop(context);

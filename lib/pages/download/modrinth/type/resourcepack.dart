@@ -6,7 +6,7 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fml/function/log.dart';
-import 'package:fml/function/download/download.dart';
+import 'package:fml/function/download.dart';
 
 class ResourcepackPage extends StatefulWidget {
   const ResourcepackPage({required this.projectId, this.projectName, super.key});

@@ -23,11 +23,13 @@ class ManagementPageState extends State<ManagementPage> {
   String _gamePath = '';
   String _logsPath = '';
   String _savesPath = '';
+  String _screenshotsPath = '';
   String _resourcepacksPath = '';
   String _modsPath = '';
   String _shaderpacksPath = '';
   String _schematicsPath = '';
   bool _save = false;
+  bool _screenshots = false;
   bool _logs = false;
   bool _resourcepacks = false;
   bool _mods = false;
@@ -181,6 +183,13 @@ class ManagementPageState extends State<ManagementPage> {
       setState(() {
         _save = true;
         _savesPath = '$_gamePath${Platform.pathSeparator}saves';
+      });
+    }
+    final screenshotsExists = await checkDirectoryFuture('$path${Platform.pathSeparator}screenshots');
+    if (screenshotsExists) {
+      setState(() {
+        _screenshots = true;
+        _screenshotsPath = '$_gamePath${Platform.pathSeparator}screenshots';
       });
     }
     // 检查日志文件夹
@@ -339,6 +348,15 @@ class ManagementPageState extends State<ManagementPage> {
                         subtitle: Text(_savesPath),
                         trailing: const Icon(Icons.open_in_new),
                         onTap: () => _launchURL(_savesPath),
+                      ),
+                    ),if (_screenshots)
+                    Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: ListTile(
+                        title: const Text('打开截图文件夹'),
+                        subtitle: Text(_screenshotsPath),
+                        trailing: const Icon(Icons.open_in_new),
+                        onTap: () => _launchURL(_screenshotsPath),
                       ),
                     ),if (_logs)
                     Card(

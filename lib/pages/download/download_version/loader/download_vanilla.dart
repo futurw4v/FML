@@ -5,7 +5,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:system_info2/system_info2.dart';
 
-import 'package:fml/function/download/download.dart';
+import 'package:fml/function/download.dart';
 import 'package:fml/function/extract_natives.dart';
 import 'package:fml/function/log.dart';
 
