@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/home.dart';
+import 'package:fml/pages/online.dart';
 import 'package:fml/pages/download.dart';
 import 'package:fml/pages/setting.dart';
 
@@ -219,8 +220,10 @@ class MyHomePageState extends State<MyHomePage> {
   Widget _buildPage(int index) {
     switch (index) {
       case 1:
-        return const DownloadPage();
+        return const OnlinePage();
       case 2:
+        return const DownloadPage();
+      case 3:
         return const SettingPage();
       case 0:
       default:
@@ -352,6 +355,10 @@ class MyHomePageState extends State<MyHomePage> {
               NavigationRailDestination(
                 icon: Icon(Icons.play_arrow),
                 label: Text('启动'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.hub),
+                label: Text('联机'),
               ),
               NavigationRailDestination(
                 icon: Icon(Icons.download),

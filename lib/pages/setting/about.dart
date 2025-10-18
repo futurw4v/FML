@@ -171,6 +171,12 @@ class AboutPageState extends State<AboutPage> {
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://www.gnu.org/licenses/gpl-3.0.html'),
                 ),
+                ListTile(
+                  title: const Text('EasyTier'),
+                  subtitle: const Text('异地组网\nhttps://easytier.cn/'),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://easytier.cn/'),
+                ),
                 const ListTile(
                   title: Text('本项目使用的开源库'),
                 ),
