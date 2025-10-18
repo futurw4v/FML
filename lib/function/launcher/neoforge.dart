@@ -3,11 +3,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:path/path.dart' as p;
 import 'package:dio/dio.dart';
+import 'dart:async';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/download.dart';
 
 typedef ProgressCallback = void Function(String message);
 typedef ErrorCallback = void Function(String error);
+typedef PortCallback = void Function(int port);
+final StreamController<int> lanPortController = StreamController<int>.broadcast();
+int? _lastDetectedPort;
+int? getLastDetectedPort() => _lastDetectedPort;
+
+// 清除端口缓存
+Future<void> clearPortCache() async {
+  _lastDetectedPort = null;
+  try {
+    lanPortController.add(-1);
+  } catch (_) {}
+  LogUtil.log('已清除端口缓存', level: 'INFO');
+}
 
 // library获取
 Future<Set<String>> loadLibraryArtifactPaths(String versionJsonPath, String gamePath) async {
@@ -299,6 +313,7 @@ Future<String> refreshToken(String url,
 Future<void> neoforgeLauncher({
     ProgressCallback? onProgress,
     ErrorCallback? onError,
+    PortCallback? onPortOpen,
   }) async {
   onProgress?.call('正在准备启动');
   final prefs = await SharedPreferences.getInstance();
@@ -459,9 +474,36 @@ Future<void> neoforgeLauncher({
   }
   final args = [...jvmArgs, mainClass, ...gameArgs];
   onProgress?.call('正在启动游戏');
-  final proc = await Process.start(java, args, workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game');
-  proc.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => LogUtil.log('[MINECRAFT] $l', level: 'INFO'));
-  proc.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => LogUtil.log('[MINECRAFT] $l', level: 'ERROR'));
+  final proc = await Process.start(
+    java,
+    args,
+    workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game'
+  );
+  final stdoutController = StreamController<String>();
+  proc.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((line) {
+    // 端口检测
+    if (line.contains('Started serving on')) {
+      final portMatch = RegExp(r'Started serving on (\d+)').firstMatch(line);
+      if (portMatch != null) {
+        final port = int.parse(portMatch.group(1)!);
+        LogUtil.log('检测到局域网游戏已开放，端口: $port', level: 'INFO');
+        _lastDetectedPort = port;
+        try {
+          lanPortController.add(port);
+        } catch (e) {
+          LogUtil.log('端口事件发送失败: $e', level: 'ERROR');
+        }
+      }
+    } else if (line.contains('Stopping server')) {
+      LogUtil.log('检测到局域网游戏已关闭', level: 'INFO');
+      clearPortCache();
+    }
+    LogUtil.log('[MINECRAFT] $line', level: 'INFO');
+    stdoutController.add(line);
+  });
+  proc.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen(
+    (line) => LogUtil.log('[MINECRAFT] $line', level: 'ERROR')
+  );
   onProgress?.call('游戏启动完成');
   final code = await proc.exitCode;
   LogUtil.log('退出码: $code', level: 'INFO');

@@ -11,6 +11,7 @@ import 'package:fml/pages/home.dart';
 import 'package:fml/pages/online.dart';
 import 'package:fml/pages/download.dart';
 import 'package:fml/pages/setting.dart';
+import 'package:fml/pages/online/owner.dart';
 
 // 软件版本
 late String appVersion;
@@ -187,6 +188,15 @@ class MyAppState extends State<MyApp> {
       darkTheme: _buildTheme(Brightness.dark),
       themeMode: _themeMode,
       home: const MyHomePage(),
+      onGenerateRoute: (settings) {
+    if (settings.name == '/online/owner') {
+      final int port = settings.arguments as int;
+      return MaterialPageRoute(
+        builder: (context) => OwnerPage(port: port),
+      );
+    }
+    return null;
+  },
     );
   }
 }

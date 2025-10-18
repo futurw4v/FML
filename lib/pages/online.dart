@@ -5,11 +5,12 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:system_info2/system_info2.dart';
 import 'package:archive/archive.dart';
-import 'dart:convert';
 import 'dart:async';
 
 import 'package:fml/function/log.dart';
 import 'package:fml/function/download.dart';
+import 'package:fml/pages/online/owner.dart';
+import 'package:fml/pages/online/member.dart';
 
 class OnlinePage extends StatefulWidget {
   const OnlinePage({super.key});
@@ -338,7 +339,18 @@ class OnlinePageState extends State<OnlinePage> {
                   title: const Text('创建房间'),
                   subtitle: const Text('生成邀请码,与好友一起游玩'),
                   leading: const Icon(Icons.home),
-                  onTap: () => _launchURL('https://easytier.cn/'),
+                  onTap: () {
+                    if (!_coreExists) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('请先安装 EasyTier 核心')),
+                      );
+                      return;
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const OwnerPage(port: -1)),
+                    );
+                  },
                 ),
               ),
               Card(
@@ -347,7 +359,12 @@ class OnlinePageState extends State<OnlinePage> {
                   title: const Text('加入房间'),
                   subtitle: const Text('输入邀请码,与好友一起游玩'),
                   leading: const Icon(Icons.login),
-                  onTap: () => _launchURL('https://easytier.cn/'),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MemberPage()),
+                    );
+                  },
                 ),
               )
             ] else ...[
