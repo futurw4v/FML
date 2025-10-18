@@ -176,6 +176,11 @@ class AboutPageState extends State<AboutPage> {
                   subtitle: const Text('异地组网\nhttps://easytier.cn/'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://easytier.cn/'),
+                ),ListTile(
+                  title: const Text('Terracotta'),
+                  subtitle: const Text('联机协议\nhttps://github.com/burningtnt/Terracotta'),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://github.com/burningtnt/Terracotta'),
                 ),
                 const ListTile(
                   title: Text('本项目使用的开源库'),

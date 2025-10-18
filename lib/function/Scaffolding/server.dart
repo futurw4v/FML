@@ -12,6 +12,7 @@ class OnlineCenterServer {
   final List<PlayerProfile> _players = [];
   final int minecraftServerPort;
   OnlineCenterServer({required this.port, required this.minecraftServerPort});
+  List<PlayerProfile> get players => _players;
 
   Future<void> start() async {
     try {
@@ -118,8 +119,8 @@ class OnlineCenterServer {
         case 'c:player_ping':
           await _handlePlayerPingRequest(body, socket);
           break;
-        case 'c:player_profile_list':
-          await _handlePlayerProfileListRequest(body, socket);
+        case 'c:player_profiles_list':
+          await _handlePlayerProfilesListRequest(body, socket);
           break;
         default:
           // 未知协议请求
@@ -193,8 +194,8 @@ class OnlineCenterServer {
     }
   }
 
-  // 处理 c:player_profile_list 请求
-  Future<void> _handlePlayerProfileListRequest(List<int> body, Socket socket) async {
+  // 处理 c:player_profiles_list 请求
+  Future<void> _handlePlayerProfilesListRequest(List<int> body, Socket socket) async {
     // 清理超时玩家（30秒无心跳）
     final now = DateTime.now();
     _players.removeWhere((player) {
@@ -284,7 +285,6 @@ class PlayerProfile {
   final String kind; // 'HOST' | 'GUEST'
   DateTime lastActivity;
   String socketId;
-  
   PlayerProfile({
     required this.name,
     required this.machineId,

@@ -309,7 +309,7 @@ class OnlinePageState extends State<OnlinePage> {
             Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: ListTile(
-                title: const Text('支持与 FML、HMCL、PCL2-CE 客户端联机'),
+                title: const Text('支持与 FML、HMCL、PCL2-CE、FCL 客户端联机'),
                 subtitle: const Text('基于p2p,使用Scaffolding协议通讯,联机效果取决于你的网络环境'),
                 leading: const Icon(Icons.info),
               ),
