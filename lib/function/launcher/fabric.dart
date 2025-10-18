@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:path/path.dart' as p;
+import 'package:dio/dio.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/download.dart';
 
@@ -248,28 +249,145 @@ Future<bool> checkAuthlibInjector(String gamePath) async {
   }
 }
 
-
+  // 读取App版本
+  Future<String> _loadAppVersion() async {
+  final prefs = await SharedPreferences.getInstance();
+  final version = prefs.getString('version') ?? "1.0.0";
+  return version;
+}
 
 // 下载authlib-injector
 Future<void> downloadAuthlibInjector(String gamePath) async {
-  final url = 'https://bmclapi2.bangbang93.com/mirrors/authlib-injector/artifact/54/authlib-injector-1.2.6.jar';
-  DownloadUtils.downloadFile(url: url, savePath: '$gamePath${Platform.pathSeparator}authlib-injector.jar',
-    onProgress: (progress) {
-      final percent = (progress * 100).toStringAsFixed(2);
-      LogUtil.log('正在下载AuthlibInjector: $percent%', level: 'INFO');
+  LogUtil.log('加载authlib-injector版本', level: 'INFO');
+  final Dio dio = Dio();
+  final String appVersion = await _loadAppVersion();
+  final options = Options(
+    headers: {
+      'User-Agent': 'FML/$appVersion',
     },
-    onSuccess: () {
-      LogUtil.log('AuthlibInjector 下载完成', level: 'INFO');
-    },
-    onError: (error) {
-      LogUtil.log('AuthlibInjector 下载失败: $error', level: 'ERROR');
-    },
-    onCancel: () {
-      LogUtil.log('AuthlibInjector 下载已取消', level: 'WARNING');
-    }
   );
+  try {
+    final response = await dio.get(
+      'https://bmclapi2.bangbang93.com/mirrors/authlib-injector/artifact/latest.json',
+      options: options,
+    );
+    if (response.statusCode == 200 && response.data.isNotEmpty) {
+      final String? downloadUrl = response.data['download_url'];
+      if (downloadUrl != null) {
+        // 使用获取到的下载链接
+        await DownloadUtils.downloadFile(
+          url: downloadUrl,
+          savePath: '$gamePath${Platform.pathSeparator}authlib-injector.jar',
+          onProgress: (progress) {
+            final percent = (progress * 100).toStringAsFixed(2);
+            LogUtil.log('正在下载AuthlibInjector: $percent%', level: 'INFO');
+          },
+          onSuccess: () {
+            LogUtil.log('AuthlibInjector 下载完成', level: 'INFO');
+          },
+          onError: (error) {
+            LogUtil.log('AuthlibInjector 下载失败: $error', level: 'ERROR');
+          },
+          onCancel: () {
+            LogUtil.log('AuthlibInjector 下载已取消', level: 'WARNING');
+          }
+        );
+      } else {
+        throw '无法获取 authlib-injector 下载链接';
+      }
+    } else {
+      throw '获取 authlib-injector 版本信息失败';
+    }
+  } catch (e) {
+    LogUtil.log('获取 authlib-injector 信息失败: $e', level: 'ERROR');
+    rethrow;
+  }
 }
 
+// 令牌检查
+Future<bool> checkToken(String url,String accessToken,String clientToken) async {
+  LogUtil.log('检查令牌有效性', level: 'INFO');
+  final Dio dio = Dio();
+  final String appVersion = await _loadAppVersion();
+  final options = Options(
+    headers: {
+      'User-Agent': 'FML/$appVersion',
+      'Content-Type': 'application/json'
+    },
+  );
+  try {
+    Map<String, dynamic> data = {
+      'accessToken': accessToken,
+      'clientToken': clientToken
+    };
+    final response = await dio.post(
+      '$url/authserver/validate',
+      data: data,
+      options: options,
+    );
+    if (response.statusCode == 204) {
+      LogUtil.log('令牌有效', level: 'INFO');
+      return true;
+    } else if (response.statusCode == 403) {
+      LogUtil.log('令牌无效', level: 'WARNING');
+      return false;
+    }
+    else {
+      LogUtil.log('令牌检查失败，状态码: ${response.statusCode}', level: 'WARNING');
+      return false;
+    }
+  }
+  catch (e) {
+    LogUtil.log('$url/authserver/validate令牌检查失败: $e', level: 'ERROR');
+    return false;
+  }
+}
+
+// 刷新令牌
+Future<String> refreshToken(String url,
+    String accessToken,
+    String clientToken,
+    String name,
+    String uuid
+  ) async {
+  LogUtil.log('正在刷新令牌', level: 'INFO');
+  final Dio dio = Dio();
+  final String appVersion = await _loadAppVersion();
+  final options = Options(
+    headers: {
+      'User-Agent': 'FML/$appVersion',
+      'Content-Type': 'application/json'
+    },
+  );
+  try {
+    Map<String, dynamic> data = {
+      'accessToken': accessToken,
+      'clientToken': clientToken,
+      "selectedProfile":{
+        'name': name,
+        'id': uuid
+      },
+    };
+    final response = await dio.post(
+      '$url/authserver/refresh',
+      data: data,
+      options: options,
+    );
+    if (response.statusCode == 200) {
+      LogUtil.log('令牌刷新成功', level: 'INFO');
+      return response.data['accessToken'];
+    } else {
+      LogUtil.log('令牌刷新失败，状态码: ${response.statusCode}', level: 'WARNING');
+      return accessToken;
+    }
+  }
+  catch (e) {
+    LogUtil.log('令牌刷新失败: $e', level: 'ERROR');
+    return accessToken;
+  }
+}
+
+// 启动Fabric游戏
 Future<void> fabricLauncher({
   ProgressCallback? onProgress,
   ErrorCallback? onError,
@@ -293,7 +411,7 @@ Future<void> fabricLauncher({
     final account = prefs.getString('SelectedAccount') ?? '';
     final accountInfo = prefs.getStringList('Account_$account') ?? [];
     final assetIndex = await getAssetIndex(jsonPath) ?? '';
-    // 从fabric.json获取Fabric信息，而不是从game.json
+    // 从fabric.json获取Fabric信息
     onProgress?.call('正在获取Fabric参数');
     final fabricInfo = await getFabricInfoFromFabricJson(gamePath, game);
     // 基础路径
@@ -355,6 +473,7 @@ Future<void> fabricLauncher({
     }
     // 账号信息
     String uuid = '';
+    String token = '';
     onProgress?.call('正在获取账号信息');
     if (accountInfo[0] == '0') {
       if (accountInfo[2] == '1') {
@@ -376,6 +495,17 @@ Future<void> fabricLauncher({
         await downloadAuthlibInjector(gamePath);
       }
       uuid = accountInfo[1];
+      onProgress?.call('正在检查令牌');
+      if (await checkToken(accountInfo[2], accountInfo[5], accountInfo[6])) {
+        token = accountInfo[5];
+      } else {
+        onProgress?.call('正在刷新令牌');
+        token = await refreshToken(accountInfo[2],
+        accountInfo[5],
+        accountInfo[6],
+        account,
+        uuid);
+      }
     }
     // 启动参数
     onProgress?.call('正在构建启动参数');
@@ -394,6 +524,7 @@ Future<void> fabricLauncher({
       '-Djna.tmpdir=$nativesPath',
       '-Dfabric.gameDir=$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game',
       '-Dfabric.modsDir=$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}mods',
+      if (accountInfo[0] == '2') '-javaagent:$gamePath${Platform.pathSeparator}authlib-injector.jar=${accountInfo[2]}',
       '-cp', cp,
       'net.fabricmc.loader.impl.launch.knot.KnotClient',
       '--username', account,
@@ -402,10 +533,13 @@ Future<void> fabricLauncher({
       '--assetsDir', '$gamePath${Platform.pathSeparator}assets',
       '--assetIndex', assetIndex,
       '--uuid', uuid,
-      '--accessToken', accountInfo[0],
+      if (accountInfo[0] == '0') '--accessToken', accountInfo[0],
+      if (accountInfo[0] == '0') '--clientId', '"\${clientid}"',
+      if (accountInfo[0] == '0') '--accessToken', token,
+      if (accountInfo[0] == '2') '--clientId', token,
+      if (accountInfo[0] == '2') '--userType', 'mojang',
       '--versionType', '"FML $version"',
       '--xuid', '"\${auth_xuid}"',
-      '--clientId', '"\${clientid}"',
       '--width', cfg[2],
       '--height', cfg[3],
       if (cfg[1] == '1') '--fullscreen'
@@ -416,6 +550,7 @@ Future<void> fabricLauncher({
     final proc = await Process.start(java, args, workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game');
     proc.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => LogUtil.log('[MINECRAFT] $l', level: 'INFO'));
     proc.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => LogUtil.log('[MINECRAFT] $l', level: 'ERROR'));
+    onProgress?.call('游戏启动完成');
     final code = await proc.exitCode;
     LogUtil.log('退出码: $code', level: 'INFO');
   }

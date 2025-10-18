@@ -47,6 +47,35 @@ class NewAccountPageState extends State<NewAccountPage> {
     });
   }
 
+  // http不安全提示框
+  Future<void> _showHttpWarningDialog() async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('不安全的连接'),
+          content: const SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                Text('您正在使用不安全的HTTP协议,这可能会导致您的账号信息被窃取'),
+                Text('建议您使用HTTPS协议以确保账号安全'),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('无视风险继续访问'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -179,6 +208,9 @@ class NewAccountPageState extends State<NewAccountPage> {
                 const SnackBar(content: Text('请填写完整的账号和密码')),
               );
               return;
+            }
+            if (_serverUrlController.text.startsWith('http://')) {
+              await _showHttpWarningDialog();
             }
             final String serverUrl = _serverUrlController.text.isEmpty ?
               defaultAuthServer : _serverUrlController.text;

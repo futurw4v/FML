@@ -157,8 +157,14 @@ Future<AuthResponse> authenticate(String serverUrl, String username, String pass
 
 // 保存单个外置登录账户信息
 Future<void> _saveAccount(
-    String name, String uuid, String serverUrl, String username,
-    String password, String accessToken) async {
+    String name,
+    String uuid,
+    String serverUrl,
+    String username,
+    String password,
+    String accessToken,
+    String clientToken
+    ) async {
   final prefs = await SharedPreferences.getInstance();
   List<String> accounts = prefs.getStringList('AccountsList') ?? [];
   if (!accounts.contains(name)) {
@@ -174,7 +180,8 @@ Future<void> _saveAccount(
     serverUrl,
     username,
     password,
-    accessToken
+    accessToken,
+    clientToken,
   ]);
   LogUtil.log('账号保存成功: $name, UUID: $uuid', level: 'INFO');
 }
@@ -204,7 +211,7 @@ Future<void> saveAuthLibInjectorAccount(
     if (authResponse.selectedProfile != null) {
       String name = authResponse.selectedProfile!.name;
       String uuid = authResponse.selectedProfile!.id;
-      await _saveAccount(name, uuid, serverUrl, username, password, authResponse.accessToken);
+      await _saveAccount(name, uuid, serverUrl, username, password, authResponse.accessToken, authResponse.clientToken);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('已添加外置登录账号: $name')),
       );
@@ -234,7 +241,8 @@ Future<void> saveAuthLibInjectorAccount(
                           serverUrl,
                           username,
                           password,
-                          authResponse.accessToken
+                          authResponse.accessToken,
+                          authResponse.clientToken
                         );
                       }
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -257,6 +265,7 @@ Future<void> saveAuthLibInjectorAccount(
                           username,
                           password,
                           authResponse.accessToken
+                          , authResponse.clientToken
                         );
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('已添加外置登录账号: ${profile.name}')),
@@ -280,6 +289,7 @@ Future<void> saveAuthLibInjectorAccount(
         username,
         password,
         authResponse.accessToken
+        , authResponse.clientToken
       );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('已添加外置登录账号: ${profile.name}')),

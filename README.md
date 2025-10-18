@@ -38,7 +38,8 @@
 | 2 | 验证服务器URL |
 | 3 | 服务器用户名 |
 | 4 | 服务器密码 |
-| 5 | 令牌 |
+| 5 | accessToken |
+| 6 | clientToken |
 
 版本配置 Config_${path}_$game list(string)
 | 序号 | 值 |
