@@ -11,9 +11,25 @@ class OnlineCenterServer {
   final List<Socket> _clients = [];
   final List<PlayerProfile> _players = [];
   final int minecraftServerPort;
-  OnlineCenterServer({required this.port, required this.minecraftServerPort});
+  final String hostName;
+  final String hostVendor;
+  OnlineCenterServer({
+    required this.port,
+    required this.minecraftServerPort,
+    required this.hostName,
+    required this.hostVendor,
+  });
   List<PlayerProfile> get players => _players;
 
+  // 将字节转换为无符号32位整数
+  int _bytesToUint32(List<int> bytes) {
+    if (bytes.length != 4) {
+      throw ArgumentError('预期 4 个字节，实际 ${bytes.length}');
+    }
+    return (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+  }
+
+  // 启动TCP服务器
   Future<void> start() async {
     try {
       _server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
@@ -28,6 +44,7 @@ class OnlineCenterServer {
     }
   }
 
+  // 关闭TCP服务器
   Future<void> stop() async {
     for (var client in _clients) {
       try {
@@ -42,6 +59,7 @@ class OnlineCenterServer {
     LogUtil.log('TCP服务器已关闭', level: 'INFO');
   }
 
+  // 处理新客户端连接
   Future<void> _handleClient(Socket socket) async {
     LogUtil.log('新客户端连接: ${socket.remoteAddress.address}:${socket.remotePort}', level: 'INFO');
     _clients.add(socket);
@@ -60,7 +78,7 @@ class OnlineCenterServer {
             utf8.decode(requestTypeBytes);
             final bodyLengthBytes = buffer.sublist(1 + typeLength, 5 + typeLength);
             final bodyLength = _bytesToUint32(bodyLengthBytes);
-            expectedLength = 5 + typeLength + bodyLength;
+            expectedLength = (5 + typeLength + bodyLength) as int?;
             if (buffer.length < expectedLength!) return;
           }
           if (buffer.length >= expectedLength!) {
@@ -71,10 +89,18 @@ class OnlineCenterServer {
           }
         }
       },
-      onError: (error) {
+    onError: (error) {
+      if (error is SocketException) {
+        if (error.osError?.errorCode == 54) {
+          LogUtil.log('客户端主动断开连接: ${socket.remoteAddress.address}:${socket.remotePort}', level: 'INFO');
+        } else {
+          LogUtil.log('客户端连接错误 [${error.osError?.errorCode}]: $error', level: 'WARNING');
+        }
+      } else {
         LogUtil.log('客户端连接错误: $error', level: 'ERROR');
-        _removeClient(socket);
-      },
+      }
+      _removeClient(socket);
+    },
       onDone: () {
         LogUtil.log('客户端连接关闭: ${socket.remoteAddress.address}:${socket.remotePort}', level: 'INFO');
         _removeClient(socket);
@@ -82,8 +108,17 @@ class OnlineCenterServer {
     );
   }
 
+  // 优化移除客户端逻辑
   Future<void> _removeClient(Socket socket) async {
+    if (!_clients.contains(socket)) {
+      return;
+    }
     _clients.remove(socket);
+    try {
+      await socket.close();
+    } catch (e) {
+      LogUtil.log('关闭socket失败: $e', level: 'ERROR');
+    }
     _players.removeWhere((player) {
       final isMatch = player.socketId == '${socket.remoteAddress.address}:${socket.remotePort}';
       if (isMatch) {
@@ -93,6 +128,7 @@ class OnlineCenterServer {
     });
   }
 
+  // 处理客户端请求
   Future<void> _handleRequest(List<int> requestBytes, Socket socket) async {
     try {
       // 解析请求
@@ -102,7 +138,7 @@ class OnlineCenterServer {
       final bodyLengthBytes = requestBytes.sublist(1 + typeLength, 5 + typeLength);
       final bodyLength = _bytesToUint32(bodyLengthBytes);
       final body = bodyLength > 0
-          ? requestBytes.sublist(5 + typeLength, 5 + typeLength + bodyLength)
+          ? requestBytes.sublist(5 + typeLength, (5 + typeLength + bodyLength) as int?)
           : <int>[];
       LogUtil.log('收到请求: $requestType, 请求体长度: $bodyLength', level: 'INFO');
       // 根据请求类型分发处理
@@ -199,27 +235,19 @@ class OnlineCenterServer {
     // 清理超时玩家（30秒无心跳）
     final now = DateTime.now();
     _players.removeWhere((player) {
+      if (player.kind == 'HOST') return false;
       final isTimeout = now.difference(player.lastActivity).inSeconds > 30;
       if (isTimeout) {
         LogUtil.log('玩家超时: ${player.name}', level: 'INFO');
       }
       return isTimeout;
     });
-    // 生成包含所有玩家的列表
-    final allPlayers = [
-      {
-        'name': 'Host',
-        'machine_id': 'host-machine-id',
-        'vendor': 'FML',
-        'kind': 'HOST'
-      },
-      ..._players.map((p) => {
-        'name': p.name,
-        'machine_id': p.machineId,
-        'vendor': p.vendor,
-        'kind': p.kind
-      })
-    ];
+    final allPlayers = _players.map((p) => {
+      'name': p.name,
+      'machine_id': p.machineId,
+      'vendor': p.vendor,
+      'kind': p.kind
+    }).toList();
     final responseBody = utf8.encode(jsonEncode(allPlayers));
     _sendSuccessResponse(socket, responseBody);
   }
@@ -255,25 +283,34 @@ class OnlineCenterServer {
   // 发送响应
   Future<void> _sendResponse(Socket socket, List<int> response) async {
     try {
-      socket.add(response);
+      if (_clients.contains(socket)) {
+        socket.add(response);
+        await socket.flush();
+      } else {
+        LogUtil.log('尝试向已关闭的socket发送数据', level: 'WARNING');
+      }
+    } on SocketException catch (e) {
+      if (e.osError?.errorCode == 54 || e.osError?.errorCode == 32) {
+        LogUtil.log('发送响应失败,连接已断开: ${e.osError?.errorCode}', level: 'INFO');
+        _removeClient(socket);
+      } else {
+        LogUtil.log('发送响应失败: $e', level: 'ERROR');
+      }
     } catch (e) {
       LogUtil.log('发送响应失败: $e', level: 'ERROR');
     }
   }
-  int _bytesToUint32(List<int> bytes) {
-    return (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
-  }
 
   // 生成并添加主机玩家
-  Future<void> addHostPlayer(String name) async {
+  Future<void> addHostPlayer(String machineId) async {
     _players.add(PlayerProfile(
-      name: name,
-      machineId: 'host-machine-id',
-      vendor: 'FML',
+      name: hostName,
+      machineId: machineId,
+      vendor: hostVendor,
       kind: 'HOST',
       socketId: 'local-host',
     ));
-    LogUtil.log('添加房主: $name', level: 'INFO');
+    LogUtil.log('添加房主: $hostName ($hostVendor)', level: 'INFO');
   }
 }
 

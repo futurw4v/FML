@@ -450,7 +450,7 @@ Future<void> neoforgeLauncher({
     '--uuid', if (accountInfo[2] == '1') accountInfo[3] else accountInfo[0],
     if (accountInfo[0] == '0') '--accessToken', accountInfo[0],
     if (accountInfo[0] == '0') '--clientId', '"\${clientid}"',
-    if (accountInfo[0] == '0') '--accessToken', token,
+    if (accountInfo[0] == '2') '--accessToken', token,
     if (accountInfo[0] == '2') '--clientId', token,
     if (accountInfo[0] == '2') '--userType', 'mojang',
     '--versionType', '"FML $version"',

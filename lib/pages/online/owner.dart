@@ -42,20 +42,17 @@ class OwnerPageState extends State<OwnerPage> {
   int _tcpServerPort = 25565;
   bool _isServerRunning = false;
   String _playerName = "房主";
-  bool _isGenerating = false;
   final Random _random = Random();
   Process? _easyTierProcess;
   String? _machineId;
   bool _isEasyTierRunning = false;
-  Timer? _peerDetectionTimer;
+  Timer? _playerListRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadPlayerName();
     _initMachineId();
-    
-    // 恢复持久化的房间码和TCP服务器状态
     _roomCode = OwnerPage._persistRoomCode;
     _networkName = OwnerPage._persistNetworkName;
     _networkKey = OwnerPage._persistNetworkKey;
@@ -65,27 +62,29 @@ class OwnerPageState extends State<OwnerPage> {
     _easyTierProcess = OwnerPage._easyTierProcess;
     _machineId = OwnerPage._machineId;
     _isEasyTierRunning = _easyTierProcess != null;
-
+    
+    // 启动定时器,每2秒刷新一次玩家列表
+    _playerListRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      if (_isServerRunning && _tcpServer != null && mounted) {
+        setState(() {});
+      }
+    });
+    
     final fabricPort = fabric_launcher.getLastDetectedPort();
     final vanillaPort = vanilla_launcher.getLastDetectedPort();
     final neoforgePort = neoforge_launcher.getLastDetectedPort();
     final cachedPort = fabricPort ?? vanillaPort ?? neoforgePort;
-    
     if (cachedPort != null && cachedPort > 0) {
       setState(() {
         _port = cachedPort;
       });
       LogUtil.log('使用缓存的端口: $_port', level: 'INFO');
-      
-      // 自动启动或重启TCP服务器
       if (!_isServerRunning) {
         _startTcpServer();
       } else if (_tcpServer != null && _tcpServer!.minecraftServerPort != cachedPort) {
         _restartTcpServer();
       }
     }
-    
-    // 监听端口变化
     _lanPortSub = fabric_launcher.lanPortController.stream.listen((port) {
       _handlePortChange(port);
     });
@@ -95,8 +94,6 @@ class OwnerPageState extends State<OwnerPage> {
     neoforge_launcher.lanPortController.stream.listen((port) {
       _handlePortChange(port);
     });
-    
-    // 只有在没有房间码的情况下才生成新的
     if (_roomCode == null) {
       _generateRoomCode();
     }
@@ -105,25 +102,19 @@ class OwnerPageState extends State<OwnerPage> {
   // 初始化机器ID
   Future<void> _initMachineId() async {
     if (_machineId != null) return;
-    
     try {
-      // 尝试从存储读取
       final prefs = await SharedPreferences.getInstance();
       var machineId = prefs.getString('machine_id');
-      
-      // 如果没有，则生成新的
       if (machineId == null) {
         machineId = const Uuid().v4();
         await prefs.setString('machine_id', machineId);
       }
-      
       setState(() {
         _machineId = machineId;
       });
       OwnerPage._machineId = machineId;
       LogUtil.log('机器ID: $_machineId', level: 'INFO');
     } catch (e) {
-      // 出错时生成临时ID
       final tempId = const Uuid().v4();
       setState(() {
         _machineId = tempId;
@@ -136,14 +127,11 @@ class OwnerPageState extends State<OwnerPage> {
   // 处理端口变化
   Future<void> _handlePortChange(int port) async {
     if (!mounted) return;
-    
     setState(() {
       _port = port;
     });
-    
     if (port > 0) {
       LogUtil.log('收到新的端口事件: $port', level: 'INFO');
-      // 如果端口有效，自动启动或重启TCP服务器
       if (_isServerRunning && _tcpServer != null) {
         _restartTcpServer();
       } else {
@@ -151,7 +139,6 @@ class OwnerPageState extends State<OwnerPage> {
       }
     } else if (port == -1) {
       LogUtil.log('局域网游戏已关闭', level: 'INFO');
-      // 游戏关闭时，关闭TCP服务器但保留房间码
       if (_isServerRunning) {
         await _stopTcpServer();
       }
@@ -160,12 +147,11 @@ class OwnerPageState extends State<OwnerPage> {
 
   @override
   void dispose() {
-    _stopPeerDetection();
-    // 不在dispose中关闭TCP服务器，而是保持它的状态
     _lanPortSub?.cancel();
+    _playerListRefreshTimer?.cancel();
     super.dispose();
   }
-  
+
   // 有效字符集
   static const List<String> _validChars = [
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -175,10 +161,6 @@ class OwnerPageState extends State<OwnerPage> {
   ];
 
   Future<void> _generateRoomCode() async {
-    setState(() {
-      _isGenerating = true;
-    });
-    
     final random = Random.secure();
     final List<int> charIndices = List.generate(15, (_) => random.nextInt(34));
     int partialValue = 0;
@@ -210,24 +192,17 @@ class OwnerPageState extends State<OwnerPage> {
       _roomCode = code;
       _networkName = 'scaffolding-mc-${parts[0]}-${parts[1]}';
       _networkKey = '${parts[2]}-${parts[3]}';
-      _isGenerating = false;
     });
-    
-    // 保存到静态变量
     OwnerPage._persistRoomCode = _roomCode;
     OwnerPage._persistNetworkName = _networkName;
     OwnerPage._persistNetworkKey = _networkKey;
-    
-    if (kDebugMode && !_isValidCode(code)) {
+    if (kDebugMode && !(await _isValidCode(code))) {
       LogUtil.log('生成的代码验证失败: $code', level: 'ERROR');
     } else {
       LogUtil.log('生成房间码: $_roomCode', level: 'INFO');
       LogUtil.log('网络名称: $_networkName', level: 'INFO');
       LogUtil.log('网络密钥: $_networkKey', level: 'INFO');
-      
-      // 房间码生成后，如果有有效的Minecraft服务器端口，自动启动TCP服务器
       if (_port > 0 && !_isServerRunning) {
-        // 延迟一点启动，等待UI更新
         Future.delayed(const Duration(milliseconds: 100), () {
           _startTcpServer();
         });
@@ -235,7 +210,8 @@ class OwnerPageState extends State<OwnerPage> {
     }
   }
 
-  bool _isValidCode(String code) {
+  // 验证房间码
+  Future<bool> _isValidCode(String code) async {
     if (!RegExp(r'^U/[0-9A-HJ-NP-Z]{4}-[0-9A-HJ-NP-Z]{4}-[0-9A-HJ-NP-Z]{4}-[0-9A-HJ-NP-Z]{4}$')
         .hasMatch(code)) {
       return false;
@@ -258,39 +234,70 @@ class OwnerPageState extends State<OwnerPage> {
   Future<void> _loadPlayerName() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final name = prefs.getString('player_name');
+      final name = prefs.getString('SelectedAccount');
       if (name != null && name.isNotEmpty) {
         setState(() {
           _playerName = name;
         });
+      } else {
+        setState(() {
+          _playerName = "匿名玩家";
+        });
       }
     } catch (e) {
       LogUtil.log('加载玩家名称失败: $e', level: 'ERROR');
+      setState(() {
+        _playerName = "FML客户端";
+      });
+    }
+  }
+
+  // 读取App版本
+  Future<String> _loadAppVersion() async {
+    final prefs = await SharedPreferences.getInstance();
+    final version = prefs.getString('version') ?? "1.0.0";
+    return version;
+  }
+
+  // 检测核心版本
+  Future<String> _checkCoreVersion() async {
+    final prefs = await SharedPreferences.getInstance();
+    final name = prefs.getString('SelectedPath') ?? '';
+    final path = prefs.getString('Path_$name') ?? '';
+    final String core = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-core');
+    try {
+      final ProcessResult proc = await Process.run(core, ['--version']);
+      final String output = proc.stdout.toString().trim();
+      if (output.contains('easytier-core ')) {
+        final String versionWithHash = output.split('easytier-core ')[1];
+        if (versionWithHash.contains('-')) {
+          return versionWithHash.split('-')[0];
+        }
+        return versionWithHash;
+      }
+      return output;
+    } catch (e) {
+      LogUtil.log('获取EasyTier核心版本失败: $e', level: 'ERROR');
+      return "未知";
     }
   }
 
   // 生成随机端口并检查可用性
   Future<int> _findAvailablePort() async {
-    int maxAttempts = 10; // 最大尝试次数
+    int maxAttempts = 20;
     int attempts = 0;
-    
     while (attempts < maxAttempts) {
       attempts++;
-      // 生成随机端口 (1024-65535)
       int port = 1024 + _random.nextInt(65535 - 1024);
-      
       try {
-        // 尝试绑定端口
         final socket = await ServerSocket.bind(InternetAddress.anyIPv4, port, shared: true);
         await socket.close();
         LogUtil.log('找到可用的随机端口: $port (尝试次数: $attempts)', level: 'INFO');
         return port;
       } catch (e) {
         LogUtil.log('端口 $port 被占用，尝试另一个随机端口', level: 'INFO');
-        // 继续循环尝试下一个随机端口
       }
     }
-    
     throw Exception('尝试$maxAttempts次后仍无法找到可用端口');
   }
 
@@ -300,23 +307,17 @@ class OwnerPageState extends State<OwnerPage> {
       LogUtil.log('EasyTier已在运行中', level: 'INFO');
       return true;
     }
-
     if (_networkName == null || _networkKey == null || _machineId == null) {
       LogUtil.log('缺少启动EasyTier所需的信息', level: 'ERROR');
       return false;
     }
-
     try {
-      // EasyTier路径
       final prefs = await SharedPreferences.getInstance();
       final name = prefs.getString('SelectedPath') ?? '';
       final path = prefs.getString('Path_$name') ?? '';
       final String core = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-core');
-
-      // 构建启动命令 - 确保主机名格式正确
       final hostname = 'scaffolding-mc-server-$_tcpServerPort';
       LogUtil.log('设置EasyTier主机名: $hostname', level: 'INFO');
-      
       final args = [
         '-d',
         '--network-name', _networkName!,
@@ -325,24 +326,19 @@ class OwnerPageState extends State<OwnerPage> {
         '--hostname', hostname,
         '-p', 'tcp://public.easytier.cn:11010'
       ];
-
       LogUtil.log('正在启动EasyTier: $core ${args.join(' ')}', level: 'INFO');
-      // 启动EasyTier进程
       if (Platform.isMacOS || Platform.isLinux) {
         _easyTierProcess = await Process.start('sudo', [core, ...args]);
       } else {
         _easyTierProcess = await Process.start(core, args);
       }
-      // 保存进程引用
       OwnerPage._easyTierProcess = _easyTierProcess;
-      // 监听标准输出和错误
       _easyTierProcess!.stdout.transform(utf8.decoder).listen((data) {
         LogUtil.log('EasyTier输出: $data', level: 'INFO');
       });
       _easyTierProcess!.stderr.transform(utf8.decoder).listen((data) {
         LogUtil.log('EasyTier错误: $data', level: 'ERROR');
       });
-      // 监听进程退出
       _easyTierProcess!.exitCode.then((code) {
         LogUtil.log('EasyTier进程退出,退出码: $code', level: 'INFO');
         if (mounted) {
@@ -353,14 +349,9 @@ class OwnerPageState extends State<OwnerPage> {
           OwnerPage._easyTierProcess = null;
         }
       });
-      
       setState(() {
         _isEasyTierRunning = true;
       });
-      
-      // 启动对等点检测
-      _startPeerDetection();
-      
       LogUtil.log('EasyTier启动成功', level: 'INFO');
       return true;
     } catch (e) {
@@ -368,23 +359,16 @@ class OwnerPageState extends State<OwnerPage> {
       return false;
     }
   }
-  
+
   // 停止EasyTier
   Future<void> _stopEasyTier() async {
-    _stopPeerDetection();
-    
     if (!_isEasyTierRunning || _easyTierProcess == null) {
       LogUtil.log('EasyTier未在运行', level: 'INFO');
       return;
     }
-
     try {
       LogUtil.log('正在停止EasyTier', level: 'INFO');
-      
-      // 发送终止信号
       _easyTierProcess!.kill(ProcessSignal.sigterm);
-      
-      // 等待进程结束，设置超时
       await _easyTierProcess!.exitCode.timeout(
         const Duration(seconds: 5),
         onTimeout: () {
@@ -393,12 +377,10 @@ class OwnerPageState extends State<OwnerPage> {
           return -1;
         }
       );
-      
       setState(() {
         _isEasyTierRunning = false;
         _easyTierProcess = null;
       });
-      
       OwnerPage._easyTierProcess = null;
       LogUtil.log('EasyTier已停止', level: 'INFO');
     } catch (e) {
@@ -406,184 +388,81 @@ class OwnerPageState extends State<OwnerPage> {
     }
   }
 
-  // 开始定期检测对等点
-  void _startPeerDetection() {
-    _stopPeerDetection(); // 确保先停止之前的计时器
-    
-    _peerDetectionTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
-      await _detectPeers();
-    });
-    
-    // 立即执行一次检测
-    _detectPeers();
-  }
-  
-  // 停止对等点检测
-  void _stopPeerDetection() {
-    _peerDetectionTimer?.cancel();
-    _peerDetectionTimer = null;
-  }
-  
-  // 检测对等点
-  Future<void> _detectPeers() async {
-    if (!_isEasyTierRunning) return;
-    
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final name = prefs.getString('SelectedPath') ?? '';
-      final path = prefs.getString('Path_$name') ?? '';
-      final String cliPath = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
-      
-      // 检查easytier-cli是否存在
-      if (!await File(cliPath).exists()) {
-        LogUtil.log('easytier-cli不存在: $cliPath', level: 'WARNING');
-        return;
-      }
-      
-      // 运行peer命令
-      LogUtil.log('执行easytier-cli peer命令检测对等点...', level: 'INFO');
-      final result = await Process.run(cliPath, ['peer']);
-      
-      if (result.exitCode == 0) {
-        LogUtil.log('easytier-cli peer命令输出:\n${result.stdout}', level: 'INFO');
-        
-        // 记录连接的客户端数量
-        final outputLines = (result.stdout as String).split('\n');
-        final peerCount = outputLines.where((line) => line.trim().isNotEmpty).length - 1; // 减去标题行
-        LogUtil.log('当前连接的对等点数量: $peerCount', level: 'INFO');
-      } else {
-        LogUtil.log('easytier-cli peer命令失败: ${result.stderr}', level: 'ERROR');
-      }
-    } catch (e) {
-      LogUtil.log('执行对等点检测时出错: $e', level: 'ERROR');
-    }
-  }
-  
   // 启动TCP服务器
   Future<void> _startTcpServer() async {
     if (_isServerRunning) {
       LogUtil.log('TCP服务器已经在运行', level: 'INFO');
       return;
     }
-    
     if (_port <= 0) {
-      LogUtil.log('Minecraft服务器尚未启动，无法启动TCP服务器', level: 'WARNING');
+      LogUtil.log('Minecraft服务器尚未启动,无法启动TCP服务器', level: 'WARNING');
       return;
     }
-    
     setState(() {
-      _isGenerating = true;
     });
-    
     try {
-      // 查找随机可用端口
+      final appVersion = await _loadAppVersion();
+      final coreVersion = await _checkCoreVersion();
       _tcpServerPort = await _findAvailablePort();
-      
-      // 创建并启动TCP服务器
       _tcpServer = OnlineCenterServer(
+        hostName: _playerName,
+        hostVendor: 'FML $appVersion, EasyTier v$coreVersion',
         port: _tcpServerPort,
         minecraftServerPort: _port
       );
       await _tcpServer!.start();
-      await _tcpServer!.addHostPlayer(_playerName);
-      
+      await _tcpServer!.addHostPlayer(_machineId ?? 'unknown-machine-id');
       // 启动EasyTier网络
       final easyTierStarted = await _startEasyTier();
-      
       setState(() {
         _isServerRunning = true;
-        _isGenerating = false;
       });
-      
-      // 保存到静态变量
       OwnerPage._persistTcpServer = _tcpServer;
       OwnerPage._persistTcpServerPort = _tcpServerPort;
       OwnerPage._persistIsServerRunning = _isServerRunning;
-      
       LogUtil.log('TCP服务器启动成功,端口: $_tcpServerPort', level: 'INFO');
-      
       String message = '联机服务器启动成功,端口: $_tcpServerPort';
       if (!easyTierStarted) {
         message += ' (EasyTier启动失败)';
       }
-      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message))
       );
     } catch (e) {
-      setState(() {
-        _isGenerating = false;
-      });
       LogUtil.log('启动TCP服务器失败: $e', level: 'ERROR');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('启动联机服务器失败: $e'))
       );
-      
-      // 如果TCP服务器启动失败，确保EasyTier也被停止
       await _stopEasyTier();
     }
   }
-  
+
   // 停止TCP服务器
   Future<void> _stopTcpServer() async {
     if (!_isServerRunning) return;
-    
-    setState(() {
-      _isGenerating = true;
-    });
-    
     try {
-      // 先停止EasyTier
       await _stopEasyTier();
-      
-      // 然后停止TCP服务器
       await _tcpServer?.stop();
       _tcpServer = null;
-      
       setState(() {
         _isServerRunning = false;
-        _isGenerating = false;
       });
-      
-      // 更新静态变量
       OwnerPage._persistTcpServer = null;
       OwnerPage._persistIsServerRunning = false;
-      
       LogUtil.log('TCP服务器已停止', level: 'INFO');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('联机服务器已停止'))
       );
+      Navigator.pop(context);
     } catch (e) {
-      setState(() {
-        _isGenerating = false;
-      });
       LogUtil.log('停止TCP服务器失败: $e', level: 'ERROR');
     }
   }
-  
+
   // 重启TCP服务器
   Future<void> _restartTcpServer() async {
     await _stopTcpServer();
     await _startTcpServer();
-  }
-  
-  // 重置所有状态（清除房间码和TCP服务器）
-  Future<void> _resetAll() async {
-    await _stopTcpServer();
-    
-    setState(() {
-      _roomCode = null;
-      _networkName = null;
-      _networkKey = null;
-    });
-    
-    // 清除静态变量
-    OwnerPage._persistRoomCode = null;
-    OwnerPage._persistNetworkName = null;
-    OwnerPage._persistNetworkKey = null;
-    
-    // 重新生成房间码
-    _generateRoomCode();
   }
 
   @override
@@ -591,13 +470,6 @@ class OwnerPageState extends State<OwnerPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('创建房间'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: '重新生成房间码',
-            onPressed: _isGenerating ? null : _resetAll,
-          ),
-        ],
       ),
       body: Center(
         child: _port < 0
@@ -636,6 +508,62 @@ class OwnerPageState extends State<OwnerPage> {
                               ],
                             ),
                             const Divider(),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            'Scaffolding 协议服务器: ',
+                                            style: TextStyle(fontWeight: FontWeight.bold),
+                                          ),
+                                          Text(
+                                            _isServerRunning ? "运行中" : "未运行或正在启动",
+                                            style: TextStyle(
+                                              color: _isServerRunning ? Colors.green : Colors.orange,
+                                              fontWeight: FontWeight.bold
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            'EasyTier 网络: ',
+                                            style: TextStyle(fontWeight: FontWeight.bold),
+                                          ),
+                                          Text(
+                                            _isEasyTierRunning ? "已连接" : "未连接",
+                                            style: TextStyle(
+                                              color: _isEasyTierRunning ? Colors.green : Colors.red,
+                                              fontWeight: FontWeight.bold
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      if (_isServerRunning)
+                                        Text('Scaffolding 协议端口: $_tcpServerPort'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                             const Text('EasyTier网络信息:'),
                             const SizedBox(height: 8),
                             Row(
@@ -650,115 +578,42 @@ class OwnerPageState extends State<OwnerPage> {
                                     ],
                                   ),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.copy),
-                                  onPressed: () {
-                                    Clipboard.setData(ClipboardData(
-                                      text: '网络名称: $_networkName\n网络密钥: $_networkKey'
-                                    ));
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('网络信息已复制到剪贴板'))
-                                    );
-                                  },
-                                ),
                               ],
                             ),
-                            const Divider(),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            '联机服务器: ',
-                                            style: TextStyle(fontWeight: FontWeight.bold),
-                                          ),
-                                          Text(
-                                            _isServerRunning ? "运行中" : "未运行或正在启动",
-                                            style: TextStyle(
-                                              color: _isServerRunning ? Colors.green : Colors.orange,
-                                              fontWeight: FontWeight.bold
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      if (_isServerRunning)
-                                        Text('服务器端口: $_tcpServerPort'),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          Text(
-                                            'EasyTier网络: ',
-                                            style: TextStyle(fontWeight: FontWeight.bold),
-                                          ),
-                                          Text(
-                                            _isEasyTierRunning ? "已连接" : "未连接",
-                                            style: TextStyle(
-                                              color: _isEasyTierRunning ? Colors.green : Colors.red,
-                                              fontWeight: FontWeight.bold
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (_isServerRunning) // 只显示停止按钮
-                                  ElevatedButton(
-                                    onPressed: _isGenerating ? null : _stopTcpServer,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red.shade100,
+                        ],
+                      ),
+                    ),
+                  ),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_isServerRunning && _tcpServer != null) ...[
+                            const Text('已连接玩家:'),
+                            const SizedBox(height: 8),
+                            if (_tcpServer!.players.isNotEmpty)
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: _tcpServer!.players.map((player) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          player.kind == 'HOST' ? Icons.star : Icons.person,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text('${player.name} (${player.vendor})'),
+                                      ],
                                     ),
-                                    child: _isGenerating
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(strokeWidth: 2),
-                                          )
-                                        : const Text('停止服务器'),
-                                  ),
-                              ],
-                            ),
-                            if (_isServerRunning && _tcpServer != null) ...[
-                              const SizedBox(height: 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('已连接玩家:'),
-                                  IconButton(
-                                    icon: const Icon(Icons.refresh, size: 18),
-                                    tooltip: '刷新玩家列表',
-                                    onPressed: () => setState(() {}),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              if (_tcpServer!.players.isNotEmpty)
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: _tcpServer!.players.map((player) {
-                                    return Padding(
-                                      padding: const EdgeInsets.only(bottom: 4),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            player.kind == 'HOST' ? Icons.star : Icons.person,
-                                            size: 16,
-                                            color: player.kind == 'HOST' ? Colors.amber : null,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text('${player.name} (${player.vendor})'),
-                                        ],
-                                      ),
-                                    );
-                                  }).toList(),
-                                )
-                              else
-                                const Text('暂无玩家连接', style: TextStyle(fontStyle: FontStyle.italic)),
-                            ],
+                                  );
+                                }).toList(),
+                              )
+                            else
+                              const Text('暂无玩家连接', style: TextStyle(fontStyle: FontStyle.italic)),
                           ],
                         ],
                       ),
@@ -767,6 +622,10 @@ class OwnerPageState extends State<OwnerPage> {
                 ],
               ),
       ),
+      floatingActionButton: _isServerRunning ? FloatingActionButton(
+        onPressed:  _stopTcpServer,
+        child: const Icon(Icons.stop),
+      ) : null,
     );
   }
 }

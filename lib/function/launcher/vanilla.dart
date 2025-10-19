@@ -315,12 +315,11 @@ Future<void> vanillaLauncher({
     '--assetIndex', assetIndex,
     if (accountInfo[0] == '0') '--accessToken', accountInfo[0],
     if (accountInfo[0] == '0') '--clientId', '"\${clientid}"',
-    if (accountInfo[0] == '0') '--accessToken', token,
+    if (accountInfo[0] == '2') '--accessToken', token,
     if (accountInfo[0] == '2') '--clientId', token,
     if (accountInfo[0] == '2') '--userType', 'mojang',
     '--versionType', '"FML $version"',
     '--xuid', '"\${auth_xuid}"',
-    '--clientId', '"\${clientid}"',
     '--width', cfg[2],
     '--height', cfg[3],
     if (cfg[1] == '1') '--fullscreen'

@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:fml/function/log.dart';
 import 'package:fml/function/Scaffolding/client.dart';
+import 'package:fml/function/fakeserver.dart';
 
 class MemberPage extends StatefulWidget {
   const MemberPage({super.key});
@@ -21,6 +22,7 @@ class MemberPage extends StatefulWidget {
   static List<PlayerProfile> _persistPlayers = [];
   static int? _persistMinecraftServerPort;
   static String? _persistIpAddress;
+  static FakeServer? _persistFakeServer;
 
   @override
   MemberPageState createState() => MemberPageState();
@@ -42,6 +44,7 @@ class MemberPageState extends State<MemberPage> {
   int? _minecraftServerPort;
   String? _ipAddress;
   Timer? _minecraftLaunchTimer;
+  FakeServer? _fakeServer;
 
   @override
   void initState() {
@@ -63,6 +66,7 @@ class MemberPageState extends State<MemberPage> {
     _players = MemberPage._persistPlayers;
     _minecraftServerPort = MemberPage._persistMinecraftServerPort;
     _ipAddress = MemberPage._persistIpAddress;
+    _fakeServer = MemberPage._persistFakeServer;
     if (_isConnected && _client != null) {
       _setupClientListeners();
     }
@@ -72,6 +76,42 @@ class MemberPageState extends State<MemberPage> {
       final codePrefix = 'U/${networkParts[0]}-${networkParts[1]}';
       final codeSuffix = _networkKey!;
       _codeController.text = '$codePrefix-$codeSuffix';
+    }
+  }
+
+  // 启动FakeServer
+  Future<void> _startFakeServer() async {
+    if (_fakeServer != null && _fakeServer!.isRunning) {
+      LogUtil.log('FakeServer已在运行', level: 'INFO');
+      return;
+    }
+
+    if (_minecraftServerPort == null || _ipAddress == null) {
+      LogUtil.log('无法启动FakeServer: 缺少服务器信息', level: 'WARNING');
+      return;
+    }
+
+    try {
+      _fakeServer = FakeServer(
+        port: _minecraftServerPort!,
+      );
+      await _fakeServer!.start();
+      MemberPage._persistFakeServer = _fakeServer;
+      LogUtil.log('FakeServer已启动', level: 'INFO');
+    } catch (e) {
+      LogUtil.log('启动FakeServer失败: $e', level: 'ERROR');
+      _fakeServer = null;
+      MemberPage._persistFakeServer = null;
+    }
+  }
+
+  // 停止FakeServer
+  Future<void> _stopFakeServer() async {
+    if (_fakeServer != null) {
+      await _fakeServer!.stop();
+      _fakeServer = null;
+      MemberPage._persistFakeServer = null;
+      LogUtil.log('FakeServer已停止', level: 'INFO');
     }
   }
 
@@ -91,6 +131,8 @@ class MemberPageState extends State<MemberPage> {
           _minecraftServerPort = port;
           MemberPage._persistMinecraftServerPort = port;
         });
+        // 收到Minecraft端口后启动FakeServer
+        _startFakeServer();
       }
     });
   }
@@ -427,6 +469,12 @@ class MemberPageState extends State<MemberPage> {
         MemberPage._persistNetworkName = _networkName;
         MemberPage._persistNetworkKey = _networkKey;
         LogUtil.log('成功连接到EasyTier网络中发现的服务器', level: 'INFO');
+        
+        // 如果已经有Minecraft端口信息，立即启动FakeServer
+        if (_minecraftServerPort != null) {
+          _startFakeServer();
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('已连接到房间')),
         );
@@ -506,6 +554,10 @@ class MemberPageState extends State<MemberPage> {
   // 断开连接
   Future<void> _disconnect() async {
     _minecraftLaunchTimer?.cancel();
+    
+    // 停止FakeServer
+    await _stopFakeServer();
+    
     if (_client != null) {
       try {
         await _client?.disconnect();
@@ -532,6 +584,7 @@ class MemberPageState extends State<MemberPage> {
     MemberPage._persistPlayers = [];
     MemberPage._persistMinecraftServerPort = null;
     MemberPage._persistIpAddress = null;
+    MemberPage._persistFakeServer = null;
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已断开连接')),
