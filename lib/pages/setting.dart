@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 
 import 'package:fml/pages/setting/theme.dart';
+import 'package:fml/pages/setting/online_setting.dart';
 import 'package:fml/pages/setting/about.dart';
 import 'package:fml/pages/setting/java.dart';
 import 'package:fml/function/log.dart';
@@ -92,6 +93,18 @@ Future<void> _saveLog() async {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => ThemePage()),
+                  );
+                },
+              ),
+            ),Card(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: ListTile(
+                title: Text('\n 联机设置 \n'),
+                leading: Icon(Icons.hub),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => OnlineSettingPage()),
                   );
                 },
               ),

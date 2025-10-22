@@ -172,6 +172,12 @@ class AboutPageState extends State<AboutPage> {
                   onTap: () => _launchURL('https://www.gnu.org/licenses/gpl-3.0.html'),
                 ),
                 ListTile(
+                  title: const Text('authlib-injector'),
+                  subtitle: const Text('外置登录\nhttps://github.com/yushijinhun/authlib-injector'),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://github.com/yushijinhun/authlib-injector'),
+                ),
+                ListTile(
                   title: const Text('EasyTier'),
                   subtitle: const Text('异地组网\nhttps://easytier.cn/'),
                   trailing: const Icon(Icons.open_in_new),
@@ -256,36 +262,48 @@ class AboutPageState extends State<AboutPage> {
                   subtitle: const Text('https://github.com/flutter/packages/tree/main/packages/url_launcher/url_launcher'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/flutter/packages/tree/main/packages/url_launcher/url_launcher'),
-                ),ListTile(
+                ),
+                ListTile(
                   title: const Text('archive'),
                   subtitle: const Text('https://github.com/brendan-duncan/archive'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/flutter/packages/tree/main/packages/url_launcher/url_launcher'),
-                ),ListTile(
+                ),
+                ListTile(
                   title: const Text('flutter_colorpicker'),
                   subtitle: const Text('https://github.com/mchome/flutter_colorpicker'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/mchome/flutter_colorpicker'),
-                ),ListTile(
+                ),
+                ListTile(
                   title: const Text('flutter_local_notifications'),
                   subtitle: const Text('https://github.com/MaikuB/flutter_local_notifications/tree/master/flutter_local_notifications'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/MaikuB/flutter_local_notifications/tree/master/flutter_local_notifications'),
-                ),ListTile(
+                ),
+                ListTile(
                   title: const Text('synchronized'),
                   subtitle: const Text('https://github.com/tekartik/synchronized.dart/tree/master/synchronized'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/tekartik/synchronized.dart/tree/master/synchronized'),
-                ),ListTile(
+                ),
+                ListTile(
                   title: const Text('package_info_plus'),
                   subtitle: const Text('https://github.com/fluttercommunity/plus_plugins/tree/main/packages/package_info_plus/package_info_plus'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/fluttercommunity/plus_plugins/tree/main/packages/package_info_plus/package_info_plus'),
-                ),ListTile(
+                ),
+                ListTile(
                   title: const Text('flutter_markdown'),
                   subtitle: const Text('https://github.com/xushengs/flutter_markdown_latex'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/xushengs/flutter_markdown_latex'),
+                ),
+                ListTile(
+                  title: const Text('uuid'),
+                  subtitle: const Text('https://github.com/daegalus/dart-uuid'),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://github.com/daegalus/dart-uuid'),
                 ),
                 const ListTile(
                   title: Text('Github的各位'),

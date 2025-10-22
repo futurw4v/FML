@@ -44,41 +44,42 @@ class OnlineCenterServer {
     }
   }
 
-  // 关闭TCP服务器
+  // 停止TCP服务器
   Future<void> stop() async {
-    for (var client in _clients) {
+    final clientsCopy = List<Socket>.from(_clients);
+    for (var client in clientsCopy) {
       try {
-        client.close();
+        await _removeClient(client);
       } catch (e) {
         LogUtil.log('关闭客户端连接失败: $e', level: 'ERROR');
       }
     }
     _clients.clear();
-    _server?.close();
+    await _server?.close();
     _server = null;
     LogUtil.log('TCP服务器已关闭', level: 'INFO');
   }
 
-  // 处理新客户端连接
+  // 新客户端连接
   Future<void> _handleClient(Socket socket) async {
-    LogUtil.log('新客户端连接: ${socket.remoteAddress.address}:${socket.remotePort}', level: 'INFO');
+    final clientAddress = socket.remoteAddress.address;
+    final clientPort = socket.remotePort;
+    LogUtil.log('新客户端连接: $clientAddress:$clientPort', level: 'INFO');
     _clients.add(socket);
     List<int> buffer = [];
     int? expectedLength;
+    socket.setOption(SocketOption.tcpNoDelay, true);
     socket.listen(
       (data) {
-        // 添加新数据到缓冲区
         buffer.addAll(data);
         while (buffer.isNotEmpty) {
           if (expectedLength == null) {
             if (buffer.isEmpty) return;
             final typeLength = buffer[0];
             if (buffer.length < 1 + typeLength + 4) return;
-            final requestTypeBytes = buffer.sublist(1, 1 + typeLength);
-            utf8.decode(requestTypeBytes);
             final bodyLengthBytes = buffer.sublist(1 + typeLength, 5 + typeLength);
             final bodyLength = _bytesToUint32(bodyLengthBytes);
-            expectedLength = (5 + typeLength + bodyLength) as int?;
+            expectedLength = 5 + typeLength + bodyLength;
             if (buffer.length < expectedLength!) return;
           }
           if (buffer.length >= expectedLength!) {
@@ -86,32 +87,43 @@ class OnlineCenterServer {
             buffer = buffer.sublist(expectedLength!);
             _handleRequest(requestBytes, socket);
             expectedLength = null;
+          } else {
+            break;
           }
         }
       },
-    onError: (error) {
-      if (error is SocketException) {
-        if (error.osError?.errorCode == 54) {
-          LogUtil.log('客户端主动断开连接: ${socket.remoteAddress.address}:${socket.remotePort}', level: 'INFO');
+      onError: (error) {
+        if (error is SocketException) {
+          if (error.osError?.errorCode == 54) {
+            LogUtil.log('客户端主动断开连接: $clientAddress:$clientPort', level: 'INFO');
+          } else {
+            LogUtil.log('客户端连接错误 [${error.osError?.errorCode}]: $error', level: 'WARNING');
+          }
         } else {
-          LogUtil.log('客户端连接错误 [${error.osError?.errorCode}]: $error', level: 'WARNING');
+          LogUtil.log('客户端连接错误: $error', level: 'ERROR');
         }
-      } else {
-        LogUtil.log('客户端连接错误: $error', level: 'ERROR');
-      }
-      _removeClient(socket);
-    },
+        _removeClient(socket, clientAddress, clientPort);
+      },
       onDone: () {
-        LogUtil.log('客户端连接关闭: ${socket.remoteAddress.address}:${socket.remotePort}', level: 'INFO');
-        _removeClient(socket);
+        LogUtil.log('客户端连接关闭: $clientAddress:$clientPort', level: 'INFO');
+        _removeClient(socket, clientAddress, clientPort);
       },
     );
   }
 
-  // 优化移除客户端逻辑
-  Future<void> _removeClient(Socket socket) async {
+  // 移除客户端
+  Future<void> _removeClient(Socket socket, [String? savedAddress, int? savedPort]) async {
     if (!_clients.contains(socket)) {
       return;
+    }
+    String clientId;
+    try {
+      clientId = savedAddress != null && savedPort != null
+          ? '$savedAddress:$savedPort'
+          : '${socket.remoteAddress.address}:${socket.remotePort}';
+    } catch (e) {
+      clientId = 'unknown-client';
+      LogUtil.log('获取客户端地址失败: $e', level: 'DEBUG');
     }
     _clients.remove(socket);
     try {
@@ -120,7 +132,7 @@ class OnlineCenterServer {
       LogUtil.log('关闭socket失败: $e', level: 'ERROR');
     }
     _players.removeWhere((player) {
-      final isMatch = player.socketId == '${socket.remoteAddress.address}:${socket.remotePort}';
+      final isMatch = player.socketId == clientId;
       if (isMatch) {
         LogUtil.log('玩家离线: ${player.name}', level: 'INFO');
       }
@@ -130,8 +142,11 @@ class OnlineCenterServer {
 
   // 处理客户端请求
   Future<void> _handleRequest(List<int> requestBytes, Socket socket) async {
+    if (!_clients.contains(socket)) {
+      LogUtil.log('尝试处理已断开连接的客户端请求', level: 'WARNING');
+      return;
+    }
     try {
-      // 解析请求
       final typeLength = requestBytes[0];
       final requestTypeBytes = requestBytes.sublist(1, 1 + typeLength);
       final requestType = utf8.decode(requestTypeBytes);
@@ -141,6 +156,10 @@ class OnlineCenterServer {
           ? requestBytes.sublist(5 + typeLength, (5 + typeLength + bodyLength) as int?)
           : <int>[];
       LogUtil.log('收到请求: $requestType, 请求体长度: $bodyLength', level: 'INFO');
+      if (!_clients.contains(socket)) {
+        LogUtil.log('请求处理过程中客户端断开: $requestType', level: 'WARNING');
+        return;
+      }
       // 根据请求类型分发处理
       switch (requestType) {
         case 'c:ping':
@@ -159,13 +178,14 @@ class OnlineCenterServer {
           await _handlePlayerProfilesListRequest(body, socket);
           break;
         default:
-          // 未知协议请求
           await _sendErrorResponse(socket, 255, 'Unknown protocol: $requestType');
           break;
       }
-    } catch (e) {
-      LogUtil.log('处理请求失败: $e', level: 'ERROR');
-      _sendErrorResponse(socket, 255, 'Error processing request: $e');
+    } catch (e, stack) {
+      LogUtil.log('处理请求失败: $e\n$stack', level: 'ERROR');
+      if (_clients.contains(socket)) {
+        await _sendErrorResponse(socket, 255, 'Error processing request: $e');
+      }
     }
   }
 
@@ -191,9 +211,11 @@ class OnlineCenterServer {
   // 处理 c:server_port 请求
   Future<void> _handleServerPortRequest(List<int> body, Socket socket) async {
     if (minecraftServerPort <= 0) {
+      LogUtil.log('服务器端口请求失败: 端口号无效 ($minecraftServerPort)', level: 'WARNING');
       _sendErrorResponse(socket, 32, '');
       return;
     }
+    LogUtil.log('发送Minecraft服务器端口: $minecraftServerPort 到客户端: ${socket.remoteAddress.address}:${socket.remotePort}', level: 'INFO');
     final portBytes = Uint8List(2);
     portBytes[0] = (minecraftServerPort >> 8) & 0xFF;
     portBytes[1] = minecraftServerPort & 0xFF;
@@ -283,21 +305,23 @@ class OnlineCenterServer {
   // 发送响应
   Future<void> _sendResponse(Socket socket, List<int> response) async {
     try {
-      if (_clients.contains(socket)) {
-        socket.add(response);
-        await socket.flush();
-      } else {
+      if (!_clients.contains(socket)) {
         LogUtil.log('尝试向已关闭的socket发送数据', level: 'WARNING');
+        return;
       }
+      socket.add(response);
+      await socket.flush();
     } on SocketException catch (e) {
       if (e.osError?.errorCode == 54 || e.osError?.errorCode == 32) {
         LogUtil.log('发送响应失败,连接已断开: ${e.osError?.errorCode}', level: 'INFO');
-        _removeClient(socket);
+        await _removeClient(socket);
       } else {
         LogUtil.log('发送响应失败: $e', level: 'ERROR');
+        await _removeClient(socket);
       }
     } catch (e) {
       LogUtil.log('发送响应失败: $e', level: 'ERROR');
+      await _removeClient(socket);
     }
   }
 

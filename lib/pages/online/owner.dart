@@ -62,14 +62,11 @@ class OwnerPageState extends State<OwnerPage> {
     _easyTierProcess = OwnerPage._easyTierProcess;
     _machineId = OwnerPage._machineId;
     _isEasyTierRunning = _easyTierProcess != null;
-    
-    // 启动定时器,每2秒刷新一次玩家列表
     _playerListRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       if (_isServerRunning && _tcpServer != null && mounted) {
         setState(() {});
       }
     });
-    
     final fabricPort = fabric_launcher.getLastDetectedPort();
     final vanillaPort = vanilla_launcher.getLastDetectedPort();
     final neoforgePort = neoforge_launcher.getLastDetectedPort();
@@ -160,6 +157,7 @@ class OwnerPageState extends State<OwnerPage> {
     'W', 'X', 'Y', 'Z'
   ];
 
+  // 生成房间码
   Future<void> _generateRoomCode() async {
     final random = Random.secure();
     final List<int> charIndices = List.generate(15, (_) => random.nextInt(34));
@@ -311,52 +309,140 @@ class OwnerPageState extends State<OwnerPage> {
       LogUtil.log('缺少启动EasyTier所需的信息', level: 'ERROR');
       return false;
     }
+    int maxRetries = 5;
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final name = prefs.getString('SelectedPath') ?? '';
+        final path = prefs.getString('Path_$name') ?? '';
+        final String core = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-core');
+        int scaffoldingPort = _tcpServerPort;
+        int minecraftPort = _port;
+        if (attempt > 0) {
+          scaffoldingPort = await _findAvailablePort();
+          if (_tcpServer != null) {
+            await _tcpServer!.stop();
+            _tcpServer = OnlineCenterServer(
+              hostName: _playerName,
+              hostVendor: _tcpServer!.hostVendor,
+              port: scaffoldingPort,
+              minecraftServerPort: _port
+            );
+            await _tcpServer!.start();
+            await _tcpServer!.addHostPlayer(_machineId ?? 'unknown-machine-id');
+            OwnerPage._persistTcpServer = _tcpServer;
+            OwnerPage._persistTcpServerPort = scaffoldingPort;
+            setState(() {
+              _tcpServerPort = scaffoldingPort;
+            });
+            LogUtil.log('TCP服务器端口更新为: $_tcpServerPort', level: 'INFO');
+          }
+        }
+        final listenerPort = await _findAvailablePort();
+        final hostname = 'scaffolding-mc-server-$scaffoldingPort';
+        LogUtil.log('设置EasyTier主机名: $hostname', level: 'INFO');
+        LogUtil.log('设置转发: tcp://0.0.0.0:$scaffoldingPort/10.126.126.1:$scaffoldingPort,tcp://0.0.0.0:$minecraftPort/10.126.126.1:$minecraftPort', level: 'INFO');
+        final args = [
+          '-d',
+          '--no-tun',
+          '--network-name', _networkName!,
+          '--network-secret', _networkKey!,
+          '--machine-id', _machineId!,
+          '--hostname', hostname,
+          '--listeners', 'udp:$listenerPort',
+          '-p', 'tcp://public.easytier.cn:11010'
+        ];
+        LogUtil.log('正在启动EasyTier${attempt > 0 ? " (尝试 ${attempt+1}/$maxRetries)" : ""}: $core ${args.join(' ')}', level: 'INFO');
+        _easyTierProcess = await Process.start(core, args);
+        OwnerPage._easyTierProcess = _easyTierProcess;
+        _easyTierProcess!.stdout.transform(utf8.decoder).listen((data) {
+          LogUtil.log('EasyTier输出: $data', level: 'INFO');
+        });
+        bool hasPortConflict = false;
+        _easyTierProcess!.stderr.transform(utf8.decoder).listen((data) {
+          LogUtil.log('EasyTier错误: $data', level: 'ERROR');
+          if (data.contains('Address already in use') || data.contains('error code 48')) {
+            hasPortConflict = true;
+          }
+        });
+        await Future.delayed(const Duration(seconds: 1));
+        try {
+          int? exitCode;
+          try {
+            exitCode = await _easyTierProcess!.exitCode.timeout(
+              const Duration(milliseconds: 100),
+            );
+          } on TimeoutException {
+            exitCode = null;
+          }
+          if (exitCode != null) {
+            if (hasPortConflict && attempt < maxRetries - 1) {
+              LogUtil.log('检测到端口冲突,将尝试使用不同的端口 (尝试 ${attempt+1}/$maxRetries)', level: 'WARNING');
+            } else if (exitCode != 0) {
+              LogUtil.log('EasyTier启动失败,退出码: $exitCode', level: 'ERROR');
+              return false;
+            }
+          }
+        } catch (e) {
+          LogUtil.log('检查EasyTier启动状态时出错: $e', level: 'ERROR');
+        }
+        _easyTierProcess!.exitCode.then((code) {
+          LogUtil.log('EasyTier进程退出,退出码: $code', level: 'INFO');
+          if (mounted) {
+            setState(() {
+              _isEasyTierRunning = false;
+              _easyTierProcess = null;
+            });
+            OwnerPage._easyTierProcess = null;
+          }
+        });
+        setState(() {
+          _isEasyTierRunning = true;
+        });
+        LogUtil.log('EasyTier启动成功', level: 'INFO');
+        _startPortForwarding();
+        return true;
+      } catch (e) {
+        LogUtil.log('启动EasyTier失败 (尝试 ${attempt+1}/$maxRetries): $e', level: 'ERROR');
+        if (attempt < maxRetries - 1) {
+          LogUtil.log('将使用不同端口重试...', level: 'INFO');
+          if (_easyTierProcess != null) {
+            try {
+              _easyTierProcess!.kill();
+            } catch (killError) {
+              LogUtil.log('终止EasyTier进程时出错: $killError', level: 'ERROR');
+            }
+            _easyTierProcess = null;
+          }
+          await Future.delayed(Duration(seconds: 1));
+        }
+      }
+    }
+    LogUtil.log('在尝试所有可能的端口后,EasyTier启动失败', level: 'ERROR');
+    return false;
+  }
+
+  // 端口转发
+  Future<void> _startPortForwarding() async {
+    if (!_isEasyTierRunning || _easyTierProcess == null) {
+      LogUtil.log('EasyTier未在运行,无法进行端口转发', level: 'WARNING');
+      return;
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       final name = prefs.getString('SelectedPath') ?? '';
       final path = prefs.getString('Path_$name') ?? '';
-      final String core = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-core');
-      final hostname = 'scaffolding-mc-server-$_tcpServerPort';
-      LogUtil.log('设置EasyTier主机名: $hostname', level: 'INFO');
-      final args = [
-        '-d',
-        '--network-name', _networkName!,
-        '--network-secret', _networkKey!,
-        '--machine-id', _machineId!,
-        '--hostname', hostname,
-        '-p', 'tcp://public.easytier.cn:11010'
-      ];
-      LogUtil.log('正在启动EasyTier: $core ${args.join(' ')}', level: 'INFO');
-      if (Platform.isMacOS || Platform.isLinux) {
-        _easyTierProcess = await Process.start('sudo', [core, ...args]);
-      } else {
-        _easyTierProcess = await Process.start(core, args);
-      }
-      OwnerPage._easyTierProcess = _easyTierProcess;
-      _easyTierProcess!.stdout.transform(utf8.decoder).listen((data) {
-        LogUtil.log('EasyTier输出: $data', level: 'INFO');
-      });
-      _easyTierProcess!.stderr.transform(utf8.decoder).listen((data) {
-        LogUtil.log('EasyTier错误: $data', level: 'ERROR');
-      });
-      _easyTierProcess!.exitCode.then((code) {
-        LogUtil.log('EasyTier进程退出,退出码: $code', level: 'INFO');
-        if (mounted) {
-          setState(() {
-            _isEasyTierRunning = false;
-            _easyTierProcess = null;
-          });
-          OwnerPage._easyTierProcess = null;
-        }
-      });
-      setState(() {
-        _isEasyTierRunning = true;
-      });
-      LogUtil.log('EasyTier启动成功', level: 'INFO');
-      return true;
+      final String cli = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
+      LogUtil.log('正在请求EasyTier进行端口转发', level: 'INFO');
+      LogUtil.log('转发tcp服务器: 0.0.0.0:$_tcpServerPort 10.126.126.1:$_tcpServerPort', level: 'INFO');
+      await Process.start(cli, 'port-forward add tcp 0.0.0.0:$_tcpServerPort 10.126.126.1:$_tcpServerPort'.split(' '));
+      await Process.start(cli, 'port-forward add udp 0.0.0.0:$_tcpServerPort 10.126.126.1:$_tcpServerPort'.split(' '));
+      LogUtil.log('转发游戏服务器: 0.0.0.0:$_port 10.126.126.1:$_port', level: 'INFO');
+      await Process.start(cli, 'port-forward add tcp 0.0.0.0:$_port 10.126.126.1:$_port'.split(' '));
+      await Process.start(cli, 'port-forward add udp 0.0.0.0:$_port 10.126.126.1:$_port'.split(' '));
+      LogUtil.log('端口转发请求已发送', level: 'INFO');
     } catch (e) {
-      LogUtil.log('启动EasyTier失败: $e', level: 'ERROR');
-      return false;
+      LogUtil.log('请求端口转发失败: $e', level: 'ERROR');
     }
   }
 

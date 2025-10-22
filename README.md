@@ -21,6 +21,8 @@
 | PathList | 游戏文件夹列表 | list(string) |
 | Path_$name | 版本路径 | string |
 | Game_$name | 版本列表 | list(string) |
+| useTun | 是否使用Tun | bool |
+| extraNode | 额外节点配置 | string |
 
 离线账号配置 Account_$name list(string)
 | 序号 | 值 |

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart' show BlockPicker;
+import 'package:fml/main.dart';
 
-import 'package:fml/main.dart'; // 引入 MyApp 类
-
-// ThemePage 类定义了主题设置页面的内容
 class ThemePage extends StatefulWidget {
   const ThemePage({super.key});
 
@@ -12,9 +10,9 @@ class ThemePage extends StatefulWidget {
 }
 
 class ThemePageState extends State<ThemePage> {
-  bool _isDarkMode = false; // 亮暗色模式开关状态
-  bool _followSystem = false; // 暗色模式跟随系统开关状态
-  Color _themeColor = Colors.blue; // 默认主题色
+  bool _isDarkMode = false;
+  bool _followSystem = false;
+  Color _themeColor = Colors.blue;
 
   @override
   void initState() {
@@ -24,7 +22,7 @@ class ThemePageState extends State<ThemePage> {
     _themeColor = MyApp.of(context).themeColor;
   }
 
-  void _selectColor() {
+  Future<void> _selectColor() async {
     showDialog(
       context: context,
       builder: (context) {
@@ -34,8 +32,7 @@ class ThemePageState extends State<ThemePage> {
             pickerColor: _themeColor,
             onColorChanged: (Color color) {
               setState(() {
-                _themeColor = color; // 更新主题色
-                // 更新应用主题色
+                _themeColor = color;
                 MyApp.of(context).changeThemeColor(_themeColor);
               });
             },
@@ -57,7 +54,7 @@ class ThemePageState extends State<ThemePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('主题设置'), // 主题设置页面标题
+        title: const Text('主题设置'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -72,7 +69,6 @@ class ThemePageState extends State<ThemePage> {
                 onChanged: (bool value) {
                   setState(() {
                     _followSystem = value;
-                    // 更新应用主题
                     MyApp.of(context).changeTheme(_followSystem ? ThemeMode.system : (_isDarkMode ? ThemeMode.dark : ThemeMode.light));
                   });
                 },
@@ -87,8 +83,7 @@ class ThemePageState extends State<ThemePage> {
                   value: _isDarkMode,
                   onChanged: (bool value) {
                     setState(() {
-                      _isDarkMode = value; // 更新亮暗色模式开关状态
-                      // 更新应用主题
+                      _isDarkMode = value;
                       MyApp.of(context).changeTheme(_isDarkMode ? ThemeMode.dark : ThemeMode.light);
                     });
                   },
