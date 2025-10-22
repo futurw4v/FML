@@ -14,6 +14,33 @@ import 'package:fml/function/launcher/fabric.dart' as fabric_launcher;
 import 'package:fml/function/launcher/neoforge.dart' as neoforge_launcher;
 import 'package:fml/function/Scaffolding/server.dart';
 
+// EasyTier对等节点类
+class EasyTierPeer {
+  final String? ipv4;
+  final String hostname;
+  final String cost;
+  final String latency;
+  final String loss;
+  final String rx;
+  final String tx;
+  final String tunnel;
+  final String nat;
+  final String version;
+
+  EasyTierPeer({
+    this.ipv4,
+    required this.hostname,
+    required this.cost,
+    required this.latency,
+    required this.loss,
+    required this.rx,
+    required this.tx,
+    required this.tunnel,
+    required this.nat,
+    required this.version,
+  });
+}
+
 class OwnerPage extends StatefulWidget {
   final int port;
   const OwnerPage({super.key, required this.port});
@@ -47,6 +74,8 @@ class OwnerPageState extends State<OwnerPage> {
   String? _machineId;
   bool _isEasyTierRunning = false;
   Timer? _playerListRefreshTimer;
+  List<EasyTierPeer> _peers = [];
+  Timer? _peerListRefreshTimer;
 
   @override
   void initState() {
@@ -62,9 +91,16 @@ class OwnerPageState extends State<OwnerPage> {
     _easyTierProcess = OwnerPage._easyTierProcess;
     _machineId = OwnerPage._machineId;
     _isEasyTierRunning = _easyTierProcess != null;
+    // 玩家列表刷新定时器
     _playerListRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       if (_isServerRunning && _tcpServer != null && mounted) {
         setState(() {});
+      }
+    });
+    // 节点列表刷新定时器
+    _peerListRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_isEasyTierRunning && mounted) {
+        _refreshPeerList();
       }
     });
     final fabricPort = fabric_launcher.getLastDetectedPort();
@@ -146,6 +182,7 @@ class OwnerPageState extends State<OwnerPage> {
   void dispose() {
     _lanPortSub?.cancel();
     _playerListRefreshTimer?.cancel();
+    _peerListRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -326,7 +363,7 @@ class OwnerPageState extends State<OwnerPage> {
               hostName: _playerName,
               hostVendor: _tcpServer!.hostVendor,
               port: scaffoldingPort,
-              minecraftServerPort: _port
+              minecraftServerPort: minecraftPort
             );
             await _tcpServer!.start();
             await _tcpServer!.addHostPlayer(_machineId ?? 'unknown-machine-id');
@@ -335,21 +372,19 @@ class OwnerPageState extends State<OwnerPage> {
             setState(() {
               _tcpServerPort = scaffoldingPort;
             });
-            LogUtil.log('TCP服务器端口更新为: $_tcpServerPort', level: 'INFO');
+            LogUtil.log('TCP服务器端口更新为: $scaffoldingPort', level: 'INFO');
           }
         }
-        final listenerPort = await _findAvailablePort();
         final hostname = 'scaffolding-mc-server-$scaffoldingPort';
         LogUtil.log('设置EasyTier主机名: $hostname', level: 'INFO');
-        LogUtil.log('设置转发: tcp://0.0.0.0:$scaffoldingPort/10.126.126.1:$scaffoldingPort,tcp://0.0.0.0:$minecraftPort/10.126.126.1:$minecraftPort', level: 'INFO');
         final args = [
-          '-d',
           '--no-tun',
           '--network-name', _networkName!,
           '--network-secret', _networkKey!,
           '--machine-id', _machineId!,
           '--hostname', hostname,
-          '--listeners', 'udp:$listenerPort',
+          '--listeners', 'udp:0',
+          '--ipv4', '10.144.144.1',
           '-p', 'tcp://public.easytier.cn:11010'
         ];
         LogUtil.log('正在启动EasyTier${attempt > 0 ? " (尝试 ${attempt+1}/$maxRetries)" : ""}: $core ${args.join(' ')}', level: 'INFO');
@@ -434,12 +469,10 @@ class OwnerPageState extends State<OwnerPage> {
       final path = prefs.getString('Path_$name') ?? '';
       final String cli = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
       LogUtil.log('正在请求EasyTier进行端口转发', level: 'INFO');
-      LogUtil.log('转发tcp服务器: 0.0.0.0:$_tcpServerPort 10.126.126.1:$_tcpServerPort', level: 'INFO');
-      await Process.start(cli, 'port-forward add tcp 0.0.0.0:$_tcpServerPort 10.126.126.1:$_tcpServerPort'.split(' '));
-      await Process.start(cli, 'port-forward add udp 0.0.0.0:$_tcpServerPort 10.126.126.1:$_tcpServerPort'.split(' '));
-      LogUtil.log('转发游戏服务器: 0.0.0.0:$_port 10.126.126.1:$_port', level: 'INFO');
-      await Process.start(cli, 'port-forward add tcp 0.0.0.0:$_port 10.126.126.1:$_port'.split(' '));
-      await Process.start(cli, 'port-forward add udp 0.0.0.0:$_port 10.126.126.1:$_port'.split(' '));
+      LogUtil.log('转发tcp服务器: 0.0.0.0:$_tcpServerPort 10.144.144.1:$_tcpServerPort', level: 'INFO');
+      await Process.start(cli, 'port-forward add tcp 0.0.0.0:$_tcpServerPort 10.144.144.1:$_tcpServerPort'.split(' '));
+      LogUtil.log('转发游戏服务器: 0.0.0.0:$_port 10.144.144.1:$_port', level: 'INFO');
+      await Process.start(cli, 'port-forward add tcp 0.0.0.0:$_port 10.144.144.1:$_port'.split(' '));
       LogUtil.log('端口转发请求已发送', level: 'INFO');
     } catch (e) {
       LogUtil.log('请求端口转发失败: $e', level: 'ERROR');
@@ -551,6 +584,63 @@ class OwnerPageState extends State<OwnerPage> {
     await _startTcpServer();
   }
 
+  // 解析EasyTier对等节点数据
+  List<EasyTierPeer> parseEasyTierPeers(String output) {
+    List<EasyTierPeer> peers = [];
+    List<String> lines = output.split('\n');
+    if (lines.length > 2) {
+      for (int i = 2; i < lines.length; i++) {
+        String line = lines[i].trim();
+        if (line.isEmpty) continue;
+        List<String> parts = line.split('|').map((part) => part.trim()).toList();
+        if (parts.length >= 11) {
+          if (!parts[2].startsWith('PublicServer')) {
+            peers.add(EasyTierPeer(
+              ipv4: parts[1].isEmpty ? null : parts[1],
+              hostname: parts[2],
+              cost: parts[3],
+              latency: parts[4],
+              loss: parts[5],
+              rx: parts[6],
+              tx: parts[7],
+              tunnel: parts[8],
+              nat: parts[9],
+              version: parts[10],
+            ));
+          }
+        }
+      }
+    }
+    return peers;
+  }
+
+  // 刷新EasyTier对等节点列表
+  Future<void> _refreshPeerList() async {
+    if (!_isEasyTierRunning) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final name = prefs.getString('SelectedPath') ?? '';
+      final path = prefs.getString('Path_$name') ?? '';
+      final String cli = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
+      final result = await Process.run(cli, ['peer']);
+      if (result.exitCode == 0) {
+        final output = result.stdout.toString();
+        final peers = parseEasyTierPeers(output);
+        if (mounted) {
+          setState(() {
+            _peers = peers;
+          });
+        }
+        LogUtil.log('刷新对等节点列表成功，共${peers.length}个节点', level: 'INFO');
+      } else {
+        LogUtil.log('执行easytier-cli peer命令失败,退出码:${result.exitCode}', level: 'ERROR');
+        LogUtil.log('错误输出：${result.stderr}', level: 'ERROR');
+      }
+    } catch (e) {
+      LogUtil.log('刷新EasyTier对等节点列表失败: $e', level: 'ERROR');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -607,7 +697,7 @@ class OwnerPageState extends State<OwnerPage> {
                                             style: TextStyle(fontWeight: FontWeight.bold),
                                           ),
                                           Text(
-                                            _isServerRunning ? "运行中" : "未运行或正在启动",
+                                            _isServerRunning ? "运行中" : "正在启动",
                                             style: TextStyle(
                                               color: _isServerRunning ? Colors.green : Colors.orange,
                                               fontWeight: FontWeight.bold
@@ -623,9 +713,9 @@ class OwnerPageState extends State<OwnerPage> {
                                             style: TextStyle(fontWeight: FontWeight.bold),
                                           ),
                                           Text(
-                                            _isEasyTierRunning ? "已连接" : "未连接",
+                                            _isEasyTierRunning ? "已连接" : "正在连接",
                                             style: TextStyle(
-                                              color: _isEasyTierRunning ? Colors.green : Colors.red,
+                                              color: _isEasyTierRunning ? Colors.green : Colors.orange,
                                               fontWeight: FontWeight.bold
                                             ),
                                           ),
@@ -634,6 +724,7 @@ class OwnerPageState extends State<OwnerPage> {
                                       const SizedBox(height: 4),
                                       if (_isServerRunning)
                                         Text('Scaffolding 协议端口: $_tcpServerPort'),
+                                        Text('Minecraft 服务器端口: $_port')
                                     ],
                                   ),
                                 ),
@@ -705,6 +796,61 @@ class OwnerPageState extends State<OwnerPage> {
                       ),
                     ),
                   ),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('EasyTier网络节点:', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (_peers.isNotEmpty)
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: DataTable(
+                                columnSpacing: 16,
+                                horizontalMargin: 8,
+                                columns: const [
+                                  DataColumn(label: Text('主机名')),
+                                  DataColumn(label: Text('IP')),
+                                  DataColumn(label: Text('类型')),
+                                  DataColumn(label: Text('延迟')),
+                                  DataColumn(label: Text('丢包')),
+                                  DataColumn(label: Text('接收(rx)')),
+                                  DataColumn(label: Text('发送(tx)')),
+                                  DataColumn(label: Text('NAT类型')),
+                                ],
+                                rows: _peers.map((peer) {
+                                  return DataRow(cells: [
+                                    DataCell(Text(peer.hostname)),
+                                    DataCell(Text(peer.ipv4 ?? '-')),
+                                    DataCell(Text(peer.cost)),
+                                    DataCell(Text(peer.latency)),
+                                    DataCell(Text(peer.loss)),
+                                    DataCell(Text(peer.rx)),
+                                    DataCell(Text(peer.tx)),
+                                    DataCell(Text(peer.nat)),
+                                  ]);
+                                }).toList(),
+                              ),
+                            )
+                          else
+                            const Text('暂无对等节点连接', style: TextStyle(fontStyle: FontStyle.italic)),
+                          if (_isEasyTierRunning && _peers.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 8.0),
+                              child: Text('正在获取节点数据...', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 64.0),
                 ],
               ),
       ),

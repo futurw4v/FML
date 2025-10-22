@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,6 +11,32 @@ import 'package:uuid/uuid.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/Scaffolding/client.dart';
 import 'package:fml/function/fakeserver.dart';
+
+class EasyTierPeer {
+  final String? ipv4;
+  final String hostname;
+  final String cost;
+  final String latency;
+  final String loss;
+  final String rx;
+  final String tx;
+  final String tunnel;
+  final String nat;
+  final String version;
+
+  EasyTierPeer({
+    this.ipv4,
+    required this.hostname,
+    required this.cost,
+    required this.latency,
+    required this.loss,
+    required this.rx,
+    required this.tx,
+    required this.tunnel,
+    required this.nat,
+    required this.version,
+  });
+}
 
 class MemberPage extends StatefulWidget {
   const MemberPage({super.key});
@@ -23,6 +51,7 @@ class MemberPage extends StatefulWidget {
   static int? _persistMinecraftServerPort;
   static String? _persistIpAddress;
   static FakeServer? _persistFakeServer;
+  static List<EasyTierPeer> _persistPeers = [];
 
   @override
   MemberPageState createState() => MemberPageState();
@@ -45,6 +74,11 @@ class MemberPageState extends State<MemberPage> {
   String? _ipAddress;
   Timer? _minecraftLaunchTimer;
   FakeServer? _fakeServer;
+  List<EasyTierPeer> _peers = [];
+  Timer? _playerListRefreshTimer;
+  Timer? _peerListRefreshTimer;
+  final Random _random = Random();
+  String? mcPort;
 
   @override
   void initState() {
@@ -53,6 +87,19 @@ class MemberPageState extends State<MemberPage> {
     _initMachineId();
     _codeController.addListener(_validateCode);
     _restoreConnectionState();
+
+    // 玩家列表刷新定时器
+    _playerListRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      if (_isConnected && _client != null && mounted) {
+        setState(() {});
+      }
+    });
+    // 节点列表刷新定时器
+    _peerListRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_isEasyTierRunning && mounted) {
+        _refreshPeerList();
+      }
+    });
   }
 
   // 从静态变量恢复状态
@@ -67,6 +114,7 @@ class MemberPageState extends State<MemberPage> {
     _minecraftServerPort = MemberPage._persistMinecraftServerPort;
     _ipAddress = MemberPage._persistIpAddress;
     _fakeServer = MemberPage._persistFakeServer;
+    _peers = MemberPage._persistPeers;
     if (_isConnected && _client != null) {
       _setupClientListeners();
     }
@@ -85,19 +133,28 @@ class MemberPageState extends State<MemberPage> {
       LogUtil.log('FakeServer已在运行', level: 'INFO');
       return;
     }
-
     if (_minecraftServerPort == null || _ipAddress == null) {
       LogUtil.log('无法启动FakeServer: 缺少服务器信息', level: 'WARNING');
       return;
     }
-
     try {
+      int fakeServerPort = await _findAvailablePort();
+      LogUtil.log('使用随机端口 $fakeServerPort 启动FakeServer', level: 'INFO');
       _fakeServer = FakeServer(
-        port: _minecraftServerPort!,
+        port: fakeServerPort,
       );
       await _fakeServer!.start();
+      final prefs = await SharedPreferences.getInstance();
+      final name = prefs.getString('SelectedPath') ?? '';
+      final path = prefs.getString('Path_$name') ?? '';
+      final String cliPath = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
+      LogUtil.log('正在转发Minecraft端口: $_ipAddress:$_minecraftServerPort 到 0.0.0.0:$fakeServerPort', level: 'INFO');
+      await Process.run(cliPath, 'port-forward add tcp 0.0.0.0:$fakeServerPort $_ipAddress:$_minecraftServerPort'.split(' '));
       MemberPage._persistFakeServer = _fakeServer;
-      LogUtil.log('FakeServer已启动', level: 'INFO');
+      LogUtil.log('FakeServer已启动在端口 $fakeServerPort', level: 'INFO');
+      setState(() {
+        mcPort = fakeServerPort.toString();
+      });
     } catch (e) {
       LogUtil.log('启动FakeServer失败: $e', level: 'ERROR');
       _fakeServer = null;
@@ -131,7 +188,6 @@ class MemberPageState extends State<MemberPage> {
           _minecraftServerPort = port;
           MemberPage._persistMinecraftServerPort = port;
         });
-        // 收到Minecraft端口后启动FakeServer
         _startFakeServer();
       }
     });
@@ -141,6 +197,8 @@ class MemberPageState extends State<MemberPage> {
   void dispose() {
     _codeController.dispose();
     _minecraftLaunchTimer?.cancel();
+    _playerListRefreshTimer?.cancel();
+    _peerListRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -263,21 +321,17 @@ class MemberPageState extends State<MemberPage> {
       final name = prefs.getString('SelectedPath') ?? '';
       final path = prefs.getString('Path_$name') ?? '';
       final String core = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-core');
-      final hostname = 'scaffolding-mc-client-${_machineId!.substring(0, 8)}';
       final args = [
-        '-d',
+        '--no-tun',
+        '--dhcp',
         '--network-name', _networkName!,
         '--network-secret', _networkKey!,
         '--machine-id', _machineId!,
-        '--hostname', hostname,
+        '--listeners', 'udp:0',
         '-p', 'tcp://public.easytier.cn:11010'
       ];
       LogUtil.log('正在启动EasyTier: $core ${args.join(' ')}', level: 'INFO');
-      if (Platform.isMacOS || Platform.isLinux) {
-        _easyTierProcess = await Process.start('sudo', [core, ...args]);
-      } else {
-        _easyTierProcess = await Process.start(core, args);
-      }
+      _easyTierProcess = await Process.start(core, args);
       _easyTierProcess!.stdout.transform(utf8.decoder).listen((data) {
         if (data.contains('Connection established') ||
             data.contains('Connection success') ||
@@ -348,6 +402,23 @@ class MemberPageState extends State<MemberPage> {
     }
   }
 
+  // 生成随机端口并检查可用性
+  Future<int> _findAvailablePort() async {
+    int attempts = 0;
+    while (true) {
+      attempts++;
+      int port = 1024 + _random.nextInt(65535 - 1024);
+      try {
+        final socket = await ServerSocket.bind(InternetAddress.anyIPv4, port, shared: true);
+        await socket.close();
+        LogUtil.log('找到可用的随机端口: $port (尝试次数: $attempts)', level: 'INFO');
+        return port;
+      } catch (e) {
+        LogUtil.log('端口 $port 被占用，尝试另一个随机端口', level: 'INFO');
+      }
+    }
+  }
+
   // 检测peers并尝试连接到服务器
   Future<void> _detectPeers() async {
     if (!_isEasyTierRunning) return;
@@ -383,7 +454,7 @@ class MemberPageState extends State<MemberPage> {
                 if (portMatch != null && portMatch.groupCount >= 1) {
                   serverPort = int.tryParse(portMatch.group(1)!);
                 }
-                LogUtil.log('在EasyTier网络中发现服务器: $serverIP:$serverPort (主机名: $hostname)', level: 'INFO');
+                LogUtil.log('在EasyTier网络中发现Scaffolding服务器: $serverIP:$serverPort (主机名: $hostname)', level: 'INFO');
                 break;
               }
             }
@@ -391,12 +462,14 @@ class MemberPageState extends State<MemberPage> {
           if (serverIP != null && serverPort != null) break;
         }
         if (serverIP != null && serverPort != null) {
-          LogUtil.log('尝试连接到发现的服务器: $serverIP:$serverPort', level: 'INFO');
+          int localPort = await _findAvailablePort();
+          LogUtil.log('正在转发Scaffolding端口: $serverIP:$serverPort 到 127.0.0.1:$localPort', level: 'INFO');
+          await Process.run(cliPath, 'port-forward add tcp 127.0.0.1:$localPort $serverIP:$serverPort'.split(' '));
           setState(() {
             _ipAddress = serverIP;
             MemberPage._persistIpAddress = serverIP;
           });
-          _connectToFoundServer(serverIP, serverPort);
+          _connectToFoundServer('127.0.0.1', localPort, serverIP, serverPort);
         } else {
           LogUtil.log('未能从EasyTier网络中找到服务器', level: 'WARN');
         }
@@ -439,9 +512,9 @@ class MemberPageState extends State<MemberPage> {
   }
 
   // 连接到在EasyTier网络中发现的服务器
-  Future<void> _connectToFoundServer(String serverIP, int serverPort) async {
+  Future<void> _connectToFoundServer(String localAddress, int localPort, String originalServerIP, int originalServerPort) async {
     try {
-      LogUtil.log('正在连接到EasyTier网络中发现的服务器: $serverIP:$serverPort', level: 'INFO');
+      LogUtil.log('正在连接到Scaffolding服务器: $localAddress:$localPort (原始地址: $originalServerIP:$originalServerPort)', level: 'INFO');
       if (mounted) {
         setState(() {
           _isConnecting = true;
@@ -450,8 +523,8 @@ class MemberPageState extends State<MemberPage> {
       final appVersion = await _loadAppVersion();
       final coreVersion = await _checkCoreVersion();
       _client = OnlineCenterClient(
-        serverAddress: serverIP,
-        serverPort: serverPort,
+        serverAddress: localAddress,
+        serverPort: localPort,
         playerName: _playerName ?? 'Guest',
         machineId: _machineId ?? const Uuid().v4(),
         vendor: 'FML $appVersion, EasyTier v$coreVersion',
@@ -468,19 +541,23 @@ class MemberPageState extends State<MemberPage> {
         MemberPage._persistClient = _client;
         MemberPage._persistNetworkName = _networkName;
         MemberPage._persistNetworkKey = _networkKey;
-        LogUtil.log('成功连接到EasyTier网络中发现的服务器', level: 'INFO');
-        
-        // 如果已经有Minecraft端口信息，立即启动FakeServer
+        LogUtil.log('成功连接到Scaffolding服务器', level: 'INFO');
         if (_minecraftServerPort != null) {
+          final prefs = await SharedPreferences.getInstance();
+          final name = prefs.getString('SelectedPath') ?? '';
+          final path = prefs.getString('Path_$name') ?? '';
+          final String cliPath = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
+          int mcLocalPort = await _findAvailablePort();
+          LogUtil.log('正在转发Minecraft端口: $originalServerIP:$_minecraftServerPort 到 127.0.0.1:$mcLocalPort', level: 'INFO');
+          await Process.run(cliPath, 'port-forward add tcp 127.0.0.1:$mcLocalPort $originalServerIP:$_minecraftServerPort'.split(' '));
           _startFakeServer();
         }
-        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('已连接到房间')),
         );
       }
     } catch (e) {
-      LogUtil.log('连接到EasyTier网络中发现的服务器失败: $e', level: 'ERROR');
+      LogUtil.log('连接到Scaffolding服务器失败: $e', level: 'ERROR');
       _client?.disconnect();
       _client = null;
       if (mounted) {
@@ -554,10 +631,7 @@ class MemberPageState extends State<MemberPage> {
   // 断开连接
   Future<void> _disconnect() async {
     _minecraftLaunchTimer?.cancel();
-    
-    // 停止FakeServer
     await _stopFakeServer();
-    
     if (_client != null) {
       try {
         await _client?.disconnect();
@@ -573,6 +647,7 @@ class MemberPageState extends State<MemberPage> {
         _players = [];
         _minecraftServerPort = null;
         _ipAddress = null;
+        _peers = [];
       });
     }
     MemberPage._persistIsConnected = false;
@@ -585,6 +660,7 @@ class MemberPageState extends State<MemberPage> {
     MemberPage._persistMinecraftServerPort = null;
     MemberPage._persistIpAddress = null;
     MemberPage._persistFakeServer = null;
+    MemberPage._persistPeers = [];
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已断开连接')),
@@ -670,8 +746,7 @@ class MemberPageState extends State<MemberPage> {
   }
 
   Widget _buildConnectedView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return ListView(
       children: [
         Card(
           child: Padding(
@@ -688,7 +763,7 @@ class MemberPageState extends State<MemberPage> {
                   children: [
                     Icon(Icons.check_circle),
                     const SizedBox(width: 8),
-                    Text('状态: 已连接'),
+                    Text('已连接', style: TextStyle(color: Colors.green)),
                   ],
                 ),
               ],
@@ -697,12 +772,12 @@ class MemberPageState extends State<MemberPage> {
         ),
         Card(
           child: ListTile(
-            title: Text('Minecraft服务器地址'),
-            subtitle: Text('$_ipAddress:$_minecraftServerPort'),
+            title: Text('Minecraft服务器备用地址'),
+            subtitle: Text('127.0.0.1:$mcPort'),
             leading: const Icon(Icons.dns),
             trailing: const Icon(Icons.copy),
             onTap: () {
-              Clipboard.setData(ClipboardData(text: '$_ipAddress:$_minecraftServerPort'));
+              Clipboard.setData(ClipboardData(text: '127.0.0.1:$mcPort'));
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('已复制到剪贴板')),
               );
@@ -740,7 +815,127 @@ class MemberPageState extends State<MemberPage> {
             ),
           ),
         ),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('EasyTier网络节点:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    if (_isEasyTierRunning)
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        iconSize: 20,
+                        onPressed: _refreshPeerList,
+                        tooltip: '刷新节点列表',
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (_peers.isNotEmpty)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      columnSpacing: 16,
+                      horizontalMargin: 8,
+                      columns: const [
+                        DataColumn(label: Text('主机名')),
+                        DataColumn(label: Text('IP')),
+                        DataColumn(label: Text('类型')),
+                        DataColumn(label: Text('延迟')),
+                        DataColumn(label: Text('丢包')),
+                        DataColumn(label: Text('接收(rx)')),
+                        DataColumn(label: Text('发送(tx)')),
+                        DataColumn(label: Text('NAT类型')),
+                      ],
+                      rows: _peers.map((peer) {
+                        return DataRow(cells: [
+                          DataCell(Text(peer.hostname)),
+                          DataCell(Text(peer.ipv4 ?? '-')),
+                          DataCell(Text(peer.cost)),
+                          DataCell(Text(peer.latency)),
+                          DataCell(Text(peer.loss)),
+                          DataCell(Text(peer.rx)),
+                          DataCell(Text(peer.tx)),
+                          DataCell(Text(peer.nat)),
+                        ]);
+                      }).toList(),
+                    ),
+                  )
+                else
+                  const Text('暂无对等节点连接', style: TextStyle(fontStyle: FontStyle.italic)),
+                if (_isEasyTierRunning && _peers.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8.0),
+                    child: Text('正在获取节点数据', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(height: 64.0),
       ],
     );
+  }
+
+  // 解析EasyTier节点数据
+  List<EasyTierPeer> parseEasyTierPeers(String output) {
+    List<EasyTierPeer> peers = [];
+    List<String> lines = output.split('\n');
+    if (lines.length > 2) {
+      for (int i = 2; i < lines.length; i++) {
+        String line = lines[i].trim();
+        if (line.isEmpty) continue;
+        List<String> parts = line.split('|').map((part) => part.trim()).toList();
+        if (parts.length >= 11) {
+          if (!parts[2].startsWith('PublicServer')) {
+            peers.add(EasyTierPeer(
+              ipv4: parts[1].isEmpty ? null : parts[1],
+              hostname: parts[2],
+              cost: parts[3],
+              latency: parts[4],
+              loss: parts[5],
+              rx: parts[6],
+              tx: parts[7],
+              tunnel: parts[8],
+              nat: parts[9],
+              version: parts[10],
+            ));
+          }
+        }
+      }
+    }
+    return peers;
+  }
+
+  // 刷新EasyTier节点列表
+  Future<void> _refreshPeerList() async {
+    if (!_isEasyTierRunning) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final name = prefs.getString('SelectedPath') ?? '';
+      final path = prefs.getString('Path_$name') ?? '';
+      final String cli = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
+      final result = await Process.run(cli, ['peer']);
+      if (result.exitCode == 0) {
+        final output = result.stdout.toString();
+        final peers = parseEasyTierPeers(output);
+        if (mounted) {
+          setState(() {
+            _peers = peers;
+          });
+          MemberPage._persistPeers = peers;
+        }
+        LogUtil.log('刷新对等节点列表成功，共${peers.length}个节点', level: 'INFO');
+      } else {
+        LogUtil.log('执行easytier-cli peer命令失败,退出码:${result.exitCode}', level: 'ERROR');
+        LogUtil.log('错误输出：${result.stderr}', level: 'ERROR');
+      }
+    } catch (e) {
+      LogUtil.log('刷新EasyTier对等节点列表失败: $e', level: 'ERROR');
+    }
   }
 }
