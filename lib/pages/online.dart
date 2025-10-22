@@ -52,10 +52,17 @@ class OnlinePageState extends State<OnlinePage> {
     final prefs = await SharedPreferences.getInstance();
     final name = prefs.getString('SelectedPath') ?? '';
     final path = prefs.getString('Path_$name') ?? '';
+    if (Platform.isWindows) {
+      final File core = File('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-core.exe');
+      setState(() {
+      _coreExists = core.existsSync();
+    });
+    } else {
     final File core = File('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-core');
     setState(() {
       _coreExists = core.existsSync();
     });
+    }
   }
 
   // 检测核心版本
@@ -145,6 +152,30 @@ class OnlinePageState extends State<OnlinePage> {
     }
   }
 
+  // 获取系统架构(带后备方案)
+  String _getSystemArchitecture() {
+    String arch = SysInfo.kernelArchitecture.name;
+    
+    // 如果无法识别,尝试使用 Platform.version 或其他方法
+    if (arch == 'UNKNOWN') {
+      if (Platform.isWindows) {
+        // Windows 上可以通过环境变量判断
+        final processorArchitecture = Platform.environment['PROCESSOR_ARCHITECTURE'];
+        LogUtil.log('PROCESSOR_ARCHITECTURE: $processorArchitecture', level: 'INFO');
+        
+        if (processorArchitecture == 'AMD64' || processorArchitecture == 'x64') {
+          return 'X86_64';
+        } else if (processorArchitecture == 'ARM64') {
+          return 'ARM64';
+        }
+      }
+      LogUtil.log('无法确定系统架构,使用默认值 X86_64', level: 'WARN');
+      return 'X86_64'; // 默认使用 x86_64
+    }
+    
+    return arch;
+  }
+
   // 安装核心
   Future<void> _installCore() async {
     String downloadUrl = '';
@@ -161,8 +192,10 @@ class OnlinePageState extends State<OnlinePage> {
       );
       if (response.statusCode == 200) {
         Map<String, dynamic> loaderData = response.data;
+        String architecture = _getSystemArchitecture();
+        
         if (Platform.isMacOS) {
-          if (SysInfo.kernelArchitecture.name == 'X86_64') {
+          if (architecture == 'X86_64') {
             LogUtil.log('为 macOS x86_64 下载', level: 'INFO');
             for (var asset in loaderData['assets']) {
               if (asset['name'].startsWith('easytier-macos-x86_64')) {
@@ -170,7 +203,7 @@ class OnlinePageState extends State<OnlinePage> {
                 downloadUrl = asset['browser_download_url'];
               }
             }
-          } else if (SysInfo.kernelArchitecture.name == 'ARM64') {
+          } else if (architecture == 'ARM64') {
             LogUtil.log('为 macOS arm64 下载', level: 'INFO');
             for (var asset in loaderData['assets']) {
               if (asset['name'].startsWith('easytier-macos-aarch64')) {
@@ -179,11 +212,11 @@ class OnlinePageState extends State<OnlinePage> {
               }
             }
           } else {
-            LogUtil.log('不支持的 macOS 架构: ${SysInfo.kernelArchitecture}', level: 'ERROR');
+            LogUtil.log('不支持的 macOS 架构: $architecture', level: 'ERROR');
             _showUnsupportedDialog();
           }
         } else if (Platform.isWindows) {
-          if (SysInfo.kernelArchitecture.name == 'X86_64') {
+          if (architecture == 'X86_64') {
             LogUtil.log('为 Windows x86_64 下载', level: 'INFO');
             for (var asset in loaderData['assets']) {
               if (asset['name'].startsWith('easytier-windows-x86_64')) {
@@ -191,7 +224,7 @@ class OnlinePageState extends State<OnlinePage> {
                 downloadUrl = asset['browser_download_url'];
               }
             }
-          } else if (SysInfo.kernelArchitecture.name == 'ARM64') {
+          } else if (architecture == 'ARM64') {
             LogUtil.log('为 Windows arm64 下载', level: 'INFO');
             for (var asset in loaderData['assets']) {
               if (asset['name'].startsWith('easytier-windows-arm64')) {
@@ -200,11 +233,11 @@ class OnlinePageState extends State<OnlinePage> {
               }
             }
           } else {
-            LogUtil.log('不支持的 Windows 架构: ${SysInfo.kernelArchitecture}', level: 'ERROR');
+            LogUtil.log('不支持的 Windows 架构: $architecture', level: 'ERROR');
             _showUnsupportedDialog();
           }
         } else if (Platform.isLinux) {
-          if (SysInfo.kernelArchitecture.name == 'X86_64') {
+          if (architecture == 'X86_64') {
             LogUtil.log('为 Linux x86_64 下载', level: 'INFO');
             for (var asset in loaderData['assets']) {
               if (asset['name'].startsWith('easytier-linux-x86_64')) {
@@ -212,7 +245,7 @@ class OnlinePageState extends State<OnlinePage> {
                 downloadUrl = asset['browser_download_url'];
               }
             }
-          } else if (SysInfo.kernelArchitecture.name == 'ARM64') {
+          } else if (architecture == 'ARM64') {
             LogUtil.log('为 Linux arm64 下载', level: 'INFO');
             for (var asset in loaderData['assets']) {
               if (asset['name'].startsWith('easytier-linux-aarch64')) {
@@ -221,7 +254,7 @@ class OnlinePageState extends State<OnlinePage> {
               }
             }
           } else {
-            LogUtil.log('不支持的 Linux 架构: ${SysInfo.kernelArchitecture}', level: 'ERROR');
+            LogUtil.log('不支持的 Linux 架构: $architecture', level: 'ERROR');
             _showUnsupportedDialog();
           }
         } else {
