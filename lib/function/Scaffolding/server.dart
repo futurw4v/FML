@@ -68,9 +68,12 @@ class OnlineCenterServer {
     _clients.add(socket);
     List<int> buffer = [];
     int? expectedLength;
-    socket.setOption(SocketOption.tcpNoDelay, true);
     socket.listen(
       (data) {
+        if (!_clients.contains(socket)) {
+          LogUtil.log('收到已移除客户端的数据，忽略', level: 'INFO');
+          return;
+        }
         buffer.addAll(data);
         while (buffer.isNotEmpty) {
           if (expectedLength == null) {
@@ -85,7 +88,9 @@ class OnlineCenterServer {
           if (buffer.length >= expectedLength!) {
             final requestBytes = buffer.sublist(0, expectedLength!);
             buffer = buffer.sublist(expectedLength!);
-            _handleRequest(requestBytes, socket);
+            _handleRequest(requestBytes, socket).catchError((e) {
+              LogUtil.log('处理请求异常: $e', level: 'ERROR');
+            });
             expectedLength = null;
           } else {
             break;
@@ -108,6 +113,7 @@ class OnlineCenterServer {
         LogUtil.log('客户端连接关闭: $clientAddress:$clientPort', level: 'INFO');
         _removeClient(socket, clientAddress, clientPort);
       },
+      cancelOnError: false,
     );
   }
 
@@ -123,7 +129,7 @@ class OnlineCenterServer {
           : '${socket.remoteAddress.address}:${socket.remotePort}';
     } catch (e) {
       clientId = 'unknown-client';
-      LogUtil.log('获取客户端地址失败: $e', level: 'DEBUG');
+      LogUtil.log('获取客户端地址失败: $e', level: 'INFO');
     }
     _clients.remove(socket);
     try {
@@ -304,24 +310,37 @@ class OnlineCenterServer {
 
   // 发送响应
   Future<void> _sendResponse(Socket socket, List<int> response) async {
+    if (!_clients.contains(socket)) {
+      LogUtil.log('尝试向已关闭的socket发送数据', level: 'WARNING');
+      return;
+    }
     try {
-      if (!_clients.contains(socket)) {
-        LogUtil.log('尝试向已关闭的socket发送数据', level: 'WARNING');
-        return;
-      }
       socket.add(response);
-      await socket.flush();
+      await Future.microtask(() async {
+        try {
+          await socket.flush().timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              LogUtil.log('发送响应超时，但不断开连接', level: 'WARNING');
+            },
+          );
+          LogUtil.log('成功发送响应, ${response.length}字节', level: 'INFO');
+        } catch (e) {
+          LogUtil.log('flush时出现错误: $e', level: 'INFO');
+        }
+      });
     } on SocketException catch (e) {
-      if (e.osError?.errorCode == 54 || e.osError?.errorCode == 32) {
-        LogUtil.log('发送响应失败,连接已断开: ${e.osError?.errorCode}', level: 'INFO');
+      final errorCode = e.osError?.errorCode;
+      if (errorCode == 54 || errorCode == 32 || errorCode == 57 || errorCode == 104) {
+        LogUtil.log('发送响应失败,连接已断开 [错误码: $errorCode]: ${e.message}', level: 'INFO');
         await _removeClient(socket);
       } else {
-        LogUtil.log('发送响应失败: $e', level: 'ERROR');
-        await _removeClient(socket);
+        LogUtil.log('发送响应时出现socket异常 [错误码: $errorCode]: $e', level: 'WARNING');
       }
+    } on StateError catch (e) {
+      LogUtil.log('socket状态错误: $e ,数据可能已发送', level: 'INFO');
     } catch (e) {
-      LogUtil.log('发送响应失败: $e', level: 'ERROR');
-      await _removeClient(socket);
+      LogUtil.log('发送响应时出现错误: $e, 类型: ${e.runtimeType}', level: 'WARNING');
     }
   }
 

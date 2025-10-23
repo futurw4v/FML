@@ -172,6 +172,30 @@ class MemberPageState extends State<MemberPage> {
     }
   }
 
+  // 设置Minecraft端口转发
+  Future<void> _setupMinecraftPortForwarding() async {
+    if (_minecraftServerPort == null || _ipAddress == null) {
+      LogUtil.log('无法设置Minecraft端口转发: 缺少服务器信息 (端口: $_minecraftServerPort, IP: $_ipAddress)', level: 'WARNING');
+      return;
+    }
+    if (_fakeServer != null && _fakeServer!.isRunning) {
+      LogUtil.log('FakeServer已在运行，跳过重复启动', level: 'INFO');
+      return;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final name = prefs.getString('SelectedPath') ?? '';
+      final path = prefs.getString('Path_$name') ?? '';
+      final String cliPath = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
+      int mcLocalPort = await _findAvailablePort();
+      LogUtil.log('正在转发Minecraft端口: $_ipAddress:$_minecraftServerPort 到 127.0.0.1:$mcLocalPort', level: 'INFO');
+      await Process.run(cliPath, 'port-forward add tcp 127.0.0.1:$mcLocalPort $_ipAddress:$_minecraftServerPort'.split(' '));
+      await _startFakeServer();
+    } catch (e) {
+      LogUtil.log('设置Minecraft端口转发失败: $e', level: 'ERROR');
+    }
+  }
+
   // 客户端监听器
   Future<void> _setupClientListeners() async {
     _client!.playersStream.listen((players) {
@@ -183,12 +207,33 @@ class MemberPageState extends State<MemberPage> {
       }
     });
     _client!.minecraftPortStream.listen((port) {
-      if (mounted && port != null && port > 0) {
+      if (!mounted) return;
+      if (port != null && port > 0) {
+        LogUtil.log('收到Minecraft服务器端口: $port', level: 'INFO');
         setState(() {
           _minecraftServerPort = port;
           MemberPage._persistMinecraftServerPort = port;
         });
-        _startFakeServer();
+        _setupMinecraftPortForwarding();
+      } else if (port == null) {
+        LogUtil.log('服务器明确返回:Minecraft服务未启动', level: 'WARNING');
+        setState(() {
+          _minecraftServerPort = null;
+          MemberPage._persistMinecraftServerPort = null;
+        });
+      }
+    });
+    // 监听服务器断开事件
+    _client!.serverDisconnectedStream.listen((disconnected) {
+      if (disconnected && mounted) {
+        LogUtil.log('检测到服务器已断开', level: 'ERROR');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('服务器已关闭或网络连接中断'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+        _disconnect();
       }
     });
   }
@@ -542,16 +587,11 @@ class MemberPageState extends State<MemberPage> {
         MemberPage._persistNetworkName = _networkName;
         MemberPage._persistNetworkKey = _networkKey;
         LogUtil.log('成功连接到Scaffolding服务器', level: 'INFO');
-        if (_minecraftServerPort != null) {
-          final prefs = await SharedPreferences.getInstance();
-          final name = prefs.getString('SelectedPath') ?? '';
-          final path = prefs.getString('Path_$name') ?? '';
-          final String cliPath = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
-          int mcLocalPort = await _findAvailablePort();
-          LogUtil.log('正在转发Minecraft端口: $originalServerIP:$_minecraftServerPort 到 127.0.0.1:$mcLocalPort', level: 'INFO');
-          await Process.run(cliPath, 'port-forward add tcp 127.0.0.1:$mcLocalPort $originalServerIP:$_minecraftServerPort'.split(' '));
-          _startFakeServer();
-        }
+        setState(() {
+          _ipAddress = originalServerIP;
+          MemberPage._persistIpAddress = originalServerIP;
+        });
+        _retryGetMinecraftPort();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('已连接到房间')),
         );
@@ -564,6 +604,60 @@ class MemberPageState extends State<MemberPage> {
         setState(() {
           _isConnecting = false;
         });
+      }
+    }
+  }
+
+  // 重试获取Minecraft端口
+  Future<void> _retryGetMinecraftPort() async {
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      await Future.delayed(Duration(seconds: 2));
+      if (_client == null || !_client!.isConnected) {
+        LogUtil.log('第$attempt次尝试: 客户端连接已断开，停止重试', level: 'WARNING');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('与服务器的连接已断开'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+      try {
+        await _client!.getMinecraftServerPort();
+        LogUtil.log('第$attempt次尝试: 已发送获取Minecraft端口请求', level: 'INFO');
+      } catch (e) {
+        LogUtil.log('第$attempt次尝试: 发送端口请求失败 - $e', level: 'ERROR');
+        if (attempt == 3) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('无法与服务器通信，请检查网络连接'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+        continue;
+      }
+      await Future.delayed(Duration(seconds: 1));
+      if (_minecraftServerPort != null) {
+        LogUtil.log('第$attempt次尝试: 已获取到Minecraft端口 $_minecraftServerPort，开始设置转发', level: 'INFO');
+        await _setupMinecraftPortForwarding();
+        return;
+      }
+      LogUtil.log('第$attempt次尝试: 未收到Minecraft端口信息', level: 'WARNING');
+      if (attempt == 3) {
+        LogUtil.log('已重试3次仍未收到Minecraft端口信息，可能服务器未启动Minecraft服务', level: 'WARNING');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('房主可能还未启动Minecraft服务器'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
       }
     }
   }
@@ -669,6 +763,7 @@ class MemberPageState extends State<MemberPage> {
   }
 
   @override
+  // 构建UI
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
@@ -697,6 +792,7 @@ class MemberPageState extends State<MemberPage> {
     );
   }
 
+  // 房间信息输入
   Widget _buildConnectForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -745,6 +841,7 @@ class MemberPageState extends State<MemberPage> {
     );
   }
 
+  // 已连接
   Widget _buildConnectedView() {
     return ListView(
       children: [

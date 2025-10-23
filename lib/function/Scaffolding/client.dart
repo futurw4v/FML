@@ -19,10 +19,14 @@ class OnlineCenterClient {
   final List<PlayerProfile> _players = [];
   final StreamController<List<PlayerProfile>> _playersStreamController = StreamController<List<PlayerProfile>>.broadcast();
   final StreamController<int?> _minecraftPortStreamController = StreamController<int?>.broadcast();
+  final StreamController<bool> _serverDisconnectedStreamController = StreamController<bool>.broadcast();
   int _connectionAttempts = 0;
   final int _maxConnectionAttempts = 3;
   bool _isConnecting = false;
   final bool useIP;
+  int _missedHeartbeats = 0;
+  final int _maxMissedHeartbeats = 3;
+  DateTime? _lastHeartbeatResponse;
 
   OnlineCenterClient({
     required this.serverAddress,
@@ -38,6 +42,7 @@ class OnlineCenterClient {
   int? get minecraftServerPort => _minecraftServerPort;
   Stream<List<PlayerProfile>> get playersStream => _playersStreamController.stream;
   Stream<int?> get minecraftPortStream => _minecraftPortStreamController.stream;
+  Stream<bool> get serverDisconnectedStream => _serverDisconnectedStreamController.stream;
 
   // 连接到服务器并开始心跳
   Future<void> connect() async {
@@ -67,7 +72,6 @@ class OnlineCenterClient {
       _startListening();
       await _sendPlayerPing();
       await _negotiateProtocols();
-      await _getMinecraftServerPort();
       _startHeartbeat();
       return Future.value();
     } catch (e) {
@@ -89,6 +93,8 @@ class OnlineCenterClient {
     _isConnected = false;
     _isConnecting = false;
     _connectionAttempts = 0;
+    _missedHeartbeats = 0;
+    _lastHeartbeatResponse = null;
     try {
       await _socket?.close();
       _socket = null;
@@ -104,14 +110,19 @@ class OnlineCenterClient {
     int? expectedLength;
     _socket!.listen(
       (data) {
+        LogUtil.log('收到原始数据: ${data.length}字节', level: 'INFO');
         buffer.addAll(data);
         while (buffer.isNotEmpty) {
           if (expectedLength == null) {
-            if (buffer.length < 5) return;
+            if (buffer.length < 5) {
+              return;
+            }
             final bodyLengthBytes = buffer.sublist(1, 5);
             final bodyLength = _bytesToUint32(bodyLengthBytes);
             expectedLength = 5 + bodyLength;
-            if (buffer.length < expectedLength!) return;
+            if (buffer.length < expectedLength!) {
+              return;
+            }
           }
           if (buffer.length >= expectedLength!) {
             final response = buffer.sublist(0, expectedLength!);
@@ -129,15 +140,23 @@ class OnlineCenterClient {
         LogUtil.log('联机中心连接关闭', level: 'INFO');
         _handleDisconnect();
       },
+      cancelOnError: false,
     );
   }
 
   // 处理连接断开
   Future<void> _handleDisconnect() async {
+    if (!_isConnected) return;
     _isConnected = false;
     _isConnecting = false;
     _heartbeatTimer?.cancel();
+    try {
+      await _socket?.close();
+    } catch (e) {
+      LogUtil.log('关闭socket时出错: $e', level: 'ERROR');
+    }
     _socket = null;
+    LogUtil.log('连接已断开', level: 'WARNING');
   }
 
   // 处理服务器响应
@@ -149,8 +168,12 @@ class OnlineCenterClient {
       final body = bodyLength > 0
           ? response.sublist(5, 5 + bodyLength)
           : <int>[];
+      LogUtil.log('处理响应: 状态=$status, body长度=$bodyLength', level: 'INFO');
       if (status == 0) {
         _handleSuccessResponse(body);
+      } else if (status == 32) {
+        LogUtil.log('服务器未启动Minecraft服务 (状态码 32)', level: 'WARNING');
+        _minecraftPortStreamController.add(null);
       } else {
         final errorMessage = bodyLength > 0 ? utf8.decode(body) : '未知错误';
         LogUtil.log('联机中心返回错误(状态码 $status): $errorMessage', level: 'ERROR');
@@ -163,6 +186,8 @@ class OnlineCenterClient {
   // 处理成功响应
   Future<void> _handleSuccessResponse(List<int> body) async {
     if (body.isEmpty) {
+      _lastHeartbeatResponse = DateTime.now();
+      _missedHeartbeats = 0;
       return;
     }
     try {
@@ -229,13 +254,34 @@ class OnlineCenterClient {
   // 启动定时心跳和玩家列表获取
   Future<void> _startHeartbeat() async {
     _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+    _lastHeartbeatResponse = DateTime.now();
+    _missedHeartbeats = 0;
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
       if (!_isConnected) return;
       try {
         await _sendPlayerPing();
         await _getPlayerProfilesList();
+        final now = DateTime.now();
+        if (_lastHeartbeatResponse != null) {
+          final timeSinceLastResponse = now.difference(_lastHeartbeatResponse!).inSeconds;
+          if (timeSinceLastResponse > 15) {
+            _missedHeartbeats++;
+            LogUtil.log('心跳超时 (已连续$_missedHeartbeats次), 距上次响应: $timeSinceLastResponse秒', level: 'WARNING');
+            if (_missedHeartbeats >= _maxMissedHeartbeats) {
+              LogUtil.log('连续$_maxMissedHeartbeats次心跳无响应，判定服务器已断开', level: 'ERROR');
+              _serverDisconnectedStreamController.add(true);
+              await _handleDisconnect();
+            }
+          }
+        }
       } catch (e) {
         LogUtil.log('发送心跳失败: $e', level: 'ERROR');
+        _missedHeartbeats++;
+        if (_missedHeartbeats >= _maxMissedHeartbeats) {
+          LogUtil.log('连续$_maxMissedHeartbeats次心跳发送失败,判定服务器已断开', level: 'ERROR');
+          _serverDisconnectedStreamController.add(true);
+          await _handleDisconnect();
+        }
       }
     });
   }
@@ -252,7 +298,7 @@ class OnlineCenterClient {
   }
 
   // 获取Minecraft服务器端口
-  Future<void> _getMinecraftServerPort() async {
+  Future<void> getMinecraftServerPort() async {
     if (!_isConnected) return;
     try {
       await _sendRequest('c:server_port', []);
@@ -304,6 +350,11 @@ class OnlineCenterClient {
       LogUtil.log('已发送请求: $requestType, ${body.length}字节', level: 'INFO');
     } catch (e) {
       LogUtil.log('发送请求失败: $e, 类型: $requestType', level: 'ERROR');
+      if (e.toString().contains('Broken pipe') ||
+          e.toString().contains('Connection reset') ||
+          e.toString().contains('Connection closed')) {
+        await _handleDisconnect();
+      }
       rethrow;
     }
   }
