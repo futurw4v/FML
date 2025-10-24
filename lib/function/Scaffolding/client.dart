@@ -144,6 +144,11 @@ class OnlineCenterClient {
     );
   }
 
+  // 获取Minecraft服务器端口
+  Future<void> getMinecraftServerPort() async {
+    await _getMinecraftServerPort();
+  }
+
   // 处理连接断开
   Future<void> _handleDisconnect() async {
     if (!_isConnected) return;
@@ -256,7 +261,7 @@ class OnlineCenterClient {
     _heartbeatTimer?.cancel();
     _lastHeartbeatResponse = DateTime.now();
     _missedHeartbeats = 0;
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
       if (!_isConnected) return;
       try {
         await _sendPlayerPing();
@@ -268,7 +273,7 @@ class OnlineCenterClient {
             _missedHeartbeats++;
             LogUtil.log('心跳超时 (已连续$_missedHeartbeats次), 距上次响应: $timeSinceLastResponse秒', level: 'WARNING');
             if (_missedHeartbeats >= _maxMissedHeartbeats) {
-              LogUtil.log('连续$_maxMissedHeartbeats次心跳无响应，判定服务器已断开', level: 'ERROR');
+              LogUtil.log('连续$_maxMissedHeartbeats次心跳无响应,判定服务器已断开', level: 'ERROR');
               _serverDisconnectedStreamController.add(true);
               await _handleDisconnect();
             }
@@ -298,7 +303,7 @@ class OnlineCenterClient {
   }
 
   // 获取Minecraft服务器端口
-  Future<void> getMinecraftServerPort() async {
+  Future<void> _getMinecraftServerPort() async {
     if (!_isConnected) return;
     try {
       await _sendRequest('c:server_port', []);

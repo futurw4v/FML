@@ -643,13 +643,13 @@ class MemberPageState extends State<MemberPage> {
       }
       await Future.delayed(Duration(seconds: 1));
       if (_minecraftServerPort != null) {
-        LogUtil.log('第$attempt次尝试: 已获取到Minecraft端口 $_minecraftServerPort，开始设置转发', level: 'INFO');
+        LogUtil.log('第$attempt次尝试: 已获取到Minecraft端口 $_minecraftServerPort,开始设置转发', level: 'INFO');
         await _setupMinecraftPortForwarding();
         return;
       }
       LogUtil.log('第$attempt次尝试: 未收到Minecraft端口信息', level: 'WARNING');
       if (attempt == 3) {
-        LogUtil.log('已重试3次仍未收到Minecraft端口信息，可能服务器未启动Minecraft服务', level: 'WARNING');
+        LogUtil.log('已重试3次仍未收到Minecraft端口信息,可能服务器未启动Minecraft服务', level: 'WARNING');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
