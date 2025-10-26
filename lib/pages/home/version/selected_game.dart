@@ -43,6 +43,9 @@ class SelectedGamePageState extends State<SelectedGamePage> {
     await prefs.setString('SelectedPath', widget.path);
     await prefs.setString('SelectedGame', name);
     if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已选择 ${widget.path} 文件夹下的 $name')),
+    );
     Navigator.pop(context);
     Navigator.pop(context);
   }
@@ -105,7 +108,7 @@ class SelectedGamePageState extends State<SelectedGamePage> {
           SnackBar(content: Text('删除版本时出错: ${e.toString()}')),
         );
       }
-    } 
+    }
     Navigator.pop(context);
     Navigator.pop(context);
     Navigator.pop(context);
