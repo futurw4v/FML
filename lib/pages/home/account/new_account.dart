@@ -151,7 +151,7 @@ class NewAccountPageState extends State<NewAccountPage> {
                       padding: EdgeInsets.all(16.0),
                       child: ListTile(
                       leading: CircularProgressIndicator(),
-                      title: Text('请讲启动器稍后弹出的验证代码粘贴到稍后自动打开的网页中'),
+                      title: Text('请将启动器稍后弹出的验证代码粘贴到稍后自动打开的网页中'),
                     )
                   ),
                 ),

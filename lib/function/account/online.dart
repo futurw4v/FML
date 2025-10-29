@@ -289,7 +289,7 @@ Future<String> _getXboxLiveToken(context, msToken) async {
 }
 
 // 获取 XSTS 令牌
-Future<List<String>> _getXSTSToken(context, xblToken) async {
+Future<List<String>> _getXSTSToken(context, String xblToken) async {
     final dio = Dio();
   final prefs = await SharedPreferences.getInstance();
   final appVersion = prefs.getString('version') ?? 'unknown';
