@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 // 账号模块
 import 'package:fml/function/account/offline.dart' as offline_lib;
+import 'package:fml/function/account/online.dart' as online_lib;
 import 'package:fml/function/account/authlib_injector.dart' as authlib_injector_lib;
 
 class NewAccountPage extends StatefulWidget {
@@ -19,6 +20,8 @@ class NewAccountPageState extends State<NewAccountPage> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  int _onlineStatus = 0;
+  List<String> token = ['',''];
 
   @override
   void initState() {
@@ -38,6 +41,13 @@ class NewAccountPageState extends State<NewAccountPage> {
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  // 正版登录状态回调
+  Future<void> onlineCallback(status) async {
+    setState(() {
+      _onlineStatus = status;
+    });
   }
 
   // 密码可见性
@@ -125,13 +135,62 @@ class NewAccountPageState extends State<NewAccountPage> {
               ),
             ),
             if (_loginMode == 'online')
-              Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: const ListTile(
-                  leading: Icon(Icons.account_circle),
-                  title: Text('将在Mojang审批完成后推出'),
+              if (_onlineStatus == 0)
+                Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: const ListTile(
+                    leading: Icon(Icons.account_circle),
+                    title: Text('请点击右下角使用微软账号登录'),
+                  ),
                 ),
-              ),
+              if (_onlineStatus == 1)
+                Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: const
+                  Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: ListTile(
+                      leading: CircularProgressIndicator(),
+                      title: Text('请讲启动器稍后弹出的验证代码粘贴到稍后自动打开的网页中'),
+                    )
+                  ),
+                ),
+              if (_onlineStatus == 2)
+                Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: const
+                  Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: ListTile(
+                      leading: CircularProgressIndicator(),
+                      title: Text('正在检查游戏所有权'),
+                    )
+                  ),
+                ),
+                if (_onlineStatus == 3)
+                Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: const
+                  Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: ListTile(
+                      leading: CircularProgressIndicator(),
+                      title: Text('完成登录'),
+                    )
+                  ),
+                ),
+                if (_onlineStatus == 4)
+                Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: const
+                  Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: ListTile(
+                      leading: CircularProgressIndicator(),
+                      title: Text('未购买'),
+                    )
+                  ),
+                ),
             if (_loginMode == 'offline')
               Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -192,7 +251,16 @@ class NewAccountPageState extends State<NewAccountPage> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: _loginMode == 'online'
+      ? _onlineStatus == 0
+        ? FloatingActionButton(
+          onPressed: () async {
+            await online_lib.login(context, onlineCallback);
+          },
+          child: const Icon(Icons.login)
+        )
+        : null
+      : FloatingActionButton(
         onPressed: () async {
           if (_loginMode == 'offline' && _nameController.text.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(

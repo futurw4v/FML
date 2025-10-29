@@ -21,8 +21,6 @@
 | PathList | 游戏文件夹列表 | list(string) |
 | Path_$name | 版本路径 | string |
 | Game_$name | 版本列表 | list(string) |
-| useTun | 是否使用Tun | bool |
-| extraNode | 额外节点配置 | string |
 
 离线账号配置 Account_$name list(string)
 | 序号 | 值 |
@@ -31,6 +29,12 @@
 | 1 | 生成UUID |
 | 2 | 是否启用自定义UUID(1启用,0禁用) |
 | 3 | 自定义UUID |
+
+正版登录账号配置 Account_$name list(string)
+| 序号 | 值 |
+| -- | -- |
+| 0 | 登录模式(1) |
+| 1 | UUID |
 
 外置登录账号配置 Account_$name list(string)
 | 序号 | 值 |
