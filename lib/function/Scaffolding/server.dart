@@ -235,6 +235,7 @@ class OnlineCenterServer {
       final data = jsonDecode(jsonString);
       final name = data['name'] as String;
       final machineId = data['machine_id'] as String;
+      final easytierId = data['easytier_id'] as String;
       final vendor = data['vendor'] as String;
       final socketId = '${socket.remoteAddress.address}:${socket.remotePort}';
       final existingPlayerIndex = _players.indexWhere((p) => p.machineId == machineId);
@@ -245,6 +246,7 @@ class OnlineCenterServer {
         _players.add(PlayerProfile(
           name: name,
           machineId: machineId,
+          easytierId: easytierId,
           vendor: vendor,
           kind: 'GUEST',
           socketId: socketId,
@@ -345,15 +347,16 @@ class OnlineCenterServer {
   }
 
   // 生成并添加主机玩家
-  Future<void> addHostPlayer(String machineId) async {
+  Future<void> addHostPlayer(String machineId, String easytierId) async {
     _players.add(PlayerProfile(
       name: hostName,
       machineId: machineId,
+      easytierId: easytierId,
       vendor: hostVendor,
       kind: 'HOST',
       socketId: 'local-host',
     ));
-    LogUtil.log('添加房主: $hostName ($hostVendor)', level: 'INFO');
+    LogUtil.log('添加房主: $hostName ($hostVendor) easytierID: $easytierId, machineID: $machineId', level: 'INFO');
   }
 }
 
@@ -361,6 +364,7 @@ class OnlineCenterServer {
 class PlayerProfile {
   final String name;
   final String machineId;
+  final String easytierId;
   final String vendor;
   final String kind; // 'HOST' | 'GUEST'
   DateTime lastActivity;
@@ -368,6 +372,7 @@ class PlayerProfile {
   PlayerProfile({
     required this.name,
     required this.machineId,
+    required this.easytierId,
     required this.vendor,
     required this.kind,
     required this.socketId,

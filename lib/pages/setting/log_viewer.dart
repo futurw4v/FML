@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:fml/function/log.dart';
+import 'package:fml/pages/setting/log_viewer/log_setting.dart';
 
 class LogViewerPage extends StatefulWidget {
   const LogViewerPage({super.key});
@@ -180,6 +181,10 @@ class LogViewerPageState extends State<LogViewerPage> {
         title: const Text('日志查看器'),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => LogSettingPage()))
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadLogs,

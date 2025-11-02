@@ -15,9 +15,9 @@ import 'package:fml/function/launcher/neoforge.dart' as neoforge_launcher;
 import 'package:fml/function/Scaffolding/server.dart';
 
 // EasyTier对等节点类
-class EasyTierPeer {
+class PlayerList {
   final String? ipv4;
-  final String hostname;
+  final String name;
   final String cost;
   final String latency;
   final String loss;
@@ -27,9 +27,9 @@ class EasyTierPeer {
   final String nat;
   final String version;
 
-  EasyTierPeer({
+  PlayerList({
     this.ipv4,
-    required this.hostname,
+    required this.name,
     required this.cost,
     required this.latency,
     required this.loss,
@@ -54,6 +54,7 @@ class OwnerPage extends StatefulWidget {
   static bool _persistIsServerRunning = false;
   static Process? _easyTierProcess;
   static String? _machineId;
+  static String? _easytierId;
 
   @override
   OwnerPageState createState() => OwnerPageState();
@@ -72,9 +73,10 @@ class OwnerPageState extends State<OwnerPage> {
   final Random _random = Random();
   Process? _easyTierProcess;
   String? _machineId;
+  String? _easytierId;
   bool _isEasyTierRunning = false;
   Timer? _playerListRefreshTimer;
-  List<EasyTierPeer> _peers = [];
+  List<PlayerList> _peers = [];
   Timer? _peerListRefreshTimer;
 
   @override
@@ -90,6 +92,7 @@ class OwnerPageState extends State<OwnerPage> {
     _isServerRunning = OwnerPage._persistIsServerRunning;
     _easyTierProcess = OwnerPage._easyTierProcess;
     _machineId = OwnerPage._machineId;
+    _easytierId = OwnerPage._easytierId;
     _isEasyTierRunning = _easyTierProcess != null;
     // 玩家列表刷新定时器
     _playerListRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
@@ -155,6 +158,32 @@ class OwnerPageState extends State<OwnerPage> {
       OwnerPage._machineId = tempId;
       LogUtil.log('生成临时机器ID: $_machineId', level: 'INFO');
     }
+  }
+
+  // 获取 easytier ID
+  Future<void> _getEasytierId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final name = prefs.getString('SelectedPath') ?? '';
+      final path = prefs.getString('Path_$name') ?? '';
+      final String cli = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
+      final proc = await Process.start(cli, ['--output', 'json', 'peer']);
+      final output = await proc.stdout.transform(utf8.decoder).join();
+      final List<dynamic> peer = jsonDecode(output);
+      for (var item in peer) {
+      if (item['ipv4'] == '10.144.144.1') {
+        String id = item['id'];
+        LogUtil.log('获取 easytier ID: $id', level: 'INFO');
+        setState(() {
+          _easytierId = id;
+        });
+        break;
+      }
+    }
+  }
+  catch (e) {
+    LogUtil.log('获取 easytier ID 失败: $e', level: 'ERROR');
+  }
   }
 
   // 处理端口变化
@@ -365,8 +394,6 @@ class OwnerPageState extends State<OwnerPage> {
               port: scaffoldingPort,
               minecraftServerPort: minecraftPort
             );
-            await _tcpServer!.start();
-            await _tcpServer!.addHostPlayer(_machineId ?? 'unknown-machine-id');
             OwnerPage._persistTcpServer = _tcpServer;
             OwnerPage._persistTcpServerPort = scaffoldingPort;
             setState(() {
@@ -385,7 +412,7 @@ class OwnerPageState extends State<OwnerPage> {
           '--hostname', hostname,
           '--listeners', 'udp:0',
           '--ipv4', '10.144.144.1',
-          '-p', 'tcp://public.easytier.cn:11010'
+          '-p', 'tcp://public.easytier.cn:11010 tcp://ettx.lxdklp.top:11010 tcp://ethk.lxdklp.top:11010'
         ];
         LogUtil.log('正在启动EasyTier${attempt > 0 ? " (尝试 ${attempt+1}/$maxRetries)" : ""}: $core ${args.join(' ')}', level: 'INFO');
         _easyTierProcess = await Process.start(core, args);
@@ -530,9 +557,10 @@ class OwnerPageState extends State<OwnerPage> {
         minecraftServerPort: _port
       );
       await _tcpServer!.start();
-      await _tcpServer!.addHostPlayer(_machineId ?? 'unknown-machine-id');
       // 启动EasyTier网络
       final easyTierStarted = await _startEasyTier();
+      await _getEasytierId();
+      await _tcpServer!.addHostPlayer(_machineId ?? 'unknown-machine-id', _easytierId ?? '');
       setState(() {
         _isServerRunning = true;
       });
@@ -585,32 +613,9 @@ class OwnerPageState extends State<OwnerPage> {
   }
 
   // 解析EasyTier对等节点数据
-  List<EasyTierPeer> parseEasyTierPeers(String output) {
-    List<EasyTierPeer> peers = [];
-    List<String> lines = output.split('\n');
-    if (lines.length > 2) {
-      for (int i = 2; i < lines.length; i++) {
-        String line = lines[i].trim();
-        if (line.isEmpty) continue;
-        List<String> parts = line.split('|').map((part) => part.trim()).toList();
-        if (parts.length >= 11) {
-          if (!parts[2].startsWith('PublicServer')) {
-            peers.add(EasyTierPeer(
-              ipv4: parts[1].isEmpty ? null : parts[1],
-              hostname: parts[2],
-              cost: parts[3],
-              latency: parts[4],
-              loss: parts[5],
-              rx: parts[6],
-              tx: parts[7],
-              tunnel: parts[8],
-              nat: parts[9],
-              version: parts[10],
-            ));
-          }
-        }
-      }
-    }
+  List<PlayerList> parsePlayerLists(List<dynamic> peerList) {
+    List<PlayerList> peers = [];
+    debugPrint('peerList: $peerList player: ${_tcpServer!.players}');
     return peers;
   }
 
@@ -622,10 +627,12 @@ class OwnerPageState extends State<OwnerPage> {
       final name = prefs.getString('SelectedPath') ?? '';
       final path = prefs.getString('Path_$name') ?? '';
       final String cli = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
-      final result = await Process.run(cli, ['peer']);
+      debugPrint('player: ${_tcpServer!.players}');
+      final result = await Process.run(cli, ['--output', 'json', 'peer']);
       if (result.exitCode == 0) {
-        final output = result.stdout.toString();
-        final peers = parseEasyTierPeers(output);
+        final output = await result.stdout.transform(utf8.decoder).join();
+        final List<dynamic> peerList = jsonDecode(output);
+        final peers = parsePlayerLists(peerList);
         if (mounted) {
           setState(() {
             _peers = peers;
@@ -805,7 +812,7 @@ class OwnerPageState extends State<OwnerPage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('EasyTier网络节点:', style: TextStyle(fontWeight: FontWeight.bold)),
+                              const Text('玩家列表:', style: TextStyle(fontWeight: FontWeight.bold)),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -816,7 +823,7 @@ class OwnerPageState extends State<OwnerPage> {
                                 columnSpacing: 16,
                                 horizontalMargin: 8,
                                 columns: const [
-                                  DataColumn(label: Text('主机名')),
+                                  DataColumn(label: Text('玩家')),
                                   DataColumn(label: Text('IP')),
                                   DataColumn(label: Text('类型')),
                                   DataColumn(label: Text('延迟')),
@@ -827,7 +834,7 @@ class OwnerPageState extends State<OwnerPage> {
                                 ],
                                 rows: _peers.map((peer) {
                                   return DataRow(cells: [
-                                    DataCell(Text(peer.hostname)),
+                                    DataCell(Text(peer.name)),
                                     DataCell(Text(peer.ipv4 ?? '-')),
                                     DataCell(Text(peer.cost)),
                                     DataCell(Text(peer.latency)),
