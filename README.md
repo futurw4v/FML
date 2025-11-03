@@ -14,6 +14,8 @@
 | build | 软件构建号 | int |
 | themeColor | 自定义主题颜色 | int |
 | themeMode | 是否跟随深色 | string |
+| autoClearLog | 是否自动清理日志 | bool |
+| logLevel | 日志等级(0:INFO, 1:WARNING, 2:ERROR) | int |
 | SelectedAccount | 选择的账号 | string |
 | SelectedPath | 选择的文件夹 | string |
 | SelectedGame | 选择的版本 | string |

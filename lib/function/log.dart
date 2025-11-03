@@ -7,6 +7,12 @@ class LogUtil {
   static Future<void> log(String message, {String level = 'INFO'}) async {
     debugPrint('[$level] $message');
     final prefs = await SharedPreferences.getInstance();
+    // 过滤日志
+    final int logLevel = prefs.getInt('logLevel') ?? 0;
+    if ((level == 'INFO' && logLevel > 0) ||
+        (level == 'WARNING' && logLevel > 1)) {
+      return;
+    }
     List<String> logs = prefs.getStringList('logs') ?? [];
     // 创建日志条目
     final timestamp = DateTime.now().toIso8601String();
