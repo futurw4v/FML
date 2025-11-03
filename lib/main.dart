@@ -27,7 +27,11 @@ Future<void> initVersionInfo() async {
 
 // 日志
 Future<void> initLogs() async {
-  await LogUtil.clearLogs();
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  final bool autoClearLog = prefs.getBool('autoClearLog') ?? true;
+  if (autoClearLog) {
+    await LogUtil.clearLogs();
+  }
   if (kDebugMode) {
     await LogUtil.log('启动FML,平台:${Platform.operatingSystem},版本: $appVersion,构建号: $buildNumber,debug模式', level: 'INFO');
   } else {
