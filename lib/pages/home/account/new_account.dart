@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 // 账号模块
 import 'package:fml/function/account/offline.dart' as offline_lib;
 import 'package:fml/function/account/online.dart' as online_lib;
-import 'package:fml/function/account/authlib_injector.dart' as authlib_injector_lib;
+import 'package:fml/function/account/external.dart' as external_lib;
 
 class NewAccountPage extends StatefulWidget {
   const NewAccountPage({super.key});
@@ -174,7 +174,7 @@ class NewAccountPageState extends State<NewAccountPage> {
                   Padding(
                       padding: EdgeInsets.all(16.0),
                       child: ListTile(
-                      leading: CircularProgressIndicator(),
+                      leading: Icon(Icons.done),
                       title: Text('完成登录'),
                     )
                   ),
@@ -186,8 +186,9 @@ class NewAccountPageState extends State<NewAccountPage> {
                   Padding(
                       padding: EdgeInsets.all(16.0),
                       child: ListTile(
-                      leading: CircularProgressIndicator(),
+                      leading: Icon(Icons.close),
                       title: Text('未购买'),
+                      subtitle: Text('如果确定已购买,请尝试去 minecraft.net 查看玩家档案'),
                     )
                   ),
                 ),
@@ -252,12 +253,26 @@ class NewAccountPageState extends State<NewAccountPage> {
         ),
       ),
       floatingActionButton: _loginMode == 'online'
-      ? _onlineStatus == 0
+        ? _onlineStatus == 0
+          ? FloatingActionButton(
+            onPressed: () async {
+              await online_lib.login(context, onlineCallback);
+            },
+            child: const Icon(Icons.login)
+          )
+        : _onlineStatus == 3
+          ? FloatingActionButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+            },
+            child: const Icon(Icons.check),
+          )
+        : _onlineStatus == 4
         ? FloatingActionButton(
           onPressed: () async {
-            await online_lib.login(context, onlineCallback);
+            Navigator.of(context).pop();
           },
-          child: const Icon(Icons.login)
+          child: const Icon(Icons.close),
         )
         : null
       : FloatingActionButton(
@@ -282,7 +297,7 @@ class NewAccountPageState extends State<NewAccountPage> {
             }
             final String serverUrl = _serverUrlController.text.isEmpty ?
               defaultAuthServer : _serverUrlController.text;
-            await authlib_injector_lib.saveAuthLibInjectorAccount(
+            await external_lib.saveAuthLibInjectorAccount(
               context,
               serverUrl,
               _usernameController.text,

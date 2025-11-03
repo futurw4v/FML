@@ -19,12 +19,14 @@
 | SelectedAccount | 选择的账号 | string |
 | SelectedPath | 选择的文件夹 | string |
 | SelectedGame | 选择的版本 | string |
-| AccountsList | 账号列表 | list(string) |
+| offline_accounts_list | 离线账号列表 | list(string) |
+| online_accounts_list | 在线账号列表 | list(string) |
+| external_accounts_list | 外置账号列表 | list(string) |
 | PathList | 游戏文件夹列表 | list(string) |
 | Path_$name | 版本路径 | string |
 | Game_$name | 版本列表 | list(string) |
 
-离线账号配置 Account_$name list(string)
+离线账号配置 offline_account_$name list(string)
 | 序号 | 值 |
 | -- | -- |
 | 0 | 登录模式(0) |
@@ -32,13 +34,14 @@
 | 2 | 是否启用自定义UUID(1启用,0禁用) |
 | 3 | 自定义UUID |
 
-正版登录账号配置 Account_$name list(string)
+正版登录账号配置 online_account_$name list(string)
 | 序号 | 值 |
 | -- | -- |
 | 0 | 登录模式(1) |
 | 1 | UUID |
+| 2 | refreshToken |
 
-外置登录账号配置 Account_$name list(string)
+外置登录账号配置 external_account_$name list(string)
 | 序号 | 值 |
 | -- | -- |
 | 0 | 登录模式(2) |

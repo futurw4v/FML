@@ -169,12 +169,12 @@ Future<void> _saveAccount(
   List<String> accounts = prefs.getStringList('AccountsList') ?? [];
   if (!accounts.contains(name)) {
     accounts.add(name);
-    await prefs.setStringList('AccountsList', accounts);
+    await prefs.setStringList('external_accounts_list', accounts);
     LogUtil.log('添加账号到列表: $name', level: 'INFO');
   } else {
     LogUtil.log('账号已存在，更新账号信息: $name', level: 'INFO');
   }
-  await prefs.setStringList('Account_$name', [
+  await prefs.setStringList('external_account_$name', [
     '2',
     uuid,
     serverUrl,

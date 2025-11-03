@@ -12,7 +12,6 @@ class OfflineAccountManagementPage extends StatefulWidget {
 
 class OfflineAccountManagementPageState extends State<OfflineAccountManagementPage> {
   String _uuid = '';
-  bool _online = false;
   bool _isCustomUUID = false;
   String _customUUID = '';
   bool _loading = true;
@@ -40,9 +39,13 @@ class OfflineAccountManagementPageState extends State<OfflineAccountManagementPa
   // 读取账号信息
   Future<Map<String, String>> _getAccountInfo(String name) async {
     final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList('Account_$name') ?? [];
-    while (list.length < 4) {
-      list.add('');
+    final list = prefs.getStringList('offline_account_$name') ?? [];
+    if (list.isEmpty) {
+      return {
+        'uuid': '',
+        'isCustomUUID': '0',
+        'customUUID': '',
+      };
     }
     return {
       'uuid': list[1],
@@ -50,13 +53,15 @@ class OfflineAccountManagementPageState extends State<OfflineAccountManagementPa
       'customUUID': list[3],
     };
   }
+
   Future<void> _loadAccountInfo() async {
     final info = await _getAccountInfo(widget.accountName);
     setState(() {
       _uuid = info['uuid'] ?? '';
       _isCustomUUID = (info['isCustomUUID'] == '1');
       _customUUID = info['customUUID'] ?? '';
-      if (_isCustomUUID) {
+      // 设置输入框的值
+      if (_isCustomUUID && _customUUID.isNotEmpty) {
         _customUUIDController.text = _customUUID;
       }
       _loading = false;
@@ -67,21 +72,21 @@ class OfflineAccountManagementPageState extends State<OfflineAccountManagementPa
   Future<void> _saveAccountInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final list = [
-      _uuid,
-      _online.toString(),
-      _isCustomUUID ? '1' : '0',
-      _isCustomUUID ? _customUUIDController.text : '',
+      '0',  // 登录模式
+      _isCustomUUID ? _uuid : _uuid, // 保持原始UUID不变
+      _isCustomUUID ? '1' : '0',     // 是否自定义UUID
+      _customUUIDController.text,    // 自定义UUID值
     ];
-    await prefs.setStringList('Account_${widget.accountName}', list);
+    await prefs.setStringList('offline_account_${widget.accountName}', list);
     LogUtil.log('保存${widget.accountName}', level: 'INFO');
   }
   // 删除账号
   Future<void> _deleteAccount() async {
     final prefs = await SharedPreferences.getInstance();
-    final accounts = prefs.getStringList('AccountsList') ?? [];
+    final accounts = prefs.getStringList('offline_accounts_list') ?? [];
     accounts.remove(widget.accountName);
-    await prefs.setStringList('AccountsList', accounts);
-    await prefs.remove('Account_${widget.accountName}');
+    await prefs.setStringList('offline_accounts_list', accounts);
+    await prefs.remove('offline_account_${widget.accountName}');
     if (widget.accountName == prefs.getString('SelectedAccount')) {
       await prefs.remove('SelectedAccount');
     }
@@ -125,10 +130,7 @@ class OfflineAccountManagementPageState extends State<OfflineAccountManagementPa
           child: ListTile(
             leading: const Icon(Icons.account_circle),
             title: Text(widget.accountName),
-            subtitle: Text(
-              '类型: ${_online ? "正版" : "离线"}\n'
-              'UUID: ${_isCustomUUID && _customUUID.isNotEmpty ? _customUUID : _uuid}',
-            ),
+            subtitle: Text('当前UUID: ${_isCustomUUID ? _customUUID : _uuid}'),
           ),
         ),
         // 自定义 UUID
@@ -144,12 +146,12 @@ class OfflineAccountManagementPageState extends State<OfflineAccountManagementPa
                   onChanged: (value) async {
                     setState(() {
                       _isCustomUUID = value;
-                      if (!value) {
-                        _customUUIDController.clear();
-                      } else {
-                        _customUUIDController.text = _customUUID;
+                      // 关闭时保持原有自定义UUID值，只是不使用它
+                      if (value) {
+                        _customUUIDController.text = _customUUID.isEmpty ? _uuid : _customUUID;
                       }
                     });
+                    await _saveAccountInfo();
                   },
                 ),
                 if (_isCustomUUID)

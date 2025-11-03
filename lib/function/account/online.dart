@@ -88,24 +88,24 @@ Future<List<String>> getCode(context) async {
           errorMessage = '$errorType: $errorDetail';
         } else {
           errorMessage = '请求失败: ${e.response?.statusMessage}';
-          LogUtil.log('请求异常: 状态码: ${e.response?.statusCode}, 消息: ${e.response?.statusMessage}', level: 'ERROR');
+          LogUtil.log('请求Code异常: 状态码: ${e.response?.statusCode}, 消息: ${e.response?.statusMessage}', level: 'ERROR');
         }
       } catch (_) {
         errorMessage = '解析错误响应失败: ${e.message}';
-        LogUtil.log('请求异常: 解析错误响应失败', level: 'ERROR');
+        LogUtil.log('请求Code异常: 解析错误响应失败', level: 'ERROR');
       }
     } else if (e.type == DioExceptionType.connectionTimeout) {
       errorMessage = '连接超时，请检查网络设置';
-      LogUtil.log('请求异常: 连接超时', level: 'ERROR');
+      LogUtil.log('请求Code异常: 连接超时', level: 'ERROR');
     } else if (e.type == DioExceptionType.sendTimeout) {
       errorMessage = '发送请求超时，请稍后重试';
-      LogUtil.log('请求异常: 发送超时', level: 'ERROR');
+      LogUtil.log('请求Code异常: 发送超时', level: 'ERROR');
     } else if (e.type == DioExceptionType.receiveTimeout) {
       errorMessage = '接收响应超时，请稍后重试';
-      LogUtil.log('外请求异常: 接收超时', level: 'ERROR');
+      LogUtil.log('请求Code请求异常: 接收超时', level: 'ERROR');
     } else {
       errorMessage = '连接服务器失败: ${e.message}';
-      LogUtil.log('外请求异常: ${e.message}', level: 'ERROR');
+      LogUtil.log('请求Code请求异常: ${e.message}', level: 'ERROR');
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('发生错误: $errorMessage')),
@@ -176,24 +176,24 @@ Future<List<String>> _getMsToken(context, String userCode, String deviceCode) as
             errorMessage = '$errorType: $errorDetail';
           } else {
             errorMessage = '请求失败: ${e.response?.statusMessage}';
-            LogUtil.log('请求异常: 状态码: ${e.response?.statusCode}, 消息: ${e.response?.statusMessage}', level: 'ERROR');
+            LogUtil.log('请求微软账号令牌异常: 状态码: ${e.response?.statusCode}, 消息: ${e.response?.statusMessage}', level: 'ERROR');
           }
         } catch (_) {
           errorMessage = '解析错误响应失败: ${e.message}';
-          LogUtil.log('请求异常: 解析错误响应失败', level: 'ERROR');
+          LogUtil.log('请求微软账号令牌异常: 解析错误响应失败', level: 'ERROR');
         }
       } else if (e.type == DioExceptionType.connectionTimeout) {
         errorMessage = '连接超时，请检查网络设置';
-        LogUtil.log('请求异常: 连接超时', level: 'ERROR');
+        LogUtil.log('请求微软账号令牌异常: 连接超时', level: 'ERROR');
       } else if (e.type == DioExceptionType.sendTimeout) {
         errorMessage = '发送请求超时，请稍后重试';
-        LogUtil.log('请求异常: 发送超时', level: 'ERROR');
+        LogUtil.log('请求微软账号令牌异常: 发送超时', level: 'ERROR');
       } else if (e.type == DioExceptionType.receiveTimeout) {
         errorMessage = '接收响应超时，请稍后重试';
-        LogUtil.log('外请求异常: 接收超时', level: 'ERROR');
+        LogUtil.log('请求微软账号令牌异常: 接收超时', level: 'ERROR');
       } else {
         errorMessage = '连接服务器失败: ${e.message}';
-        LogUtil.log('外请求异常: ${e.message}', level: 'ERROR');
+        LogUtil.log('请求微软账号令牌异常: ${e.message}', level: 'ERROR');
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('发生错误: $errorMessage')),
@@ -257,24 +257,24 @@ Future<String> _getXboxLiveToken(context, msToken) async {
           errorMessage = '$errorType: $errorDetail';
         } else {
           errorMessage = '请求失败: ${e.response?.statusMessage}';
-          LogUtil.log('请求异常: 状态码: ${e.response?.statusCode}, 消息: ${e.response?.statusMessage}', level: 'ERROR');
+          LogUtil.log('获取 Xbox Live 令牌异常: 状态码: ${e.response?.statusCode}, 消息: ${e.response?.statusMessage}', level: 'ERROR');
         }
       } catch (_) {
         errorMessage = '解析错误响应失败: ${e.message}';
-        LogUtil.log('请求异常: 解析错误响应失败', level: 'ERROR');
+        LogUtil.log('获取 Xbox Live 令牌异常: 解析错误响应失败', level: 'ERROR');
       }
     } else if (e.type == DioExceptionType.connectionTimeout) {
       errorMessage = '连接超时，请检查网络设置';
-      LogUtil.log('请求异常: 连接超时', level: 'ERROR');
+      LogUtil.log('获取 Xbox Live 令牌异常: 连接超时', level: 'ERROR');
     } else if (e.type == DioExceptionType.sendTimeout) {
       errorMessage = '发送请求超时，请稍后重试';
-      LogUtil.log('请求异常: 发送超时', level: 'ERROR');
+      LogUtil.log('获取 Xbox Live 令牌异常: 发送超时', level: 'ERROR');
     } else if (e.type == DioExceptionType.receiveTimeout) {
       errorMessage = '接收响应超时，请稍后重试';
-      LogUtil.log('外请求异常: 接收超时', level: 'ERROR');
+      LogUtil.log('获取 Xbox Live 令牌异常: 接收超时', level: 'ERROR');
     } else {
       errorMessage = '连接服务器失败: ${e.message}';
-      LogUtil.log('外请求异常: ${e.message}', level: 'ERROR');
+      LogUtil.log('获取 Xbox Live 令牌异常: ${e.message}', level: 'ERROR');
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('发生错误: $errorMessage')),
@@ -290,7 +290,7 @@ Future<String> _getXboxLiveToken(context, msToken) async {
 
 // 获取 XSTS 令牌
 Future<List<String>> _getXSTSToken(context, String xblToken) async {
-    final dio = Dio();
+  final dio = Dio();
   final prefs = await SharedPreferences.getInstance();
   final appVersion = prefs.getString('version') ?? 'unknown';
   try {
@@ -314,11 +314,16 @@ Future<List<String>> _getXSTSToken(context, String xblToken) async {
     );
     if (response.statusCode == 200) {
       if (response.data is Map) {
-        Map<String, dynamic> data =response.data as Map<String, dynamic>;
+        Map<String, dynamic> data = response.data as Map<String, dynamic>;
         String token = data['Token'] ?? '';
-        String userHash = data['DisplayClaims']['xui']['uhs'] ?? '';
+        String userHash = '';
+        if (data['DisplayClaims'] is Map &&
+            data['DisplayClaims']['xui'] is List &&
+            data['DisplayClaims']['xui'].isNotEmpty) {
+          userHash = data['DisplayClaims']['xui'][0]['uhs'] ?? '';
+        }
         if (token.isNotEmpty && userHash.isNotEmpty) {
-          return [token,userHash];
+          return [token, userHash];
         } else {
           LogUtil.log('无法获取 XSTS 令牌', level: 'ERROR');
         }
@@ -326,7 +331,8 @@ Future<List<String>> _getXSTSToken(context, String xblToken) async {
     } else {
       LogUtil.log('请求 XSTS 令牌失败: 状态码: ${response.statusCode}, 响应: ${response.data}', level: 'ERROR');
     }
-  } on DioException catch (e) {
+  }
+  on DioException catch (e) {
     String errorMessage;
     if (e.response != null) {
       try {
@@ -338,24 +344,24 @@ Future<List<String>> _getXSTSToken(context, String xblToken) async {
           errorMessage = '$errorType: $errorDetail';
         } else {
           errorMessage = '请求失败: ${e.response?.statusMessage}';
-          LogUtil.log('请求异常: 状态码: ${e.response?.statusCode}, 消息: ${e.response?.statusMessage}', level: 'ERROR');
+          LogUtil.log('获取 XSTS 令牌异常: 状态码: ${e.response?.statusCode}, 消息: ${e.response?.statusMessage}', level: 'ERROR');
         }
       } catch (_) {
         errorMessage = '解析错误响应失败: ${e.message}';
-        LogUtil.log('请求异常: 解析错误响应失败', level: 'ERROR');
+        LogUtil.log('获取 XSTS 令牌异常: 解析错误响应失败', level: 'ERROR');
       }
     } else if (e.type == DioExceptionType.connectionTimeout) {
       errorMessage = '连接超时，请检查网络设置';
-      LogUtil.log('请求异常: 连接超时', level: 'ERROR');
+      LogUtil.log('获取 XSTS 令牌异常: 连接超时', level: 'ERROR');
     } else if (e.type == DioExceptionType.sendTimeout) {
       errorMessage = '发送请求超时，请稍后重试';
-      LogUtil.log('请求异常: 发送超时', level: 'ERROR');
+      LogUtil.log('获取 XSTS 令牌异常: 发送超时', level: 'ERROR');
     } else if (e.type == DioExceptionType.receiveTimeout) {
       errorMessage = '接收响应超时，请稍后重试';
-      LogUtil.log('外请求异常: 接收超时', level: 'ERROR');
+      LogUtil.log('获取 XSTS 令牌异常: 接收超时', level: 'ERROR');
     } else {
       errorMessage = '连接服务器失败: ${e.message}';
-      LogUtil.log('外请求异常: ${e.message}', level: 'ERROR');
+      LogUtil.log('获取 XSTS 令牌异常: ${e.message}', level: 'ERROR');
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('发生错误: $errorMessage')),
@@ -413,24 +419,24 @@ Future<String> _getMcToken(context, xstsToken) async {
           errorMessage = '$errorType: $errorDetail';
         } else {
           errorMessage = '请求失败: ${e.response?.statusMessage}';
-          LogUtil.log('请求异常: 状态码: ${e.response?.statusCode}, 消息: ${e.response?.statusMessage}', level: 'ERROR');
+          LogUtil.log('获取 Minecraft 令牌异常: 状态码: ${e.response?.statusCode}, 消息: ${e.response?.statusMessage}', level: 'ERROR');
         }
       } catch (_) {
         errorMessage = '解析错误响应失败: ${e.message}';
-        LogUtil.log('请求异常: 解析错误响应失败', level: 'ERROR');
+        LogUtil.log('获取 Minecraft 令牌异常: 解析错误响应失败', level: 'ERROR');
       }
     } else if (e.type == DioExceptionType.connectionTimeout) {
       errorMessage = '连接超时，请检查网络设置';
-      LogUtil.log('请求异常: 连接超时', level: 'ERROR');
+      LogUtil.log('获取 Minecraft 令牌异常: 连接超时', level: 'ERROR');
     } else if (e.type == DioExceptionType.sendTimeout) {
       errorMessage = '发送请求超时，请稍后重试';
-      LogUtil.log('请求异常: 发送超时', level: 'ERROR');
+      LogUtil.log('获取 Minecraft 令牌异常: 发送超时', level: 'ERROR');
     } else if (e.type == DioExceptionType.receiveTimeout) {
       errorMessage = '接收响应超时，请稍后重试';
-      LogUtil.log('外请求异常: 接收超时', level: 'ERROR');
+      LogUtil.log('获取 Minecraft 令牌异常: 接收超时', level: 'ERROR');
     } else {
       errorMessage = '连接服务器失败: ${e.message}';
-      LogUtil.log('外请求异常: ${e.message}', level: 'ERROR');
+      LogUtil.log('获取 Minecraft 令牌异常: ${e.message}', level: 'ERROR');
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('发生错误: $errorMessage')),
@@ -445,7 +451,7 @@ Future<String> _getMcToken(context, xstsToken) async {
 }
 
 // 检查所有权
-Future<bool> checkPurchase(BuildContext context, mcToken) async {
+Future<bool> _checkPurchase(BuildContext context, mcToken) async {
   final dio = Dio();
   final prefs = await SharedPreferences.getInstance();
   final appVersion = prefs.getString('version') ?? 'unknown';
@@ -498,16 +504,16 @@ Future<bool> checkPurchase(BuildContext context, mcToken) async {
       }
     } else if (e.type == DioExceptionType.connectionTimeout) {
       errorMessage = '连接超时，请检查网络设置';
-      LogUtil.log('请求异常: 连接超时', level: 'ERROR');
+      LogUtil.log('检查所有权请求异常: 连接超时', level: 'ERROR');
     } else if (e.type == DioExceptionType.sendTimeout) {
       errorMessage = '发送请求超时，请稍后重试';
-      LogUtil.log('请求异常: 发送超时', level: 'ERROR');
+      LogUtil.log('检查所有权请求异常: 发送超时', level: 'ERROR');
     } else if (e.type == DioExceptionType.receiveTimeout) {
       errorMessage = '接收响应超时，请稍后重试';
-      LogUtil.log('外请求异常: 接收超时', level: 'ERROR');
+      LogUtil.log('检查所有权请求异常: 接收超时', level: 'ERROR');
     } else {
       errorMessage = '连接服务器失败: ${e.message}';
-      LogUtil.log('外请求异常: ${e.message}', level: 'ERROR');
+      LogUtil.log('检查所有权请求异常: ${e.message}', level: 'ERROR');
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('发生错误: $errorMessage')),
@@ -519,6 +525,93 @@ Future<bool> checkPurchase(BuildContext context, mcToken) async {
     );
   }
   return false;
+}
+
+// 获取档案
+Future<List<String>> _getProfile(context, mcToken) async {
+  final dio = Dio();
+  final prefs = await SharedPreferences.getInstance();
+  final appVersion = prefs.getString('version') ?? 'unknown';
+  try {
+    final response = await dio.get(
+      'https://api.minecraftservices.com/minecraft/profile',
+      options: Options(
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $mcToken',
+          'User-Agent': 'FML/$appVersion'
+        },
+      )
+    );
+    if (response.statusCode == 200) {
+      if (response.data is Map) {
+        Map<String, dynamic> data = response.data as Map<String, dynamic>;
+        return [
+          data['id'] ?? '',
+          data['name'] ?? '',
+        ];
+      }
+    } else {
+      LogUtil.log('获取档案失败: 状态码: ${response.statusCode}, 响应: ${response.data}', level: 'ERROR');
+    }
+  } on DioException catch (e) {
+    String errorMessage;
+    if (e.response != null) {
+      try {
+        if (e.response!.data is Map) {
+          Map<String, dynamic> errorData = e.response!.data as Map<String, dynamic>;
+          String errorType = errorData['error'] ?? '未知错误类型';
+          String errorDetail = errorData['errorMessage'] ?? '';
+          LogUtil.log('Dio异常: $errorType - $errorDetail', level: 'ERROR');
+          errorMessage = '$errorType: $errorDetail';
+        } else {
+          errorMessage = '请求失败: ${e.response?.statusMessage}';
+          LogUtil.log('请求异常: 状态码: ${e.response?.statusCode}, 消息: ${e.response?.statusMessage}', level: 'ERROR');
+        }
+      } catch (_) {
+        errorMessage = '解析错误响应失败: ${e.message}';
+        LogUtil.log('请求异常: 解析错误响应失败', level: 'ERROR');
+      }
+    } else if (e.type == DioExceptionType.connectionTimeout) {
+      errorMessage = '连接超时，请检查网络设置';
+      LogUtil.log('获取档案请求异常: 连接超时', level: 'ERROR');
+    } else if (e.type == DioExceptionType.sendTimeout) {
+      errorMessage = '发送请求超时，请稍后重试';
+      LogUtil.log('获取档案请求异常: 发送超时', level: 'ERROR');
+    } else if (e.type == DioExceptionType.receiveTimeout) {
+      errorMessage = '接收响应超时，请稍后重试';
+      LogUtil.log('获取档案请求异常: 接收超时', level: 'ERROR');
+    } else {
+      errorMessage = '连接服务器失败: ${e.message}';
+      LogUtil.log('获取档案请求异常: ${e.message}', level: 'ERROR');
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('发生错误: $errorMessage')),
+    );
+  } catch (e) {
+    LogUtil.log('获取档案发生其他错误: $e', level: 'ERROR');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('获取档案发生其他错误: $e')),
+    );
+  }
+  return ['',''];
+}
+
+// 保存账号
+Future<void> _saveAccount(context, List<String> account) async {
+  final prefs = await SharedPreferences.getInstance();
+  List<String> accounts = prefs.getStringList('online_accounts_list') ?? [];
+  accounts.add(account[1]);
+  await prefs.setStringList('online_accounts_list', accounts);
+    await prefs.setStringList(
+    'online_account_${account[1]}',
+    [
+      '1',
+      account[0],
+      account[2],
+    ],
+  );
 }
 
 // 登录
@@ -537,16 +630,25 @@ Future<void> login(
       Navigator.of(context).pop();
       String xblToken = await _getXboxLiveToken(context,msToken);
       if (xblToken.isNotEmpty) {
-        debugPrint('Xbox Live 令牌: $xblToken');
         List<String> xstsToken = await _getXSTSToken(context, xblToken);
         if (xstsToken[0].isNotEmpty && xstsToken[1].isNotEmpty) {
-          debugPrint('XSTS 令牌: $xstsToken , userHash: ${xstsToken[1]}');
           String mcToken = await _getMcToken(context, xstsToken);
           if (mcToken.isNotEmpty) {
-            debugPrint('Minecraft 令牌: $mcToken');
-            bool hasMc = await checkPurchase(context, mcToken);
+            bool hasMc = await _checkPurchase(context, mcToken);
             if (hasMc) {
-              await onlineCallback(3);
+              List<String> profile = await _getProfile(context, mcToken);
+              if (profile[0].isNotEmpty && profile[1].isNotEmpty) {
+                _saveAccount(context,
+                [
+                  profile[0],
+                  profile[1],
+                  msToken[1],
+                ]
+                );
+                await onlineCallback(3);
+              } else {
+                await onlineCallback(4);
+              }
             } else {
               await onlineCallback(4);
             }

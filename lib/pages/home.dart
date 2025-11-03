@@ -14,7 +14,8 @@ class HomePage extends StatefulWidget {
 }
 
 class HomePageState extends State<HomePage> {
-  String _selectedAccount = '未知账号';
+  String _selectedAccountName = '未知账号';
+  String _selectedAccountType = '3';
   String _selectedGame = '未知版本';
   String _selectedPath = '未知文件夹';
   String? _gameVersion;
@@ -25,14 +26,28 @@ class HomePageState extends State<HomePage> {
     _loadGameInfo();
   }
 
+  // 读取游戏信息
   Future<void> _loadGameInfo() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _selectedAccount = prefs.getString('SelectedAccount') ?? '未选择账号';
-    _selectedGame = prefs.getString('SelectedGame') ?? '未选择版本';
-    _selectedPath = prefs.getString('SelectedPath') ?? '未选择文件夹';
-    _gameVersion = '选择的文件夹:$_selectedPath\n选择的版本:$_selectedGame ';
+      _selectedAccountName = prefs.getString('SelectedAccountName') ?? '未选择账号';
+      _selectedAccountType = prefs.getString('SelectedAccountType') ?? '4';
+      _selectedGame = prefs.getString('SelectedGame') ?? '未选择版本';
+      _selectedPath = prefs.getString('SelectedPath') ?? '未选择文件夹';
+      _gameVersion = '选择的文件夹:$_selectedPath\n选择的版本:$_selectedGame ';
     });
+  }
+
+  // 登录模式
+  String _getLoginModeText(String loginMode) {
+    switch (loginMode) {
+      case '0': return '离线登录';
+      case '1': return '正版登录';
+      case '2': return '外置登录';
+      case '3': return '未知类型';
+      case '4': return '未选择账号';
+      default: return '未知类型';
+    }
   }
 
   @override
@@ -48,7 +63,7 @@ class HomePageState extends State<HomePage> {
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: ListTile(
               title: Text('\n当前账号'),
-              subtitle: Text('$_selectedAccount\n'),
+              subtitle: Text('[${_getLoginModeText(_selectedAccountType)}]$_selectedAccountName\n'),
               leading: const Icon(Icons.account_circle),
               onTap: () {
                 Navigator.push(
@@ -98,7 +113,7 @@ class HomePageState extends State<HomePage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          if (_selectedAccount == '未选择账号') {
+          if (_selectedAccountName == '未选择账号') {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('请先选择账号')),
             );
