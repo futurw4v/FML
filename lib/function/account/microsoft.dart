@@ -140,6 +140,7 @@ Future<List<String>> _getMsToken(context, String userCode, String deviceCode) as
       data: {
         'client_id': '3847de77-c7ca-4daa-a0b7-50850446d58c',
         'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+        'scope': 'XboxLive.signin offline_access',
         'device_code': deviceCode
       }
     );

@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:path/path.dart' as p;
-import 'package:dio/dio.dart';
 import 'package:fml/function/log.dart';
-import 'package:fml/function/download.dart';
+import 'package:fml/function/launcher/login/microsoft_login.dart' as microsoft_login;
+import 'package:fml/function/launcher/login/external_login.dart' as external_login;
 
 typedef ProgressCallback = void Function(String message);
 typedef ErrorCallback = void Function(String error);
@@ -68,12 +68,10 @@ Future<String?> getAssetIndex(String versionJsonPath) async {
     return null;
   }
   if (root is! Map) return null;
-  // 优先：顶层 assetIndex.id
   final ai = root['assetIndex'];
   if (ai is Map && ai['id'] is String && (ai['id'] as String).isNotEmpty) {
     return ai['id'] as String;
   }
-  // 备选：patches[].assetIndex.id
   final patches = root['patches'];
   if (patches is List) {
     for (final p in patches) {
@@ -102,15 +100,12 @@ Future<Map<String, dynamic>> getFabricInfo(String path) async {
     return {'game': null, 'fabric': null, 'mixin': null, 'libraries': <String>[]};
   }
   if (root is! Map) return {'game': null, 'fabric': null, 'mixin': null, 'libraries': <String>[]};
-
   final patches = root['patches'];
   if (patches is! List) return {'game': null, 'fabric': null, 'mixin': null, 'libraries': <String>[]};
-
   String? gameVer;
   String? fabricVer;
   String? mixin;
   final List<String> fabricLibraries = [];
-
   String? readVersion(Map m) {
     String? s;
     if (m['version'] is String && (m['version'] as String).isNotEmpty) s = m['version'] as String;
@@ -122,19 +117,16 @@ Future<Map<String, dynamic>> getFabricInfo(String path) async {
     }
     return s;
   }
-
   for (final patch in patches) {
     if (patch is! Map) continue;
     final id = patch['id'];
     if (id is! String) continue;
-
     // 读取游戏与加载器版本
     final v = readVersion(patch);
     if (id == 'game') {
       gameVer ??= v;
     } else if (id == 'fabric') {
       fabricVer ??= v;
-
       // 在 fabric 补丁的 libraries 中查找 sponge-mixin 和其他依赖库
       final libs = patch['libraries'];
       if (libs is List) {
@@ -166,6 +158,16 @@ Future<Map<String, dynamic>> getFabricInfo(String path) async {
   };
 }
 
+// 登录模式
+String _getLoginMode(String loginMode) {
+  switch (loginMode) {
+    case '0': return 'offline';
+    case '1': return 'online';
+    case '2': return 'external';
+    default: return 'unknown';
+  }
+}
+
 // 从fabric.json文件中获取Fabric信息
 Future<Map<String, dynamic>> getFabricInfoFromFabricJson(String gamePath, String game) async {
   final fabricJsonPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}fabric.json';
@@ -180,7 +182,6 @@ Future<Map<String, dynamic>> getFabricInfoFromFabricJson(String gamePath, String
       'asm': <String, String>{},
     };
   }
-
   try {
     final content = await file.readAsString();
     final json = jsonDecode(content);
@@ -251,156 +252,6 @@ Future<Map<String, dynamic>> getFabricInfoFromFabricJson(String gamePath, String
   }
 }
 
-// 检查authlib-injector
-Future<bool> checkAuthlibInjector(String gamePath) async {
-  File authlibFile = File('$gamePath${Platform.pathSeparator}authlib-injector.jar');
-  if (authlibFile.existsSync()) {
-    LogUtil.log('authlib-injector 已存在，无需下载', level: 'INFO');
-    return true;
-  }
-  else {
-    return false;
-  }
-}
-
-  // 读取App版本
-  Future<String> _loadAppVersion() async {
-  final prefs = await SharedPreferences.getInstance();
-  final version = prefs.getString('version') ?? "1.0.0";
-  return version;
-}
-
-// 下载authlib-injector
-Future<void> downloadAuthlibInjector(String gamePath) async {
-  LogUtil.log('加载authlib-injector版本', level: 'INFO');
-  final Dio dio = Dio();
-  final String appVersion = await _loadAppVersion();
-  final options = Options(
-    headers: {
-      'User-Agent': 'FML/$appVersion',
-    },
-  );
-  try {
-    final response = await dio.get(
-      'https://bmclapi2.bangbang93.com/mirrors/authlib-injector/artifact/latest.json',
-      options: options,
-    );
-    if (response.statusCode == 200 && response.data.isNotEmpty) {
-      final String? downloadUrl = response.data['download_url'];
-      if (downloadUrl != null) {
-        // 使用获取到的下载链接
-        await DownloadUtils.downloadFile(
-          url: downloadUrl,
-          savePath: '$gamePath${Platform.pathSeparator}authlib-injector.jar',
-          onProgress: (progress) {
-            final percent = (progress * 100).toStringAsFixed(2);
-            LogUtil.log('正在下载AuthlibInjector: $percent%', level: 'INFO');
-          },
-          onSuccess: () {
-            LogUtil.log('AuthlibInjector 下载完成', level: 'INFO');
-          },
-          onError: (error) {
-            LogUtil.log('AuthlibInjector 下载失败: $error', level: 'ERROR');
-          },
-          onCancel: () {
-            LogUtil.log('AuthlibInjector 下载已取消', level: 'WARNING');
-          }
-        );
-      } else {
-        throw '无法获取 authlib-injector 下载链接';
-      }
-    } else {
-      throw '获取 authlib-injector 版本信息失败';
-    }
-  } catch (e) {
-    LogUtil.log('获取 authlib-injector 信息失败: $e', level: 'ERROR');
-    rethrow;
-  }
-}
-
-// 令牌检查
-Future<bool> checkToken(String url,String accessToken,String clientToken) async {
-  LogUtil.log('检查令牌有效性', level: 'INFO');
-  final Dio dio = Dio();
-  final String appVersion = await _loadAppVersion();
-  final options = Options(
-    headers: {
-      'User-Agent': 'FML/$appVersion',
-      'Content-Type': 'application/json'
-    },
-  );
-  try {
-    Map<String, dynamic> data = {
-      'accessToken': accessToken,
-      'clientToken': clientToken
-    };
-    final response = await dio.post(
-      '$url/authserver/validate',
-      data: data,
-      options: options,
-    );
-    if (response.statusCode == 204) {
-      LogUtil.log('令牌有效', level: 'INFO');
-      return true;
-    } else if (response.statusCode == 403) {
-      LogUtil.log('令牌无效', level: 'WARNING');
-      return false;
-    }
-    else {
-      LogUtil.log('令牌检查失败，状态码: ${response.statusCode}', level: 'WARNING');
-      return false;
-    }
-  }
-  catch (e) {
-    LogUtil.log('$url/authserver/validate令牌检查失败: $e', level: 'ERROR');
-    return false;
-  }
-}
-
-// 刷新令牌
-Future<String> refreshToken(String url,
-    String accessToken,
-    String clientToken,
-    String name,
-    String uuid
-  ) async {
-  LogUtil.log('正在刷新令牌', level: 'INFO');
-  final Dio dio = Dio();
-  final String appVersion = await _loadAppVersion();
-  final options = Options(
-    headers: {
-      'User-Agent': 'FML/$appVersion',
-      'Content-Type': 'application/json'
-    },
-  );
-  try {
-    Map<String, dynamic> data = {
-      'accessToken': accessToken,
-      'clientToken': clientToken,
-      "selectedProfile":{
-        'name': name,
-        'id': uuid
-      },
-    };
-    final response = await dio.post(
-      '$url/authserver/refresh',
-      data: data,
-      options: options,
-    );
-    if (response.statusCode == 200) {
-      LogUtil.log('令牌刷新成功', level: 'INFO');
-      return response.data['accessToken'];
-    } else {
-      LogUtil.log('令牌刷新失败，状态码: ${response.statusCode}', level: 'WARNING');
-      return accessToken;
-    }
-  }
-  catch (e) {
-    LogUtil.log('令牌刷新失败: $e', level: 'ERROR');
-    return accessToken;
-  }
-}
-
 // 启动Fabric游戏
 Future<void> fabricLauncher({
   ProgressCallback? onProgress,
@@ -423,8 +274,6 @@ Future<void> fabricLauncher({
     final libraries = await loadLibraryArtifactPaths(jsonPath, gamePath);
     final separator = Platform.isWindows ? ';' : ':';
     final gameJar = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}$game.jar';
-    final account = prefs.getString('SelectedAccount') ?? '';
-    final accountInfo = prefs.getStringList('Account_$account') ?? [];
     final assetIndex = await getAssetIndex(jsonPath) ?? '';
     // 从fabric.json获取Fabric信息
     onProgress?.call('正在获取Fabric参数');
@@ -486,40 +335,44 @@ Future<void> fabricLauncher({
         LogUtil.log('Sponge Mixin 文件存在: ${File(lib).existsSync()}', level: 'INFO');
       }
     }
+    final accountName = prefs.getString('SelectedAccountName') ?? '';
+    final accountType = prefs.getString('SelectedAccountType') ?? '';
+    final accountInfo = prefs.getStringList('${_getLoginMode(accountType)}_account_$accountName') ?? [];
     // 账号信息
     String uuid = '';
     String token = '';
     onProgress?.call('正在获取账号信息');
     if (accountInfo[0] == '0') {
       if (accountInfo[2] == '1') {
-      uuid = accountInfo[3];
-      }
-      else {
+        uuid = accountInfo[3];
+      } else {
         uuid = accountInfo[1];
       }
     }
     if (accountInfo[0] == '1') {
-      uuid = '';
+      uuid = accountInfo[1];
+      token = await microsoft_login.login(accountInfo[2]);
     }
     if (accountInfo[0] == '2') {
-      if (await checkAuthlibInjector(gamePath)) {
+      if (await external_login.checkAuthlibInjector(gamePath)) {
         onProgress?.call('AuthlibInjector已存在');
       }
       else {
         onProgress?.call('正在下载AuthlibInjector');
-        await downloadAuthlibInjector(gamePath);
+        await external_login.downloadAuthlibInjector(gamePath);
       }
       uuid = accountInfo[1];
       onProgress?.call('正在检查令牌');
-      if (await checkToken(accountInfo[2], accountInfo[5], accountInfo[6])) {
+      if (await external_login.checkToken(accountInfo[2], accountInfo[5], accountInfo[6])) {
         token = accountInfo[5];
       } else {
-        onProgress?.call('正在刷新令牌');
-        token = await refreshToken(accountInfo[2],
-        accountInfo[5],
-        accountInfo[6],
-        account,
-        uuid);
+        token = await external_login.refreshToken(
+          accountInfo[2],
+          accountInfo[5],
+          accountInfo[6],
+          accountName,
+          uuid
+        );
       }
     }
     // 启动参数
@@ -542,7 +395,7 @@ Future<void> fabricLauncher({
       if (accountInfo[0] == '2') '-javaagent:$gamePath${Platform.pathSeparator}authlib-injector.jar=${accountInfo[2]}',
       '-cp', cp,
       'net.fabricmc.loader.impl.launch.knot.KnotClient',
-      '--username', account,
+      '--username', accountName,
       '--version', game,
       '--gameDir', '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game',
       '--assetsDir', '$gamePath${Platform.pathSeparator}assets',
@@ -550,9 +403,9 @@ Future<void> fabricLauncher({
       '--uuid', uuid,
       if (accountInfo[0] == '0') '--accessToken', accountInfo[0],
       if (accountInfo[0] == '0') '--clientId', '"\${clientid}"',
-      if (accountInfo[0] == '0') '--accessToken', token,
+      if (accountInfo[0] == '1' || accountInfo[0] == '2') '--accessToken', token,
+      if (accountInfo[0] == '1' || accountInfo[0] == '2') '--userType', 'mojang',
       if (accountInfo[0] == '2') '--clientId', token,
-      if (accountInfo[0] == '2') '--userType', 'mojang',
       '--versionType', '"FML $version"',
       '--xuid', '"\${auth_xuid}"',
       '--width', cfg[2],

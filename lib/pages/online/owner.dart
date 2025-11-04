@@ -12,7 +12,7 @@ import 'package:fml/function/log.dart';
 import 'package:fml/function/launcher/vanilla.dart' as vanilla_launcher;
 import 'package:fml/function/launcher/fabric.dart' as fabric_launcher;
 import 'package:fml/function/launcher/neoforge.dart' as neoforge_launcher;
-import 'package:fml/function/Scaffolding/server.dart';
+import 'package:fml/function/scaffolding/server.dart';
 
 // EasyTier对等节点类
 class PlayerList {

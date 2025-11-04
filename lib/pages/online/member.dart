@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:fml/function/log.dart';
-import 'package:fml/function/Scaffolding/client.dart';
+import 'package:fml/function/scaffolding/client.dart';
 import 'package:fml/function/fakeserver.dart';
 
 class EasyTierPeer {
