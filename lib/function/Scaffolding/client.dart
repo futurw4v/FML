@@ -245,6 +245,7 @@ class OnlineCenterClient {
         _players.add(PlayerProfile(
           name: playerJson['name'],
           machineId: playerJson['machine_id'],
+          easytierId: playerJson['easytier_id'] ?? '',
           vendor: playerJson['vendor'],
           kind: playerJson['kind'],
         ));
@@ -395,6 +396,7 @@ class OnlineCenterClient {
 class PlayerProfile {
   final String name;
   final String machineId;
+  final String easytierId;
   final String vendor;
   final String kind; // 'HOST' | 'GUEST'
   DateTime lastActivity;
@@ -402,6 +404,7 @@ class PlayerProfile {
   PlayerProfile({
     required this.name,
     required this.machineId,
+    required this.easytierId,
     required this.vendor,
     required this.kind,
     DateTime? lastActivity,

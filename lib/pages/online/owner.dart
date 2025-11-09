@@ -26,6 +26,10 @@ class PlayerList {
   final String tunnel;
   final String nat;
   final String version;
+  final String id; // EasyTier节点ID
+  final String? playerName; // 玩家名称（通过easytierId关联）
+  final String? playerVendor; // 玩家客户端信息
+  final String? playerKind; // 玩家类型 'HOST' | 'GUEST'
 
   PlayerList({
     this.ipv4,
@@ -38,6 +42,10 @@ class PlayerList {
     required this.tunnel,
     required this.nat,
     required this.version,
+    required this.id,
+    this.playerName,
+    this.playerVendor,
+    this.playerKind,
   });
 }
 
@@ -75,8 +83,8 @@ class OwnerPageState extends State<OwnerPage> {
   String? _machineId;
   String? _easytierId;
   bool _isEasyTierRunning = false;
-  Timer? _playerListRefreshTimer;
   List<PlayerList> _peers = [];
+  List<PlayerList> _servers = [];
   Timer? _peerListRefreshTimer;
 
   @override
@@ -94,13 +102,7 @@ class OwnerPageState extends State<OwnerPage> {
     _machineId = OwnerPage._machineId;
     _easytierId = OwnerPage._easytierId;
     _isEasyTierRunning = _easyTierProcess != null;
-    // 玩家列表刷新定时器
-    _playerListRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (_isServerRunning && _tcpServer != null && mounted) {
-        setState(() {});
-      }
-    });
-    // 节点列表刷新定时器
+    // 节点列表刷新定时器（包含玩家信息绑定）
     _peerListRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_isEasyTierRunning && mounted) {
         _refreshPeerList();
@@ -210,7 +212,6 @@ class OwnerPageState extends State<OwnerPage> {
   @override
   void dispose() {
     _lanPortSub?.cancel();
-    _playerListRefreshTimer?.cancel();
     _peerListRefreshTimer?.cancel();
     super.dispose();
   }
@@ -298,7 +299,7 @@ class OwnerPageState extends State<OwnerPage> {
   Future<void> _loadPlayerName() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final name = prefs.getString('SelectedAccount');
+      final name = prefs.getString('SelectedAccountName');
       if (name != null && name.isNotEmpty) {
         setState(() {
           _playerName = name;
@@ -412,7 +413,7 @@ class OwnerPageState extends State<OwnerPage> {
           '--hostname', hostname,
           '--listeners', 'udp:0',
           '--ipv4', '10.144.144.1',
-          '-p', 'tcp://public.easytier.cn:11010 tcp://ettx.lxdklp.top:11010 tcp://ethk.lxdklp.top:11010'
+          '-p', 'tcp://public.easytier.cn:11010,tcp://ettx.lxdklp.top:11010,tcp://ethk.lxdklp.top:11010'
         ];
         LogUtil.log('正在启动EasyTier${attempt > 0 ? " (尝试 ${attempt+1}/$maxRetries)" : ""}: $core ${args.join(' ')}', level: 'INFO');
         _easyTierProcess = await Process.start(core, args);
@@ -613,10 +614,101 @@ class OwnerPageState extends State<OwnerPage> {
   }
 
   // 解析EasyTier对等节点数据
-  List<PlayerList> parsePlayerLists(List<dynamic> peerList) {
+  Map<String, List<PlayerList>> parsePlayerLists(List<dynamic> peerList) {
     List<PlayerList> peers = [];
-    debugPrint('peerList: $peerList player: ${_tcpServer!.players}');
-    return peers;
+    List<PlayerList> servers = [];
+    Set<String> boundPlayerIds = {};
+    try {
+      for (var peer in peerList) {
+        if (peer['hostname']?.toString().startsWith('PublicServer') ?? false) {
+          final serverData = PlayerList(
+            ipv4: peer['ipv4']?.toString().isEmpty ?? true ? null : peer['ipv4'].toString(),
+            name: peer['hostname']?.toString() ?? '-',
+            cost: peer['cost']?.toString() ?? '-',
+            latency: peer['lat_ms']?.toString() ?? '-',
+            loss: peer['loss_rate']?.toString() ?? '-',
+            rx: peer['rx_bytes']?.toString() ?? '-',
+            tx: peer['tx_bytes']?.toString() ?? '-',
+            tunnel: peer['tunnel_proto']?.toString() ?? '-',
+            nat: peer['nat_type']?.toString() ?? '-',
+            version: peer['version']?.toString() ?? '-',
+            id: peer['id']?.toString() ?? '',
+            playerName: null,
+            playerVendor: null,
+            playerKind: null,
+          );
+          servers.add(serverData);
+          continue;
+        }
+        final nodeId = peer['id']?.toString() ?? '';
+        String? playerName;
+        String? playerVendor;
+        String? playerKind;
+        if (_tcpServer != null && nodeId.isNotEmpty) {
+          final matchedPlayer = _tcpServer!.players.firstWhere(
+            (player) => player.easytierId == nodeId,
+            orElse: () => PlayerProfile(
+              name: '',
+              machineId: '',
+              easytierId: '',
+              vendor: '',
+              kind: '',
+              socketId: '',
+            ),
+          );
+          if (matchedPlayer.name.isNotEmpty) {
+            playerName = matchedPlayer.name;
+            playerVendor = matchedPlayer.vendor;
+            playerKind = matchedPlayer.kind;
+            boundPlayerIds.add(matchedPlayer.easytierId);
+            final playerData = PlayerList(
+              ipv4: peer['ipv4']?.toString().isEmpty ?? true ? null : peer['ipv4'].toString(),
+              name: peer['hostname']?.toString() ?? '-',
+              cost: peer['cost']?.toString() ?? '-',
+              latency: peer['lat_ms']?.toString() ?? '-',
+              loss: peer['loss_rate']?.toString() ?? '-',
+              rx: peer['rx_bytes']?.toString() ?? '-',
+              tx: peer['tx_bytes']?.toString() ?? '-',
+              tunnel: peer['tunnel_proto']?.toString() ?? '-',
+              nat: peer['nat_type']?.toString() ?? '-',
+              version: peer['version']?.toString() ?? '-',
+              id: nodeId,
+              playerName: playerName,
+              playerVendor: playerVendor,
+              playerKind: playerKind,
+            );
+            peers.add(playerData);
+          }
+        }
+      }
+      if (_tcpServer != null) {
+        for (var player in _tcpServer!.players) {
+          if (player.easytierId.isEmpty || !boundPlayerIds.contains(player.easytierId)) {
+            final unboundPlayerData = PlayerList(
+              ipv4: null,
+              name: '-',
+              cost: '-',
+              latency: '-',
+              loss: '-',
+              rx: '-',
+              tx: '-',
+              tunnel: '-',
+              nat: '-',
+              version: '-',
+              id: player.easytierId,
+              playerName: player.name,
+              playerVendor: player.vendor,
+              playerKind: player.kind,
+            );
+            peers.add(unboundPlayerData);
+          }
+        }
+      }
+      LogUtil.log('解析对等节点数据成功，共${peers.length}个玩家(含未绑定节点的玩家),${servers.length}个服务器节点', level: 'INFO');
+    } catch (e) {
+      LogUtil.log('解析对等节点数据失败: $e', level: 'ERROR');
+    }
+    return {'peers': peers, 'servers': servers};
   }
 
   // 刷新EasyTier对等节点列表
@@ -627,18 +719,19 @@ class OwnerPageState extends State<OwnerPage> {
       final name = prefs.getString('SelectedPath') ?? '';
       final path = prefs.getString('Path_$name') ?? '';
       final String cli = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
-      debugPrint('player: ${_tcpServer!.players}');
       final result = await Process.run(cli, ['--output', 'json', 'peer']);
       if (result.exitCode == 0) {
-        final output = await result.stdout.transform(utf8.decoder).join();
+        final output = result.stdout.toString();
+        debugPrint('Receiver: $output');
         final List<dynamic> peerList = jsonDecode(output);
-        final peers = parsePlayerLists(peerList);
+        final parsedData = parsePlayerLists(peerList);
         if (mounted) {
           setState(() {
-            _peers = peers;
+            _peers = parsedData['peers'] ?? [];
+            _servers = parsedData['servers'] ?? [];
           });
         }
-        LogUtil.log('刷新对等节点列表成功，共${peers.length}个节点', level: 'INFO');
+        LogUtil.log('刷新对等节点列表成功，共${_peers.length}个玩家节点，${_servers.length}个服务器节点', level: 'INFO');
       } else {
         LogUtil.log('执行easytier-cli peer命令失败,退出码:${result.exitCode}', level: 'ERROR');
         LogUtil.log('错误输出：${result.stderr}', level: 'ERROR');
@@ -774,41 +867,6 @@ class OwnerPageState extends State<OwnerPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (_isServerRunning && _tcpServer != null) ...[
-                            const Text('已连接玩家:'),
-                            const SizedBox(height: 8),
-                            if (_tcpServer!.players.isNotEmpty)
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: _tcpServer!.players.map((player) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 4),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          player.kind == 'HOST' ? Icons.star : Icons.person,
-                                          size: 16,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text('${player.name} (${player.vendor})'),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                              )
-                            else
-                              const Text('暂无玩家连接', style: TextStyle(fontStyle: FontStyle.italic)),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -823,18 +881,34 @@ class OwnerPageState extends State<OwnerPage> {
                                 columnSpacing: 16,
                                 horizontalMargin: 8,
                                 columns: const [
-                                  DataColumn(label: Text('玩家')),
-                                  DataColumn(label: Text('IP')),
                                   DataColumn(label: Text('类型')),
+                                  DataColumn(label: Text('玩家')),
+                                  DataColumn(label: Text('客户端')),
+                                  DataColumn(label: Text('IP')),
+                                  DataColumn(label: Text('连接')),
                                   DataColumn(label: Text('延迟')),
                                   DataColumn(label: Text('丢包')),
-                                  DataColumn(label: Text('接收(rx)')),
-                                  DataColumn(label: Text('发送(tx)')),
+                                  DataColumn(label: Text('接收')),
+                                  DataColumn(label: Text('发送')),
                                   DataColumn(label: Text('NAT类型')),
                                 ],
                                 rows: _peers.map((peer) {
+                                  String kindText = '-';
+                                  if (peer.playerKind == 'HOST') {
+                                    kindText = '房主';
+                                  } else if (peer.playerKind == 'GUEST') {
+                                    kindText = '访客';
+                                  }
                                   return DataRow(cells: [
-                                    DataCell(Text(peer.name)),
+                                    DataCell(Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const SizedBox(width: 4),
+                                        Text(kindText),
+                                      ],
+                                    )),
+                                    DataCell(Text(peer.playerName ?? '-')),
+                                    DataCell(Text(peer.playerVendor ?? '-')),
                                     DataCell(Text(peer.ipv4 ?? '-')),
                                     DataCell(Text(peer.cost)),
                                     DataCell(Text(peer.latency)),
@@ -852,6 +926,62 @@ class OwnerPageState extends State<OwnerPage> {
                             const Padding(
                               padding: EdgeInsets.only(top: 8.0),
                               child: Text('正在获取节点数据...', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('当前使用的公共服务器,感谢各位服务器维护者:',
+                                style: TextStyle(fontWeight: FontWeight.bold)
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (_servers.isNotEmpty)
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: DataTable(
+                                columnSpacing: 16,
+                                horizontalMargin: 8,
+                                columns: const [
+                                  DataColumn(label: Text('服务器名称')),
+                                  DataColumn(label: Text('连接')),
+                                  DataColumn(label: Text('延迟')),
+                                  DataColumn(label: Text('丢包')),
+                                  DataColumn(label: Text('接收')),
+                                  DataColumn(label: Text('发送')),
+                                  DataColumn(label: Text('隧道协议')),
+                                  DataColumn(label: Text('NAT类型')),
+                                ],
+                                rows: _servers.map((server) {
+                                  return DataRow(cells: [
+                                    DataCell(Text(server.name)),
+                                    DataCell(Text(server.cost)),
+                                    DataCell(Text('${server.latency} ms')),
+                                    DataCell(Text(server.loss)),
+                                    DataCell(Text(server.rx)),
+                                    DataCell(Text(server.tx)),
+                                    DataCell(Text(server.tunnel)),
+                                    DataCell(Text(server.nat)),
+                                  ]);
+                                }).toList(),
+                              ),
+                            )
+                          else
+                            const Text('暂无公共服务器连接', style: TextStyle(fontStyle: FontStyle.italic)),
+                          if (_isEasyTierRunning && _servers.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 8.0),
+                              child: Text('正在获取服务器数据...', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
                             ),
                         ],
                       ),

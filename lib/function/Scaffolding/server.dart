@@ -208,7 +208,8 @@ class OnlineCenterServer {
       'c:ping',
       'c:server_port',
       'c:player_ping',
-      'c:player_profile_list'
+      'c:player_profile_list',
+      'c:player_easytier_id',
     ];
     final responseBody = utf8.encode(supportedProtocols.join('0'));
     _sendSuccessResponse(socket, responseBody);
@@ -275,6 +276,7 @@ class OnlineCenterServer {
     final allPlayers = _players.map((p) => {
       'name': p.name,
       'machine_id': p.machineId,
+      'easytier_id': p.easytierId,
       'vendor': p.vendor,
       'kind': p.kind
     }).toList();
