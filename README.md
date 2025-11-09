@@ -16,7 +16,8 @@
 | themeMode | 是否跟随深色 | string |
 | autoClearLog | 是否自动清理日志 | bool |
 | logLevel | 日志等级(0:INFO, 1:WARNING, 2:ERROR) | int |
-| SelectedAccount | 选择的账号 | string |
+| SelectedAccountName | 选择的账号名称 | string |
+| SelectedAccountType | 选择的账号类型(0:离线, 1:正版, 2:外置) | string |
 | SelectedPath | 选择的文件夹 | string |
 | SelectedGame | 选择的版本 | string |
 | offline_accounts_list | 离线账号列表 | list(string) |

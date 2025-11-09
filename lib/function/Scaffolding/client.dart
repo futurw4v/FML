@@ -11,6 +11,7 @@ class OnlineCenterClient {
   final int serverPort;
   final String playerName;
   final String machineId;
+  final String easytierId;
   final String vendor;
   bool _isConnected = false;
   Timer? _heartbeatTimer;
@@ -33,6 +34,7 @@ class OnlineCenterClient {
     required this.serverPort,
     required this.playerName,
     required this.machineId,
+    this.easytierId = '',
     this.vendor = 'FML',
     this.useIP = false,
   });
@@ -70,8 +72,9 @@ class OnlineCenterClient {
       _isConnecting = false;
       LogUtil.log('已连接到联机中心: $formattedHost:$serverPort', level: 'INFO');
       _startListening();
-      await _sendPlayerPing();
       await _negotiateProtocols();
+      await Future.delayed(const Duration(milliseconds: 100));
+      await _sendPlayerPing();
       _startHeartbeat();
       return Future.value();
     } catch (e) {
@@ -220,7 +223,12 @@ class OnlineCenterClient {
     try {
       final protocols = response.split('0');
       _supportedProtocols = protocols.where((p) => p.isNotEmpty).toList();
-      LogUtil.log('支持的协议: $_supportedProtocols', level: 'INFO');
+      LogUtil.log('服务端支持的协议: $_supportedProtocols', level: 'INFO');
+      if (_supportedProtocols.contains('c:player_easytier_id')) {
+        LogUtil.log('服务端支持 c:player_easytier_id 协议,心跳将包含EasyTier ID', level: 'INFO');
+      } else {
+        LogUtil.log('服务端不支持 c:player_easytier_id 协议,心跳将使用旧格式', level: 'WARNING');
+      }
     } catch (e) {
       LogUtil.log('解析协议列表失败: $e', level: 'ERROR');
     }
@@ -314,15 +322,25 @@ class OnlineCenterClient {
     }
   }
 
-  // 发送玩家心跳
+    // 发送玩家心跳
   Future<void> _sendPlayerPing() async {
     if (!_isConnected) return;
     try {
-      final pingData = {
-        'name': playerName,
-        'machine_id': machineId,
-        'vendor': vendor,
-      };
+      final Map<String, dynamic> pingData;
+      if (_supportedProtocols.contains('c:player_easytier_id')) {
+        pingData = {
+          'name': playerName,
+          'machine_id': machineId,
+          'easytier_id': easytierId,
+          'vendor': vendor,
+        };
+      } else {
+        pingData = {
+          'name': playerName,
+          'machine_id': machineId,
+          'vendor': vendor,
+        };
+      }
       final jsonData = utf8.encode(jsonEncode(pingData));
       await _sendRequest('c:player_ping', jsonData);
       LogUtil.log('已发送心跳包', level: 'INFO');

@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
-
+import 'package:flutter_gbk2utf8/flutter_gbk2utf8.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/launcher/vanilla.dart' as vanilla_launcher;
 import 'package:fml/function/launcher/fabric.dart' as fabric_launcher;
@@ -26,10 +26,10 @@ class PlayerList {
   final String tunnel;
   final String nat;
   final String version;
-  final String id; // EasyTier节点ID
-  final String? playerName; // 玩家名称（通过easytierId关联）
-  final String? playerVendor; // 玩家客户端信息
-  final String? playerKind; // 玩家类型 'HOST' | 'GUEST'
+  final String id;
+  final String? playerName;
+  final String? playerVendor;
+  final String? playerKind;
 
   PlayerList({
     this.ipv4,
@@ -102,7 +102,6 @@ class OwnerPageState extends State<OwnerPage> {
     _machineId = OwnerPage._machineId;
     _easytierId = OwnerPage._easytierId;
     _isEasyTierRunning = _easyTierProcess != null;
-    // 节点列表刷新定时器（包含玩家信息绑定）
     _peerListRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_isEasyTierRunning && mounted) {
         _refreshPeerList();
@@ -169,23 +168,42 @@ class OwnerPageState extends State<OwnerPage> {
       final name = prefs.getString('SelectedPath') ?? '';
       final path = prefs.getString('Path_$name') ?? '';
       final String cli = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
-      final proc = await Process.start(cli, ['--output', 'json', 'peer']);
-      final output = await proc.stdout.transform(utf8.decoder).join();
-      final List<dynamic> peer = jsonDecode(output);
-      for (var item in peer) {
-      if (item['ipv4'] == '10.144.144.1') {
-        String id = item['id'];
-        LogUtil.log('获取 easytier ID: $id', level: 'INFO');
-        setState(() {
-          _easytierId = id;
-        });
-        break;
+      final proc = await Process.run(
+        cli,
+        ['--output', 'json', 'peer'],
+        stdoutEncoding: Platform.isWindows ? null : utf8,
+      );
+      String output;
+      if (Platform.isWindows) {
+        try {
+          output = utf8.decode(proc.stdout);
+          jsonDecode(output);
+        } catch (e) {
+          LogUtil.log('UTF-8解码失败,尝试GBK解码: $e', level: 'WARNING');
+          output = gbk.decode(proc.stdout);
+        }
+      } else {
+        output = proc.stdout.toString();
       }
+      final List<dynamic> peer = jsonDecode(output);
+      bool found = false;
+      for (var item in peer) {
+        if (item['cost'] == 'Local') {
+          String id = item['id'];
+          LogUtil.log('easytier ID: $id ', level: 'INFO');
+          setState(() {
+            _easytierId = id;
+          });
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        LogUtil.log('错误: 无法找到本机的EasyTier节点', level: 'ERROR');
+      }
+    } catch (e) {
+      LogUtil.log('获取 easytier ID 失败: $e', level: 'ERROR');
     }
-  }
-  catch (e) {
-    LogUtil.log('获取 easytier ID 失败: $e', level: 'ERROR');
-  }
   }
 
   // 处理端口变化
@@ -719,10 +737,24 @@ class OwnerPageState extends State<OwnerPage> {
       final name = prefs.getString('SelectedPath') ?? '';
       final path = prefs.getString('Path_$name') ?? '';
       final String cli = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
-      final result = await Process.run(cli, ['--output', 'json', 'peer']);
+      final result = await Process.run(
+        cli,
+        ['--output', 'json', 'peer'],
+        stdoutEncoding: Platform.isWindows ? null : utf8,
+      );
       if (result.exitCode == 0) {
-        final output = result.stdout.toString();
-        debugPrint('Receiver: $output');
+        String output;
+        if (Platform.isWindows) {
+          try {
+            output = utf8.decode(result.stdout);
+            jsonDecode(output);
+          } catch (e) {
+            LogUtil.log('UTF-8解码失败,尝试GBK解码: $e', level: 'WARNING');
+            output = gbk.decode(result.stdout);
+          }
+        } else {
+          output = result.stdout.toString();
+        }
         final List<dynamic> peerList = jsonDecode(output);
         final parsedData = parsePlayerLists(peerList);
         if (mounted) {
@@ -897,7 +929,7 @@ class OwnerPageState extends State<OwnerPage> {
                                   if (peer.playerKind == 'HOST') {
                                     kindText = '房主';
                                   } else if (peer.playerKind == 'GUEST') {
-                                    kindText = '访客';
+                                    kindText = '房客';
                                   }
                                   return DataRow(cells: [
                                     DataCell(Row(

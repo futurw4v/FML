@@ -2,12 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
-
+import 'package:flutter_gbk2utf8/flutter_gbk2utf8.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/scaffolding/client.dart';
 import 'package:fml/function/fakeserver.dart';
@@ -188,7 +187,7 @@ class MemberPageState extends State<MemberPage> {
       return;
     }
     if (_fakeServer != null && _fakeServer!.isRunning) {
-      LogUtil.log('FakeServer已在运行，跳过重复启动', level: 'INFO');
+      LogUtil.log('FakeServer已在运行, 跳过重复启动', level: 'INFO');
       return;
     }
     try {
@@ -260,7 +259,7 @@ class MemberPageState extends State<MemberPage> {
   Future<void> _loadPlayerName() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final name = prefs.getString('SelectedAccount');
+      final name = prefs.getString('SelectedAccountName');
       if (name != null && name.isNotEmpty) {
         setState(() {
           _playerName = name;
@@ -382,7 +381,7 @@ class MemberPageState extends State<MemberPage> {
         '--network-secret', _networkKey!,
         '--machine-id', _machineId!,
         '--listeners', 'udp:0',
-        '-p', 'tcp://public.easytier.cn:11010'
+        '-p', 'tcp://public.easytier.cn:11010,tcp://ettx.lxdklp.top:11010,tcp://ethk.lxdklp.top:11010'
       ];
       LogUtil.log('正在启动EasyTier: $core ${args.join(' ')}', level: 'INFO');
       _easyTierProcess = await Process.start(core, args);
@@ -481,39 +480,62 @@ class MemberPageState extends State<MemberPage> {
       final name = prefs.getString('SelectedPath') ?? '';
       final path = prefs.getString('Path_$name') ?? '';
       final String cliPath = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
-      LogUtil.log('执行easytier-cli peer', level: 'INFO');
-      final result = await Process.run(cliPath, ['peer']);
+      LogUtil.log('执行easytier-cli --output json peer', level: 'INFO');
+      final ProcessResult result;
+      if (Platform.isWindows) {
+        result = await Process.run(
+          cliPath,
+          ['--output', 'json', 'peer'],
+          stdoutEncoding: null,
+        );
+      } else {
+        result = await Process.run(
+          cliPath,
+          ['--output', 'json', 'peer'],
+        );
+      }
       if (result.exitCode == 0) {
-        LogUtil.log('easytier-cli peer命令输出:\n${result.stdout}', level: 'INFO');
-        final outputLines = (result.stdout as String).split('\n');
-        String? serverIP;
-        int? serverPort;
-        for (var line in outputLines) {
-          if (line.contains('hostname') || line.trim().isEmpty) continue;
-          final columns = line.split('|').map((col) => col.trim()).toList();
-          columns.removeWhere((col) => col.isEmpty);
-          if (columns.length < 3) continue;
-          for (int i = 0; i < columns.length; i++) {
-            final column = columns[i];
-            if (column.startsWith('scaffolding-mc-server-')) {
-              final hostname = column;
-              final ipWithMask = i > 0 ? columns[i - 1] : null;
-              if (ipWithMask != null) {
-                if (ipWithMask.contains('/')) {
-                  serverIP = ipWithMask.split('/')[0];
-                } else {
-                  serverIP = ipWithMask;
-                }
-                final portMatch = RegExp(r'scaffolding-mc-server-(\d+)').firstMatch(hostname);
-                if (portMatch != null && portMatch.groupCount >= 1) {
-                  serverPort = int.tryParse(portMatch.group(1)!);
-                }
-                LogUtil.log('在EasyTier网络中发现Scaffolding服务器: $serverIP:$serverPort (主机名: $hostname)', level: 'INFO');
-                break;
-              }
+        String output;
+        if (Platform.isWindows) {
+          try {
+            output = utf8.decode(result.stdout as List<int>);
+            jsonDecode(output);
+          } catch (e) {
+            LogUtil.log('UTF-8 解码失败: $e, 尝试使用 GBK 解码', level: 'WARNING');
+            try {
+              output = gbk.decode(result.stdout as List<int>);
+            } catch (e2) {
+              LogUtil.log('GBK 解码失败: $e2', level: 'ERROR');
+              return;
             }
           }
-          if (serverIP != null && serverPort != null) break;
+        } else {
+          output = result.stdout.toString();
+        }
+        List<dynamic> peerList;
+        peerList = jsonDecode(output);
+        LogUtil.log('解析到 ${peerList.length} 个peer节点', level: 'INFO');
+        String? serverIP;
+        int? serverPort;
+        for (var peer in peerList) {
+          final hostname = peer['hostname']?.toString() ?? '';
+          if (hostname.startsWith('scaffolding-mc-server-')) {
+            final cidr = peer['cidr']?.toString() ?? '';
+            final ipv4 = peer['ipv4']?.toString() ?? '';
+            if (ipv4.isNotEmpty) {
+              serverIP = ipv4;
+            } else if (cidr.contains('/')) {
+              serverIP = cidr.split('/')[0];
+            }
+            final portMatch = RegExp(r'scaffolding-mc-server-(\d+)').firstMatch(hostname);
+            if (portMatch != null && portMatch.groupCount >= 1) {
+              serverPort = int.tryParse(portMatch.group(1)!);
+            }
+            if (serverIP != null && serverPort != null) {
+              LogUtil.log('在EasyTier网络中发现Scaffolding服务器: $serverIP:$serverPort (主机名: $hostname)', level: 'INFO');
+              break;
+            }
+          }
         }
         if (serverIP != null && serverPort != null) {
           int localPort = await _findAvailablePort();
@@ -525,7 +547,7 @@ class MemberPageState extends State<MemberPage> {
           });
           _connectToFoundServer('127.0.0.1', localPort, serverIP, serverPort);
         } else {
-          LogUtil.log('未能从EasyTier网络中找到服务器', level: 'WARN');
+          LogUtil.log('未能从EasyTier网络中找到Scaffolding服务器', level: 'WARN');
         }
       } else {
         LogUtil.log('easytier-cli peer命令失败: ${result.stderr}', level: 'ERROR');
@@ -576,11 +598,13 @@ class MemberPageState extends State<MemberPage> {
       }
       final appVersion = await _loadAppVersion();
       final coreVersion = await _checkCoreVersion();
+      final myEasytierId = await _getMyEasyTierId();
       _client = OnlineCenterClient(
         serverAddress: localAddress,
         serverPort: localPort,
         playerName: _playerName ?? 'Guest',
         machineId: _machineId ?? const Uuid().v4(),
+        easytierId: myEasytierId,
         vendor: 'FML $appVersion, EasyTier v$coreVersion',
         useIP: true,
       );
@@ -896,37 +920,6 @@ class MemberPageState extends State<MemberPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '房间内玩家',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                if (_players.isEmpty) const Text('加载玩家列表...'),
-                ..._players.map((player) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4.0),
-                    child: Row(
-                      children: [
-                        Icon(
-                          player.kind == 'HOST' ? Icons.star : Icons.person,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text('${player.name} (${player.vendor})'),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -957,7 +950,7 @@ class MemberPageState extends State<MemberPage> {
                         if (peer.playerKind == 'HOST') {
                           kindText = '房主';
                         } else if (peer.playerKind == 'GUEST') {
-                          kindText = '访客';
+                          kindText = '房客';
                         }
                         return DataRow(cells: [DataCell(Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1144,7 +1137,7 @@ class MemberPageState extends State<MemberPage> {
           peers.add(unboundPlayerData);
         }
       }
-      LogUtil.log('解析对等节点数据成功，共${peers.length}个玩家(含未绑定节点的玩家)，${servers.length}个服务器节点', level: 'INFO');
+      LogUtil.log('解析对等节点数据成功，共${peers.length}个玩家(含未绑定节点的玩家), ${servers.length}个服务器节点', level: 'INFO');
     } catch (e) {
       LogUtil.log('解析对等节点数据失败: $e', level: 'ERROR');
     }
@@ -1159,10 +1152,39 @@ class MemberPageState extends State<MemberPage> {
       final name = prefs.getString('SelectedPath') ?? '';
       final path = prefs.getString('Path_$name') ?? '';
       final String cli = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
-      final result = await Process.run(cli, ['--output', 'json', 'peer']);
+      final ProcessResult result;
+      if (Platform.isWindows) {
+        result = await Process.run(
+          cli,
+          ['--output', 'json', 'peer'],
+          stdoutEncoding: null,
+        );
+      } else {
+        result = await Process.run(
+          cli,
+          ['--output', 'json', 'peer'],
+        );
+      }
       if (result.exitCode == 0) {
-        final output = result.stdout.toString();
-        final List<dynamic> peerList = jsonDecode(output);
+        String output;
+        if (Platform.isWindows) {
+          try {
+            output = utf8.decode(result.stdout as List<int>);
+            jsonDecode(output);
+          } catch (e) {
+            LogUtil.log('UTF-8 解码失败: $e, 尝试使用 GBK 解码', level: 'WARNING');
+            try {
+              output = gbk.decode(result.stdout as List<int>);
+            } catch (e2) {
+              LogUtil.log('GBK 解码失败: $e2', level: 'ERROR');
+              return;
+            }
+          }
+        } else {
+          output = result.stdout.toString();
+        }
+        List<dynamic> peerList;
+        peerList = jsonDecode(output);
         final parsedData = parseEasyTierPeers(peerList);
         if (mounted) {
           setState(() {
@@ -1178,6 +1200,59 @@ class MemberPageState extends State<MemberPage> {
       }
     } catch (e) {
       LogUtil.log('刷新EasyTier对等节点列表失败: $e', level: 'ERROR');
+    }
+  }
+
+  // 获取本机的EasyTier ID
+  Future<String> _getMyEasyTierId() async {
+    if (!_isEasyTierRunning) return '';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final name = prefs.getString('SelectedPath') ?? '';
+      final path = prefs.getString('Path_$name') ?? '';
+      final String cli = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
+      ProcessResult result;
+      if (Platform.isWindows) {
+        result = await Process.run(
+          cli,
+          ['--output', 'json', 'peer'],
+          stdoutEncoding: null,
+        );
+      } else {
+        result = await Process.run(
+          cli,
+          ['--output', 'json', 'peer'],
+        );
+      }
+      if (result.exitCode == 0) {
+        String output;
+        if (Platform.isWindows) {
+          try {
+            output = utf8.decode(result.stdout as List<int>);
+            jsonDecode(output);
+          } catch (e) {
+            LogUtil.log('UTF-8 解码失败: $e, 尝试使用 GBK 解码', level: 'WARNING');
+            output = gbk.decode(result.stdout as List<int>);
+          }
+        } else {
+          output = result.stdout.toString();
+        }
+        final List<dynamic> peerList = jsonDecode(output);
+        for (var peer in peerList) {
+          if (peer['cost']?.toString() == 'Local') {
+            final peerId = peer['id']?.toString() ?? '';
+            if (peerId.isNotEmpty) {
+              LogUtil.log('本机EasyTier ID: $peerId', level: 'INFO');
+              return peerId;
+            }
+          }
+        }
+      }
+      LogUtil.log('无法从peer列表获取EasyTier ID', level: 'ERROR');
+      return '';
+    } catch (e) {
+      LogUtil.log('获取EasyTier ID时出错: $e', level: 'ERROR');
+      return '';
     }
   }
 }

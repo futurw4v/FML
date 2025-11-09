@@ -236,13 +236,16 @@ class OnlineCenterServer {
       final data = jsonDecode(jsonString);
       final name = data['name'] as String;
       final machineId = data['machine_id'] as String;
-      final easytierId = data['easytier_id'] as String;
+      final easytierId = (data['easytier_id'] as String?) ?? '';
       final vendor = data['vendor'] as String;
       final socketId = '${socket.remoteAddress.address}:${socket.remotePort}';
       final existingPlayerIndex = _players.indexWhere((p) => p.machineId == machineId);
       if (existingPlayerIndex >= 0) {
         _players[existingPlayerIndex].lastActivity = DateTime.now();
         _players[existingPlayerIndex].socketId = socketId;
+        if (easytierId.isNotEmpty) {
+          _players[existingPlayerIndex].easytierId = easytierId;
+        }
       } else {
         _players.add(PlayerProfile(
           name: name,
@@ -252,7 +255,6 @@ class OnlineCenterServer {
           kind: 'GUEST',
           socketId: socketId,
         ));
-        LogUtil.log('新玩家加入: $name ($vendor)', level: 'INFO');
       }
       _sendSuccessResponse(socket, []);
     } catch (e) {
@@ -359,6 +361,7 @@ class OnlineCenterServer {
       socketId: 'local-host',
     ));
     LogUtil.log('添加房主: $hostName ($hostVendor) easytierID: $easytierId, machineID: $machineId', level: 'INFO');
+    LogUtil.log('当前玩家列表总数: ${_players.length}, HOST玩家数: ${_players.where((p) => p.kind == 'HOST').length}', level: 'DEBUG');
   }
 }
 
@@ -366,9 +369,9 @@ class OnlineCenterServer {
 class PlayerProfile {
   final String name;
   final String machineId;
-  final String easytierId;
   final String vendor;
   final String kind; // 'HOST' | 'GUEST'
+  String easytierId;
   DateTime lastActivity;
   String socketId;
   PlayerProfile({
