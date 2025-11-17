@@ -26,6 +26,7 @@ class OnlinePageState extends State<OnlinePage> {
   double _downloadProgress = 0.0;
   String _appVersion = "1.0.0";
   String _coreVersion = "未知";
+  final TextEditingController _serverController = TextEditingController();
 
   // 打开URL
   Future<void> _launchURL(String url) async {
@@ -152,17 +153,13 @@ class OnlinePageState extends State<OnlinePage> {
     }
   }
 
-  // 获取系统架构(带后备方案)
+  // 获取系统架构
   String _getSystemArchitecture() {
     String arch = SysInfo.kernelArchitecture.name;
-    
-    // 如果无法识别,尝试使用 Platform.version 或其他方法
     if (arch == 'UNKNOWN') {
       if (Platform.isWindows) {
-        // Windows 上可以通过环境变量判断
         final processorArchitecture = Platform.environment['PROCESSOR_ARCHITECTURE'];
         LogUtil.log('PROCESSOR_ARCHITECTURE: $processorArchitecture', level: 'INFO');
-        
         if (processorArchitecture == 'AMD64' || processorArchitecture == 'x64') {
           return 'X86_64';
         } else if (processorArchitecture == 'ARM64') {
@@ -170,9 +167,8 @@ class OnlinePageState extends State<OnlinePage> {
         }
       }
       LogUtil.log('无法确定系统架构,使用默认值 X86_64', level: 'WARN');
-      return 'X86_64'; // 默认使用 x86_64
+      return 'X86_64';
     }
-    
     return arch;
   }
 
@@ -193,7 +189,6 @@ class OnlinePageState extends State<OnlinePage> {
       if (response.statusCode == 200) {
         Map<String, dynamic> loaderData = response.data;
         String architecture = _getSystemArchitecture();
-        
         if (Platform.isMacOS) {
           if (architecture == 'X86_64') {
             LogUtil.log('为 macOS x86_64 下载', level: 'INFO');
@@ -334,8 +329,6 @@ class OnlinePageState extends State<OnlinePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-      ),
       body: Center(
         child: ListView(
           children: [
@@ -365,6 +358,26 @@ class OnlinePageState extends State<OnlinePage> {
                   subtitle: Text(_coreVersion),
                   leading: const Icon(Icons.check_circle),
                 ),
+              ),
+              Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        decoration: InputDecoration(
+                          labelText: '打洞/中转 服务器地址',
+                          hintText: '因为一些原因,不再提供公共服务器',
+                          prefixIcon: const Icon(Icons.dns),
+                          border: const OutlineInputBorder(),
+                        ),
+                        controller: _serverController,
+                      ),
+                    ],
+                  ),
+                )
               ),
               Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
