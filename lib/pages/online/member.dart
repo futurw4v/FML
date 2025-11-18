@@ -46,7 +46,8 @@ class EasyTierPeer {
 }
 
 class MemberPage extends StatefulWidget {
-  const MemberPage({super.key});
+  final String etServer;
+  const MemberPage({super.key, required this.etServer});
 
   static bool _persistIsConnected = false;
   static bool _persistIsEasyTierRunning = false;
@@ -381,9 +382,9 @@ class MemberPageState extends State<MemberPage> {
         '--network-secret', _networkKey!,
         '--machine-id', _machineId!,
         '--listeners', 'udp:0',
-        '-p', 'tcp://public.easytier.cn:11010,tcp://ettx.lxdklp.top:11010,tcp://ethk.lxdklp.top:11010'
+        '-p', widget.etServer,
       ];
-      LogUtil.log('正在启动EasyTier: $core ${args.join(' ')}', level: 'INFO');
+      LogUtil.log('正在通过 ${widget.etServer} 节点启动 EasyTier: $core ${args.join(' ')}', level: 'INFO');
       _easyTierProcess = await Process.start(core, args);
       _easyTierProcess!.stdout.transform(utf8.decoder).listen((data) {
         if (data.contains('Connection established') ||

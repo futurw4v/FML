@@ -318,12 +318,39 @@ class OnlinePageState extends State<OnlinePage> {
     );
   }
 
+  // 显示更新对话框
+  Future<void> _showInfoDialog() async{
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('联机功能暂时关闭'),
+        content: Text('由于社区关于联机讨论过于激进乃至出现了无厘头行为,联机功能将暂停服务'),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              _launchURL('https://www.bilibili.com/opus/1135872352762986504');
+            },
+            child: const Text('详细信息'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     _checkCoreExists();
     _loadAppVersion();
     _checkCoreVersion();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showInfoDialog();
+    });
   }
 
   @override
@@ -369,7 +396,7 @@ class OnlinePageState extends State<OnlinePage> {
                       TextField(
                         decoration: InputDecoration(
                           labelText: '打洞/中转 服务器地址',
-                          hintText: '因为一些原因,不再提供公共服务器',
+                          hintText: '为了安全性与合规性,请仅使用自行部署的服务器',
                           prefixIcon: const Icon(Icons.dns),
                           border: const OutlineInputBorder(),
                         ),
@@ -392,9 +419,15 @@ class OnlinePageState extends State<OnlinePage> {
                       );
                       return;
                     }
+                    if (_serverController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('请先输入打洞/中转服务器地址')),
+                      );
+                      return;
+                    }
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const OwnerPage(port: -1)),
+                      MaterialPageRoute(builder: (context) => OwnerPage(port: -1, etServer: _serverController.text)),
                     );
                   },
                 ),
@@ -406,9 +439,21 @@ class OnlinePageState extends State<OnlinePage> {
                   subtitle: const Text('输入邀请码,与好友一起游玩'),
                   leading: const Icon(Icons.login),
                   onTap: () {
+                    if (!_coreExists) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('请先安装 EasyTier 核心')),
+                      );
+                      return;
+                    }
+                    if (_serverController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('请先输入打洞/中转服务器地址')),
+                      );
+                      return;
+                    }
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const MemberPage()),
+                      MaterialPageRoute(builder: (context) => MemberPage(etServer: _serverController.text)),
                     );
                   },
                 ),

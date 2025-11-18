@@ -195,8 +195,9 @@ class MyAppState extends State<MyApp> {
       onGenerateRoute: (settings) {
     if (settings.name == '/online/owner') {
       final int port = settings.arguments as int;
+      final String etServer = settings.arguments as String;
       return MaterialPageRoute(
-        builder: (context) => OwnerPage(port: port),
+        builder: (context) => OwnerPage(port: port, etServer: etServer),
       );
     }
     return null;

@@ -51,7 +51,8 @@ class PlayerList {
 
 class OwnerPage extends StatefulWidget {
   final int port;
-  const OwnerPage({super.key, required this.port});
+  final String etServer;
+  const OwnerPage({super.key, required this.port, required this.etServer});
 
   // 静态变量用于在页面重建之间保持状态
   static String? _persistRoomCode;
@@ -431,9 +432,9 @@ class OwnerPageState extends State<OwnerPage> {
           '--hostname', hostname,
           '--listeners', 'udp:0',
           '--ipv4', '10.144.144.1',
-          '-p', 'tcp://public.easytier.cn:11010,tcp://ettx.lxdklp.top:11010,tcp://ethk.lxdklp.top:11010'
+          '-p', widget.etServer,
         ];
-        LogUtil.log('正在启动EasyTier${attempt > 0 ? " (尝试 ${attempt+1}/$maxRetries)" : ""}: $core ${args.join(' ')}', level: 'INFO');
+        LogUtil.log('正在通过 ${widget.etServer} 节点启动 EasyTier ${attempt > 0 ? " (尝试 ${attempt+1}/$maxRetries)" : ""}: $core ${args.join(' ')}', level: 'INFO');
         _easyTierProcess = await Process.start(core, args);
         OwnerPage._easyTierProcess = _easyTierProcess;
         _easyTierProcess!.stdout.transform(utf8.decoder).listen((data) {
