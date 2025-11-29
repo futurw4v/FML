@@ -28,6 +28,8 @@ dependencies:
   flutter_markdown: ^0.7.7+1
   uuid: ^4.5.1
   flutter_gbk2utf8: ^1.0.1
+  encrypt: ^5.0.3
+  device_info_plus: ^12.3.0
 
 dev_dependencies:
   flutter_test:

@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/download.dart';
+import 'package:fml/function/crypto_util.dart';
 
 // 检查authlib-injector
 Future<bool> checkAuthlibInjector(String gamePath) async {
@@ -71,15 +72,17 @@ Future<void> downloadAuthlibInjector(String gamePath) async {
   }
 }
 
-// 外置登录令牌检查
+// 外置登录令牌检查（传入的是加密的令牌）
 Future<bool> checkToken(
     String url,
-    String accessToken,
-    String clientToken
+    String encryptedAccessToken,
+    String encryptedClientToken
   ) async {
   LogUtil.log('检查令牌有效性', level: 'INFO');
   final Dio dio = Dio();
   final String appVersion = await _loadAppVersion();
+  String accessToken = await CryptoUtil.decrypt(encryptedAccessToken);
+  String clientToken = await CryptoUtil.decrypt(encryptedClientToken);
   final options = Options(
     headers: {
       'User-Agent': 'FML/$appVersion',
@@ -114,17 +117,19 @@ Future<bool> checkToken(
   }
 }
 
-// 刷新外置登录令牌
+// 刷新外置登录令牌（传入的是加密的令牌，返回加密的新令牌）
 Future<String> refreshToken(
     String url,
-    String accessToken,
-    String clientToken,
+    String encryptedAccessToken,
+    String encryptedClientToken,
     String name,
     String uuid
   ) async {
   LogUtil.log('正在刷新令牌', level: 'INFO');
   final Dio dio = Dio();
   final String appVersion = await _loadAppVersion();
+  String accessToken = await CryptoUtil.decrypt(encryptedAccessToken);
+  String clientToken = await CryptoUtil.decrypt(encryptedClientToken);
   final options = Options(
     headers: {
       'User-Agent': 'FML/$appVersion',
@@ -147,14 +152,15 @@ Future<String> refreshToken(
     );
     if (response.statusCode == 200) {
       LogUtil.log('令牌刷新成功', level: 'INFO');
-      return response.data['accessToken'];
+      String newAccessToken = response.data['accessToken'];
+      return await CryptoUtil.encrypt(newAccessToken);
     } else {
       LogUtil.log('令牌刷新失败，状态码: ${response.statusCode}', level: 'WARNING');
-      return accessToken;
+      return encryptedAccessToken;
     }
   }
   catch (e) {
     LogUtil.log('令牌刷新失败: $e', level: 'ERROR');
-    return accessToken;
+    return encryptedAccessToken;
   }
 }

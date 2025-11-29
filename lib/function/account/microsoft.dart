@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
 import 'package:fml/function/log.dart';
+import 'package:fml/function/crypto_util.dart';
 
 // 打开URL
 Future<void> _launchURL() async {
@@ -605,12 +606,13 @@ Future<void> _saveAccount(context, List<String> account) async {
   List<String> accounts = prefs.getStringList('online_accounts_list') ?? [];
   accounts.add(account[1]);
   await prefs.setStringList('online_accounts_list', accounts);
-    await prefs.setStringList(
+  String encryptedRefreshToken = await CryptoUtil.encrypt(account[2]);
+  await prefs.setStringList(
     'online_account_${account[1]}',
     [
       '1',
       account[0],
-      account[2],
+      encryptedRefreshToken,
     ],
   );
 }

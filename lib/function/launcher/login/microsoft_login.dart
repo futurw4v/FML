@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:fml/function/log.dart';
+import 'package:fml/function/crypto_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // 登录模式
@@ -17,6 +18,7 @@ Future<String> _getMsToken(refreshToken) async {
   final dio = Dio();
   final prefs = await SharedPreferences.getInstance();
   final appVersion = prefs.getString('version') ?? 'unknown';
+  String decryptedRefreshToken = await CryptoUtil.decrypt(refreshToken);
   while (true) {
     try {
       final response = await dio.post(
@@ -31,21 +33,22 @@ Future<String> _getMsToken(refreshToken) async {
         'client_id': '3847de77-c7ca-4daa-a0b7-50850446d58c',
         'grant_type': 'refresh_token',
         'scope': 'XboxLive.signin offline_access',
-        'refresh_token': refreshToken,
+        'refresh_token': decryptedRefreshToken,
       }
     );
     if (response.statusCode == 200) {
       if (response.data is Map) {
         Map<String, dynamic> data =response.data as Map<String, dynamic>;
         String accessToken = data['access_token'] ?? '';
-        String refreshToken = data['refresh_token'] ?? '';
-        if (accessToken.isNotEmpty && refreshToken.isNotEmpty) {
+        String newRefreshToken = data['refresh_token'] ?? '';
+        if (accessToken.isNotEmpty && newRefreshToken.isNotEmpty) {
           final accountName = prefs.getString('SelectedAccountName') ?? '';
           final accountType = prefs.getString('SelectedAccountType') ?? '';
           final accountInfo = prefs.getStringList('${_getLoginMode(accountType)}_account_$accountName') ?? [];
+          String encryptedRefreshToken = await CryptoUtil.encrypt(newRefreshToken);
           prefs.setStringList(
             '${_getLoginMode(accountType)}_account_$accountName',
-            [accountInfo[0], accountInfo[1], refreshToken]
+            [accountInfo[0], accountInfo[1], encryptedRefreshToken]
           );
           return accessToken;
         } else {

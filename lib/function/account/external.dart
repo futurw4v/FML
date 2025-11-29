@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:fml/function/log.dart';
+import 'package:fml/function/crypto_util.dart';
 
 // 认证响应模型
 class AuthResponse {
@@ -174,14 +175,17 @@ Future<void> _saveAccount(
   } else {
     LogUtil.log('账号已存在，更新账号信息: $name', level: 'INFO');
   }
+  String encryptedPassword = await CryptoUtil.encrypt(password);
+  String encryptedAccessToken = await CryptoUtil.encrypt(accessToken);
+  String encryptedClientToken = await CryptoUtil.encrypt(clientToken);
   await prefs.setStringList('external_account_$name', [
     '2',
     uuid,
     serverUrl,
     username,
-    password,
-    accessToken,
-    clientToken,
+    encryptedPassword,
+    encryptedAccessToken,
+    encryptedClientToken,
   ]);
   LogUtil.log('账号保存成功: $name, UUID: $uuid', level: 'INFO');
 }
