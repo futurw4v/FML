@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fml/pages/download/download_version.dart';
-import 'package:fml/pages/download/download_modrinth.dart';
+import 'package:fml/pages/download/download_resources.dart';
 
 class DownloadPage extends StatefulWidget {
   const DownloadPage({super.key});
@@ -33,10 +33,10 @@ class DownloadPageState extends State<DownloadPage> with SingleTickerProviderSta
           controller: _tabController,
           tabs: const [
             Tab(
-              text: '游戏版本',
+              text: '游戏',
             ),
             Tab(
-              text: 'Modrinth',
+              text: '资源',
             ),
           ],
         ),
@@ -45,7 +45,7 @@ class DownloadPageState extends State<DownloadPage> with SingleTickerProviderSta
         controller: _tabController,
         children: const [
           DownloadVersion(),
-          DownloadModrinth(),
+          DownloadResources(),
         ],
       ),
     );

@@ -20,5 +20,5 @@
   "idf.pythonInstallPath": "/usr/bin/python3",
   "cmake.ignoreCMakeListsMissing": true,
   "commentTranslate.hover.enabled": true,
-  "dart.flutterSdkPath": ".fvm/versions/3.38.2"
+  "dart.flutterSdkPath": "/Users/lxdklp/fvm/versions/3.38.3"
 }
