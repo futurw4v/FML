@@ -151,7 +151,6 @@ class CurseforgeResourcepackPageState extends State<CurseforgeResourcepackPage> 
 
   // 下载文件
   Future<void> _downloadFile() async {
-    debugPrint(_selectedFile.toString());
     if (_selectedFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请先选择一个文件')),
@@ -378,19 +377,19 @@ class CurseforgeResourcepackPageState extends State<CurseforgeResourcepackPage> 
                         ),
                         if (_customLocation) ...[
                           Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _savePath.isEmpty ? '未选择保存路径' : _savePath,
-                                overflow: TextOverflow.ellipsis,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _savePath.isEmpty ? '未选择保存路径' : _savePath,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                            TextButton(
-                              onPressed: _selectSavePath,
-                              child: const Text('选择路径'),
-                            ),
-                          ],
-                        ),
+                              TextButton(
+                                onPressed: _selectSavePath,
+                                child: const Text('选择路径'),
+                              ),
+                            ],
+                          ),
                         ],
                         const SizedBox(height: 8),
                         SizedBox(

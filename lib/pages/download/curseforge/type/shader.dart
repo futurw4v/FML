@@ -8,8 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/download.dart';
 
-class CurseforgeModPage extends StatefulWidget {
-  const CurseforgeModPage({
+class CurseforgeShaderPage extends StatefulWidget {
+  const CurseforgeShaderPage({
     required this.modId,
     this.modName,
     required this.apiKey,
@@ -21,18 +21,16 @@ class CurseforgeModPage extends StatefulWidget {
   final String apiKey;
 
   @override
-  CurseforgeModPageState createState() => CurseforgeModPageState();
+  CurseforgeShaderPageState createState() => CurseforgeShaderPageState();
 }
 
-class CurseforgeModPageState extends State<CurseforgeModPage> {
+class CurseforgeShaderPageState extends State<CurseforgeShaderPage> {
   final Dio dio = Dio();
   bool _isLoading = true;
   String? _error;
   List<dynamic> _filesList = [];
   List<dynamic> _filteredFilesList = [];
   Map<String, dynamic>? _selectedFile;
-  Set<String> _availableLoaders = {};
-  String? _selectedLoader;
   Set<String> _availableGameVersions = {};
   String? _selectedGameVersion;
   String _savePath = '';
@@ -42,11 +40,11 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
   @override
   void initState() {
     super.initState();
-    LogUtil.log('加载CurseForge模组ID: ${widget.modId}', level: 'INFO');
+    LogUtil.log('加载CurseForge光影ID: ${widget.modId}', level: 'INFO');
     _loadAppVersion();
   }
 
-  // 加载版本信息
+  // 加载设置
   Future<void> _loadAppVersion() async {
     final prefs = await SharedPreferences.getInstance();
     final version = prefs.getString('version') ?? "UnknownVersion";
@@ -56,10 +54,10 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
     _fetchFiles();
   }
 
-  // 从API获取文件信息
+  // 获取文件列表
   Future<void> _fetchFiles() async {
     try {
-      setState(() {
+        setState(() {
         _isLoading = true;
         _error = null;
       });
@@ -73,28 +71,18 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
             'x-api-key': widget.apiKey,
             'User-Agent': 'lxdklp/FML/$_appVersion (fml.lxdklp.top)',
           },
-        ),
+        )
       );
       if (response.statusCode == 200) {
         final allFiles = response.data['data'] as List;
         Set<String> gameVersions = {};
-        Set<String> loaders = {};
         for (var file in allFiles) {
           final fileGameVersions = file['gameVersions'] as List?;
           if (fileGameVersions != null) {
             for (var version in fileGameVersions) {
               final versionStr = version.toString();
-              if (versionStr.contains('.') &&
-                !versionStr.contains('Forge') &&
-                !versionStr.contains('Fabric') &&
-                !versionStr.contains('NeoForge') &&
-                !versionStr.contains('Quilt')) {
+              if (versionStr.contains('.')) {
                 gameVersions.add(versionStr);
-              } else if (versionStr == 'Forge' ||
-                versionStr == 'Fabric' ||
-                versionStr == 'NeoForge' ||
-                versionStr == 'Quilt') {
-                loaders.add(versionStr);
               }
             }
           }
@@ -103,7 +91,6 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
           _filesList = allFiles;
           _filteredFilesList = allFiles;
           _availableGameVersions = gameVersions;
-          _availableLoaders = loaders;
           _isLoading = false;
         });
       } else {
@@ -120,17 +107,14 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
     }
   }
 
-  // 筛选文件
+  // 过滤文件列表
   Future<void> _filterFiles() async {
     setState(() {
       _filteredFilesList = _filesList.where((file) {
         final fileGameVersions = file['gameVersions'] as List?;
         if (fileGameVersions == null) return false;
-        bool matchesVersion = _selectedGameVersion == null ||
+        return _selectedGameVersion == null ||
             fileGameVersions.contains(_selectedGameVersion);
-        bool matchesLoader = _selectedLoader == null ||
-            fileGameVersions.contains(_selectedLoader);
-        return matchesVersion && matchesLoader;
       }).toList();
     });
   }
@@ -143,6 +127,15 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
         _savePath = selectedDirectory;
       });
     }
+  }
+
+  // 获取当前版本目录
+  Future<String> _getCurrentVersionDirectory(fileName) async {
+    final prefs = await SharedPreferences.getInstance();
+    final path = prefs.getString('Path_${prefs.getString('SelectedPath')}');
+    final game = prefs.getString('SelectedGame');
+    _savePath = '$path${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}shaderpacks';
+    return _savePath;
   }
 
   // 构建下载URL
@@ -184,7 +177,7 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
           SnackBar(content: Text('开始下载: $fileName')),
         );
       }
-      LogUtil.log('开始下载: $fileName', level: 'INFO');
+      LogUtil.log('开始下载光影: $fileName', level: 'INFO');
       await DownloadUtils.downloadFile(
         url: downloadUrl,
         savePath: filePath,
@@ -197,7 +190,7 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
           }
         },
         onError: (e) {
-          LogUtil.log('下载失败: $e', level: 'error');
+          LogUtil.log('下载失败: $e', level: 'ERROR');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('下载失败: $e')),
@@ -206,7 +199,7 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
         },
       );
     } catch (e) {
-      LogUtil.log('下载失败: $e', level: '_error');
+      LogUtil.log('下载失败: $e', level: 'ERROR');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('下载失败: $e')),
@@ -215,7 +208,7 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
     }
   }
 
-  // 获取发布类型文本
+  // 发布类型文本
   String _getReleaseTypeText(int? releaseType) {
     switch (releaseType) {
       case 1:
@@ -229,7 +222,7 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
     }
   }
 
-  // 获取发布类型颜色
+  // 发布类型颜色
   Color _getReleaseTypeColor(int? releaseType) {
     switch (releaseType) {
       case 1:
@@ -243,20 +236,11 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
     }
   }
 
-  // 获取当前版本目录
-  Future<String> _getCurrentVersionDirectory(fileName) async {
-    final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString('Path_${prefs.getString('SelectedPath')}');
-    final game = prefs.getString('SelectedGame');
-    _savePath = '$path${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}mods';
-    return _savePath;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.modName ?? '模组文件'),
+        title: Text(widget.modName ?? '光影文件'),
       ),
       body: _isLoading
         ? const Center(child: CircularProgressIndicator())
@@ -276,7 +260,6 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
             )
           : Column(
               children: [
-                // 筛选器
                 Card(
                   margin: const EdgeInsets.all(8.0),
                   child: Padding(
@@ -286,60 +269,30 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
                       children: [
                         const Text('筛选', style: TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: DropdownButton<String>(
-                                isExpanded: true,
-                                hint: const Text('游戏版本'),
-                                value: _selectedGameVersion,
-                                items: [
-                                  const DropdownMenuItem(
-                                    value: null,
-                                    child: Text('全部版本'),
-                                  ),
-                                  ..._availableGameVersions.map((v) =>
-                                    DropdownMenuItem(value: v, child: Text(v))
-                                  ),
-                                ],
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedGameVersion = value;
-                                  });
-                                  _filterFiles();
-                                },
-                              ),
+                        DropdownButton<String>(
+                          isExpanded: true,
+                          hint: const Text('游戏版本'),
+                          value: _selectedGameVersion,
+                          items: [
+                            const DropdownMenuItem(
+                              value: null,
+                              child: Text('全部版本'),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: DropdownButton<String>(
-                                isExpanded: true,
-                                hint: const Text('加载器'),
-                                value: _selectedLoader,
-                                items: [
-                                  const DropdownMenuItem(
-                                    value: null,
-                                    child: Text('全部'),
-                                  ),
-                                  ..._availableLoaders.map((l) =>
-                                    DropdownMenuItem(value: l, child: Text(l))
-                                  ),
-                                ],
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedLoader = value;
-                                  });
-                                  _filterFiles();
-                                },
-                              ),
+                            ..._availableGameVersions.map((v) =>
+                              DropdownMenuItem(value: v, child: Text(v))
                             ),
                           ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedGameVersion = value;
+                            });
+                            _filterFiles();
+                          },
                         ),
                       ],
                     ),
                   ),
                 ),
-                // 文件列表
                 Expanded(
                   child: ListView.builder(
                     itemCount: _filteredFilesList.length,
@@ -388,7 +341,6 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
                     },
                   ),
                 ),
-                // 下载区域
                 Card(
                   margin: const EdgeInsets.all(8.0),
                   child: Padding(

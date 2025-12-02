@@ -45,11 +45,9 @@ class ModPageState extends State<ModPage> {
         isLoading = true;
         error = null;
       });
-
       final response = await dio.get(
         'https://api.modrinth.com/v2/project/${widget.projectId}/version',
       );
-
       if (response.statusCode == 200) {
         final versions = response.data as List;
         Set<String> loaders = {};
@@ -97,6 +95,7 @@ class ModPageState extends State<ModPage> {
     }
   }
 
+  // 应用筛选条件
   Future<void> _applyFilters() async {
     setState(() {
       filteredVersionsList = List.from(versionsList);
