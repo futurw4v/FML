@@ -318,39 +318,12 @@ class OnlinePageState extends State<OnlinePage> {
     );
   }
 
-  // 显示更新对话框
-  Future<void> _showInfoDialog() async{
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('联机功能暂时关闭'),
-        content: Text('由于社区关于联机讨论过于激进乃至出现了无厘头行为,联机功能将暂停服务'),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              _launchURL('https://www.bilibili.com/opus/1135872352762986504');
-            },
-            child: const Text('详细信息'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   void initState() {
     super.initState();
     _checkCoreExists();
     _loadAppVersion();
     _checkCoreVersion();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showInfoDialog();
-    });
   }
 
   @override
