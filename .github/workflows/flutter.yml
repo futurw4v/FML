@@ -1,19 +1,16 @@
 name: Flutter Build
 
 on:
-    push:
-        branches: [main, master]
-        tags:
-            - 'v*'
-    pull_request:
-        branches: [main, master]
-    workflow_dispatch:
-        inputs:
-            skip_release:
-                description: '不创建 Release'
-                required: false
-                default: false
-                type: boolean
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      skip_release:
+        description: '不创建 Release'
+        required: false
+        default: true
+        type: boolean
 
 env:
     FLUTTER_VERSION: '3.38.3'
