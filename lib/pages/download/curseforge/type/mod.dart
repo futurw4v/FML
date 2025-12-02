@@ -145,6 +145,17 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
     }
   }
 
+  // 构建下载URL
+  String? _buildDownloadUrl(int? fileId, String? fileName) {
+    if (fileId == null || fileName == null) return null;
+    final idStr = fileId.toString();
+    if (idStr.length < 5) return null;
+    final firstPart = idStr.substring(0, 4);
+    final secondPart = int.parse(idStr.substring(4)).toString();
+    final encodedFileName = Uri.encodeComponent(fileName);
+    return 'https://mediafilez.forgecdn.net/files/$firstPart/$secondPart/$encodedFileName';
+  }
+
   // 下载文件
   Future<void> _downloadFile() async {
     if (_selectedFile == null) {
@@ -159,17 +170,16 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
       );
       return;
     }
-    final downloadUrl = _selectedFile!['downloadUrl'];
+    var downloadUrl = _selectedFile!['downloadUrl'];
     final fileName = _selectedFile!['fileName'];
+    final fileId = _selectedFile!['id'] as int?;
     if (downloadUrl == null || downloadUrl.toString().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('此文件不允许第三方下载,请前往CurseForge官网下载')),
-      );
-      return;
+      downloadUrl = _buildDownloadUrl(fileId, fileName);
+      LogUtil.log('downloadUrl为空,尝试使用构建的URL: $downloadUrl', level: 'WARNING');
     }
     final filePath = path.join(_savePath, fileName);
     try {
-  if (mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('开始下载: $fileName')),
         );
