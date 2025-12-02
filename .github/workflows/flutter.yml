@@ -1,145 +1,145 @@
 name: Flutter Build
 
 on:
-  push:
-    branches: [main, master]
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [main, master]
-  workflow_dispatch:
-    inputs:
-      skip_release:
-        description: '仅测试构建，不创建 Release'
-        required: false
-        default: false
-        type: boolean
+    push:
+        branches: [main, master]
+        tags:
+            - 'v*'
+    pull_request:
+        branches: [main, master]
+    workflow_dispatch:
+        inputs:
+            skip_release:
+                description: '不创建 Release'
+                required: false
+                default: false
+                type: boolean
 
 env:
-  FLUTTER_VERSION: '3.24.0'
+    FLUTTER_VERSION: '3.38.3'
 
 jobs:
-  build-windows:
-    name: Build Windows
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    build-windows:
+        name: Build Windows
+        runs-on: windows-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: 'stable'
-          cache: true
+            - name: Setup Flutter
+              uses: subosito/flutter-action@v2
+              with:
+                flutter-version: ${{ env.FLUTTER_VERSION }}
+                channel: 'stable'
+                cache: true
 
-      - name: Install dependencies
-        run: flutter pub get
+            - name: Install dependencies
+              run: flutter pub get
 
-      - name: Build Windows
-        run: flutter build windows --release
+            - name: Build Windows
+              run: flutter build windows --release
 
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-release
-          path: build/windows/x64/runner/Release/
-          retention-days: 7
+            - name: Upload Windows artifact
+              uses: actions/upload-artifact@v4
+              with:
+                name: windows-release
+                path: build/windows/x64/runner/Release/
+                retention-days: 7
 
-  build-linux:
-    name: Build Linux
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    build-linux:
+        name: Build Linux
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
+            - name: Install Linux dependencies
+              run: |
+                sudo apt-get update
+                sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: 'stable'
-          cache: true
+            - name: Setup Flutter
+              uses: subosito/flutter-action@v2
+              with:
+                flutter-version: ${{ env.FLUTTER_VERSION }}
+                channel: 'stable'
+                cache: true
 
-      - name: Install dependencies
-        run: flutter pub get
+            - name: Install dependencies
+              run: flutter pub get
 
-      - name: Build Linux
-        run: flutter build linux --release
+            - name: Build Linux
+              run: flutter build linux --release
 
-      - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-release
-          path: build/linux/x64/release/bundle/
-          retention-days: 7
+            - name: Upload Linux artifact
+              uses: actions/upload-artifact@v4
+              with:
+                name: linux-release
+                path: build/linux/x64/release/bundle/
+                retention-days: 7
 
-  build-macos:
-    name: Build macOS
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    build-macos:
+        name: Build macOS
+        runs-on: macos-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: 'stable'
-          cache: true
+            - name: Setup Flutter
+              uses: subosito/flutter-action@v2
+              with:
+                flutter-version: ${{ env.FLUTTER_VERSION }}
+                channel: 'stable'
+                cache: true
 
-      - name: Install dependencies
-        run: flutter pub get
+            - name: Install dependencies
+              run: flutter pub get
 
-      - name: Build macOS
-        run: flutter build macos --release
+            - name: Build macOS
+              run: flutter build macos --release
 
-      - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-release
-          path: build/macos/Build/Products/Release/*.app
-          retention-days: 7
+            - name: Upload macOS artifact
+              uses: actions/upload-artifact@v4
+              with:
+                name: macos-release
+                path: build/macos/Build/Products/Release/*.app
+                retention-days: 7
 
-  release:
-    name: Create Release
-    needs: [build-windows, build-linux, build-macos]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') && github.event.inputs.skip_release != 'true'
-    permissions:
-      contents: write
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
+    release:
+        name: Create Release
+        needs: [build-windows, build-linux, build-macos]
+        runs-on: ubuntu-latest
+        if: startsWith(github.ref, 'refs/tags/v') && github.event.inputs.skip_release != 'true'
+        permissions:
+            contents: write
+        steps:
+            - name: Download all artifacts
+              uses: actions/download-artifact@v4
+              with:
+                path: artifacts
 
-      - name: Zip Windows release
-        run: |
-          cd artifacts/windows-release
-          zip -r ../../FML-windows-x64.zip .
+            - name: Zip Windows release
+              run: |
+                cd artifacts/windows-release
+                zip -r ../../FML-windows-x64.zip .
 
-      - name: Zip Linux release
-        run: |
-          cd artifacts/linux-release
-          tar -czvf ../../FML-linux-x64.tar.gz .
+            - name: Zip Linux release
+              run: |
+                cd artifacts/linux-release
+                tar -czvf ../../FML-linux-x64.tar.gz .
 
-      - name: Zip macOS release
-        run: |
-          cd artifacts/macos-release
-          zip -r ../../FML-macos-x64.zip .
+            - name: Zip macOS release
+              run: |
+                cd artifacts/macos-release
+                zip -r ../../FML-macos-x64.zip .
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            FML-windows-x64.zip
-            FML-linux-x64.tar.gz
-            FML-macos-x64.zip
-          draft: false
-          prerelease: false
-          generate_release_notes: true
+            - name: Create Release
+              uses: softprops/action-gh-release@v1
+              with:
+                files: |
+                  FML-windows-x64.zip
+                  FML-linux-x64.tar.gz
+                  FML-macos-x64.zip
+                draft: false
+                prerelease: false
+                generate_release_notes: true
