@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:html/parser.dart' as html_parser;
+import 'package:share_plus/share_plus.dart';
 
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/download/curseforge/type/mod.dart';
@@ -34,7 +35,7 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
   String _appVersion = '';
   String _description = '';
 
-  // 项目类型映射 (classId)
+  // 项目类型映射
   final Map<int, String> classIdNames = {
     6: '模组',
     4471: '整合包',
@@ -91,7 +92,6 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
           projectDetails = response.data['data'];
         });
         LogUtil.log('成功获取项目详情', level: 'INFO');
-        // 获取描述
         await _fetchDescription();
       } else {
         setState(() {
@@ -119,7 +119,6 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
       );
       if (response.statusCode == 200) {
         final htmlContent = response.data['data'] ?? '';
-        // 将HTML转换为纯文本或Markdown
         final document = html_parser.parse(htmlContent);
         final text = document.body?.text ?? '';
         setState(() {
@@ -149,6 +148,24 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('无法打开链接: $e')),
+      );
+    }
+  }
+
+  // 分享项目链接
+  Future<void> _shareProject(String? url) async {
+    if (url == null || url.isEmpty) return;
+    final Uri uri = Uri.parse(url);
+    try {
+      SharePlus.instance.share(
+        ShareParams(
+          uri: uri,
+          title: '分享 CurseForge 项目',
+        )
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('无法分享项目: $e')),
       );
     }
   }
@@ -432,65 +449,83 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
                 ),
               ),
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          final classId = projectDetails['classId'] ?? widget.projectInfo['classId'];
-          if (classId == 6) {
-            // 模组
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CurseforgeModPage(
-                  modId: widget.modId,
-                  modName: projectDetails['name'] ?? widget.projectInfo['name'] ?? '',
-                  apiKey: widget.apiKey,
-                ),
-              ),
-            );
-          } else if (classId == 4471) {
-            // 整合包
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CurseforgeModpackPage(
-                  modId: widget.modId,
-                  modName: projectDetails['name'] ?? widget.projectInfo['name'] ?? '',
-                  apiKey: widget.apiKey,
-                ),
-              ),
-            );
-          } else if (classId == 12) {
-            // 资源包
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CurseforgeResourcepackPage(
-                  modId: widget.modId,
-                  modName: projectDetails['name'] ?? widget.projectInfo['name'] ?? '',
-                  apiKey: widget.apiKey,
-                ),
-              ),
-            );
-          } else if (classId == 6552) {
-            // 光影
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CurseforgeShaderPage(
-                  modId: widget.modId,
-                  modName: projectDetails['name'] ?? widget.projectInfo['name'] ?? '',
-                  apiKey: widget.apiKey,
-                ),
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('未知的项目类型，无法下载')),
-            );
-          }
-        },
-        child: const Icon(Icons.download),
-      ),
+      floatingActionButton:
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FloatingActionButton(
+              heroTag: 'share',
+              onPressed: () {
+                final projectUrl = projectDetails['links'] != null
+                    ? projectDetails['links']['websiteUrl']
+                    : null;
+                _shareProject(projectUrl);
+              },
+              child: const Icon(Icons.share),
+            ),
+            const SizedBox(height: 16),
+            FloatingActionButton(
+              heroTag: 'download',
+              onPressed: () {
+                final classId = projectDetails['classId'] ?? widget.projectInfo['classId'];
+                if (classId == 6) {
+                  // 模组
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CurseforgeModPage(
+                        modId: widget.modId,
+                        modName: projectDetails['name'] ?? widget.projectInfo['name'] ?? '',
+                        apiKey: widget.apiKey,
+                      ),
+                    ),
+                  );
+                } else if (classId == 4471) {
+                  // 整合包
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CurseforgeModpackPage(
+                        modId: widget.modId,
+                        modName: projectDetails['name'] ?? widget.projectInfo['name'] ?? '',
+                        apiKey: widget.apiKey,
+                      ),
+                    ),
+                  );
+                } else if (classId == 12) {
+                  // 资源包
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CurseforgeResourcepackPage(
+                        modId: widget.modId,
+                        modName: projectDetails['name'] ?? widget.projectInfo['name'] ?? '',
+                        apiKey: widget.apiKey,
+                      ),
+                    ),
+                  );
+                } else if (classId == 6552) {
+                  // 光影
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CurseforgeShaderPage(
+                        modId: widget.modId,
+                        modName: projectDetails['name'] ?? widget.projectInfo['name'] ?? '',
+                        apiKey: widget.apiKey,
+                      ),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('未知的项目类型，无法下载')),
+                  );
+                }
+              },
+              child: const Icon(Icons.download),
+            ),
+          ],
+        ),
     );
   }
 }
