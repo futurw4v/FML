@@ -1,4 +1,4 @@
-name: Flutter Build
+name: Flutter 构建
 
 on:
   push:
@@ -163,7 +163,7 @@ jobs:
             - name: 上传 Linux (x64) 构建产物
               uses: actions/upload-artifact@v4
               with:
-                name: linux-release
+                name: linux-x64-release
                 path: |
                   FML-Linux-*-x64.zip
                   FML-Linux-*-x64.deb
@@ -322,9 +322,9 @@ jobs:
                 files: |
                   artifacts/windows-release/FML-Windows-*.zip
                   artifacts/windows-release/FML-Windows-*-setup.exe
-                  artifacts/linux-release/FML-Linux-*-x64.zip
-                  artifacts/linux-release/FML-Linux-*-x64.deb
-                  artifacts/linux-release/FML-Linux-*-x64.AppImage
+                  artifacts/linux-x64-release/FML-Linux-*-x64.zip
+                  artifacts/linux-x64-release/FML-Linux-*-x64.deb
+                  artifacts/linux-x64-release/FML-Linux-*-x64.AppImage
                   artifacts/linux-arm64-release/FML-Linux-*-arm64.zip
                   artifacts/linux-arm64-release/FML-Linux-*-arm64.deb
                   artifacts/linux-arm64-release/FML-Linux-*-arm64.AppImage
