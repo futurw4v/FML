@@ -192,8 +192,13 @@ class AboutPageState extends State<AboutPage> {
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://easytier.cn/'),
                 ),ListTile(
+                  title: const Text('Scaffolding-MC'),
+                  subtitle: const Text('联机协议\nhttps://github.com/Scaffolding-MC/Scaffolding-MC'),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://github.com/Scaffolding-MC/Scaffolding-MC'),
+                ),ListTile(
                   title: const Text('Terracotta'),
-                  subtitle: const Text('联机协议\nhttps://github.com/burningtnt/Terracotta'),
+                  subtitle: const Text('联机实现参考\nhttps://github.com/burningtnt/Terracotta'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/burningtnt/Terracotta'),
                 ),
