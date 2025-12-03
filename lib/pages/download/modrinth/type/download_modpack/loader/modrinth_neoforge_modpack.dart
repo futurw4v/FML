@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fml/function/download.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'package:archive/archive.dart';
@@ -986,28 +987,33 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
     });
   }
 
-  // 执行NeoForge安装器
+  // 执行 NeoForge 安装器
   Future<void> _executeNeoForgeInstaller() async {
     final prefs = await SharedPreferences.getInstance();
     final selectedGamePath = prefs.getString('SelectedPath') ?? '';
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     final installerPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}${Platform.pathSeparator}neoforge-installer.jar';
     final neoForgeJson = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}neoforge-$_neoforgeVersion${Platform.pathSeparator}neoforge-$_neoforgeVersion.json';
-    final proc = await Process.start('java', [
+    await LogUtil.log('开始执行NeoForge安装器: $installerPath', level: 'INFO');
+    final result = await Process.run('java', [
       '-jar', installerPath,
       '--installClient', gamePath
     ]);
-    proc.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => LogUtil.log('[NROFORGE INSTALLER] $l', level: 'INFO'));
-    proc.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen((l) => LogUtil.log('[NROFORGE INSTALLER] $l', level: 'ERROR'));
-    final code = await proc.exitCode;
-    LogUtil.log('NeoForge安装器退出码: $code', level: 'INFO');
+    if (result.stderr.toString().isNotEmpty) {
+      for (var line in result.stderr.toString().split('\n')) {
+        if (line.trim().isNotEmpty) {
+          await LogUtil.log('[NEOFORGE INSTALLER] $line', level: 'ERROR');
+        }
+      }
+    }
+    final code = result.exitCode;
+    await LogUtil.log('NeoForge安装器退出码: $code', level: 'INFO');
     if (code != 0) {
       throw Exception('NeoForge安装器执行失败,退出码: $code');
     }
-    LogUtil.log('NeoForge安装器执行成功', level: 'INFO');
     await LogUtil.log('NeoForge安装器执行成功', level: 'INFO');
-    LogUtil.log('移动$neoForgeJson 配置文件到: $gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}${Platform.pathSeparator}NeoForge.json', level: 'INFO');
-    await _moveFile(neoForgeJson , '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}${Platform.pathSeparator}NeoForge.json');
+    await LogUtil.log('移动$neoForgeJson 配置文件到: $gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}${Platform.pathSeparator}NeoForge.json', level: 'INFO');
+    await _moveFile(neoForgeJson, '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}${Platform.pathSeparator}NeoForge.json');
     setState(() {
       _neoForgeInstalled = true;
     });
@@ -1068,7 +1074,6 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
               updateProgressCallback(completed / total);
               await LogUtil.log('已完成: $completed/$total $fileType', level: 'INFO');
             } else {
-              // 短暂延迟后再重试
               await Future.delayed(Duration(milliseconds: 500));
             }
           } catch (e) {
@@ -1095,7 +1100,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
           });
         },
         onSuccess: () {
-          success = true;  // 正确设置成功标志
+          success = true;
         },
         onError: (error) async {
           await LogUtil.log('下载失败: $error, URL: $url', level: 'ERROR');

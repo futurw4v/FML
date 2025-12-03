@@ -2,11 +2,31 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
 import 'package:system_info2/system_info2.dart';
-import 'package:fml/function/log.dart';
+import 'package:flutter/foundation.dart';
 
-Future<List<String>> extractNatives(String jarDir, String jarName, String outDir) async {
-  final os = Platform.operatingSystem.toLowerCase();
-  final kernelArch = SysInfo.kernelArchitecture.name.toLowerCase();
+// 在后台线程中执行的提取
+class _ExtractParams {
+  final String jarDir;
+  final String jarName;
+  final String outDir;
+  final String os;
+  final String kernelArch;
+  _ExtractParams({
+    required this.jarDir,
+    required this.jarName,
+    required this.outDir,
+    required this.os,
+    required this.kernelArch,
+  });
+}
+
+// 在后台线程中执行提取
+List<String> _extractNativesInIsolate(_ExtractParams params) {
+  final jarName = params.jarName;
+  final jarDir = params.jarDir;
+  final outDir = params.outDir;
+  final os = params.os;
+  final kernelArch = params.kernelArch;
   final lowerName = jarName.toLowerCase();
   bool matches = true;
   final hasPlatformSuffix = lowerName.contains('macos') || lowerName.contains('linux') || lowerName.contains('windows');
@@ -31,10 +51,7 @@ Future<List<String>> extractNatives(String jarDir, String jarName, String outDir
       matches = false;
     }
   }
-  if (matches) {
-    LogUtil.log('"$jarName" 平台符合 (os=$os, arch=$kernelArch)', level: 'INFO');
-  } else {
-    LogUtil.log('$jarName" 平台不符合 (os=$os, arch=$kernelArch)', level: 'ERROR');
+  if (!matches) {
     return <String>[];
   }
   final jarPath = p.join(jarDir, jarName);
@@ -63,4 +80,18 @@ Future<List<String>> extractNatives(String jarDir, String jarName, String outDir
     extracted.add(outFile.path);
   }
   return extracted;
+}
+
+// 提取natives库
+Future<List<String>> extractNatives(String jarDir, String jarName, String outDir) async {
+  final os = Platform.operatingSystem.toLowerCase();
+  final kernelArch = SysInfo.kernelArchitecture.name.toLowerCase();
+  final params = _ExtractParams(
+    jarDir: jarDir,
+    jarName: jarName,
+    outDir: outDir,
+    os: os,
+    kernelArch: kernelArch,
+  );
+  return await compute(_extractNativesInIsolate, params);
 }
