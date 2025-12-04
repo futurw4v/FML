@@ -165,10 +165,13 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
       return;
     }
     if (_savePath.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先选择保存路径')),
-      );
-      return;
+      _savePath = await _getCurrentVersionDirectory(_selectedFile!['fileName']);
+      if (_savePath.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('未选择版本目录')),
+        );
+        return;
+      }
     }
     var downloadUrl = _selectedFile!['downloadUrl'];
     final fileName = _selectedFile!['fileName'];
@@ -177,40 +180,122 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
       downloadUrl = _buildDownloadUrl(fileId, fileName);
       LogUtil.log('downloadUrl为空,尝试使用构建的URL: $downloadUrl', level: 'WARNING');
     }
+    if (!await Directory(_savePath).exists()) {
+      await Directory(_savePath).create(recursive: true);
+    }
     final filePath = path.join(_savePath, fileName);
-    try {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('开始下载: $fileName')),
-        );
-      }
-      LogUtil.log('开始下载: $fileName', level: 'INFO');
-      await DownloadUtils.downloadFile(
-        url: downloadUrl,
-        savePath: filePath,
-        onSuccess: () {
-          LogUtil.log('下载完成: $fileName', level: 'INFO');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('下载完成: $fileName')),
+    _showDownloadProgressDialog(downloadUrl, filePath);
+  }
+
+  // 显示下载进度对话框
+  Future<void> _showDownloadProgressDialog(String url, String savePath) async {
+    final ValueNotifier<double> progressNotifier = ValueNotifier(0.0);
+    final ValueNotifier<bool> isDownloadingNotifier = ValueNotifier(true);
+    final ValueNotifier<String?> errorMessageNotifier = ValueNotifier(null);
+    CancelToken? cancelToken;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('正在下载'),
+        content: ValueListenableBuilder<double>(
+          valueListenable: progressNotifier,
+          builder: (context, progress, _) {
+            return ValueListenableBuilder<bool>(
+              valueListenable: isDownloadingNotifier,
+              builder: (context, isDownloading, _) {
+                return ValueListenableBuilder<String?>(
+                  valueListenable: errorMessageNotifier,
+                  builder: (context, errorMessage, _) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (errorMessage != null)
+                          Text(
+                            errorMessage,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        if (isDownloading)
+                          Column(
+                            children: [
+                              LinearProgressIndicator(value: progress),
+                              const SizedBox(height: 8),
+                              Text('${(progress * 100).toStringAsFixed(1)}%'),
+                              const SizedBox(height: 8),
+                              Text('保存到: $savePath', style: const TextStyle(fontSize: 12)),
+                            ],
+                          ),
+                        if (!isDownloading && errorMessage == null)
+                          const Text('下载完成！'),
+                      ],
+                    );
+                  }
+                );
+              }
             );
           }
+        ),
+        actions: [
+          ValueListenableBuilder(
+            valueListenable: isDownloadingNotifier,
+            builder: (context, isDownloading, _) {
+              return isDownloading
+                ? TextButton(
+                    onPressed: () {
+                      cancelToken?.cancel();
+                      Navigator.of(dialogContext).pop();
+                    },
+                    child: const Text('取消'),
+                  )
+                : TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('关闭'),
+                  );
+            }
+          ),
+        ],
+      ),
+    );
+    // 开始下载
+    try {
+      cancelToken = await DownloadUtils.downloadFile(
+        url: url,
+        savePath: savePath,
+        onProgress: (currentProgress) {
+          progressNotifier.value = currentProgress;
         },
-        onError: (e) {
-          LogUtil.log('下载失败: $e', level: 'error');
-          if (mounted) {
+        onSuccess: () {
+          isDownloadingNotifier.value = false;
+          if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('下载失败: $e')),
+              SnackBar(content: Text('下载成功: ${path.basename(savePath)}')),
             );
+            LogUtil.log('下载完成: $savePath', level: 'INFO');
+          }
+        },
+        onError: (error) {
+          errorMessageNotifier.value = '下载失败: $error';
+          isDownloadingNotifier.value = false;
+          if (context.mounted) {
+            LogUtil.log('下载失败: $error', level: 'ERROR');
+          }
+        },
+        onCancel: () {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('下载已取消')),
+            );
+            LogUtil.log('下载已取消', level: 'INFO');
           }
         },
       );
     } catch (e) {
-      LogUtil.log('下载失败: $e', level: '_error');
-      if (mounted) {
+      errorMessageNotifier.value = '启动下载失败: $e';
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('下载失败: $e')),
+          SnackBar(content: Text('启动下载失败: $e')),
         );
+        LogUtil.log('启动下载失败: $e', level: 'ERROR');
       }
     }
   }
@@ -443,7 +528,7 @@ class CurseforgeModPageState extends State<CurseforgeModPage> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: _selectedFile != null && _savePath.isNotEmpty
+                            onPressed: _selectedFile != null
                                 ? _downloadFile
                                 : null,
                             icon: const Icon(Icons.download),
