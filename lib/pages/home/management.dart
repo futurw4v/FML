@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:fml/function/log.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:fml/pages/home/management/game_settings.dart';
+import 'package:fml/pages/home/management/mod_management.dart';
+import 'package:fml/pages/home/management/resourcepack_management.dart';
+import 'package:fml/pages/home/management/shaderpack_management.dart';
+import 'package:fml/pages/home/management/schematic_management.dart';
+import 'package:fml/pages/home/management/saves_management.dart';
 
 class ManagementPage extends StatefulWidget {
   const ManagementPage({super.key});
@@ -11,15 +15,9 @@ class ManagementPage extends StatefulWidget {
   ManagementPageState createState() => ManagementPageState();
 }
 
-class ManagementPageState extends State<ManagementPage> {
-  final List<String> _gameConfig = [];
-  late final TextEditingController _xmxController;
-  late final TextEditingController _widthController;
-  late final TextEditingController _heightController;
-  bool _isFullScreen = false;
-  String _width = '854';
-  String _height = '480';
-  String _type = '';
+class ManagementPageState extends State<ManagementPage>
+    with SingleTickerProviderStateMixin {
+  TabController? _tabController;
   String _gamePath = '';
   String _logsPath = '';
   String _savesPath = '';
@@ -35,409 +33,228 @@ class ManagementPageState extends State<ManagementPage> {
   bool _mods = false;
   bool _shaderpacks = false;
   bool _schematics = false;
+  bool _isLoading = true;
+
+  // 动态 Tab 列表
+  List<_TabInfo> _tabs = [];
 
   @override
   void initState() {
     super.initState();
-    _xmxController = TextEditingController();
-    _widthController = TextEditingController();
-    _heightController = TextEditingController();
-    _loadGameConfig();
-    _checkDirectory();
+    _loadGamePath();
   }
 
   @override
   void dispose() {
-    _xmxController.dispose();
-    _widthController.dispose();
-    _heightController.dispose();
+    _tabController?.dispose();
     super.dispose();
   }
 
-  // 加载游戏配置
-  Future<void> _loadGameConfig() async {
+  Future<void> _loadGamePath() async {
     final prefs = await SharedPreferences.getInstance();
     final path = prefs.getString('SelectedPath') ?? '';
     final game = prefs.getString('SelectedGame') ?? '';
     final gamePath = prefs.getString('Path_$path') ?? '';
-    final fullPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game';
-    final gameName = '_$game';
-    final cfg = prefs.getStringList('Config_$path$gameName') ?? [];
-    final xmx = cfg.isNotEmpty ? cfg[0] : '';
-    final isFullScreen = cfg.length > 1 ? (cfg[1] == '1') : false;
-    final width = cfg.length > 2 && cfg[2].isNotEmpty ? cfg[2] : _width;
-    final height = cfg.length > 3 && cfg[3].isNotEmpty ? cfg[3] : _height;
-    final type = cfg.length > 4 && cfg[4].isNotEmpty ? cfg[4] : _type;
+    final fullPath =
+        '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game';
+
+    String finalGamePath;
+    if (Platform.isWindows) {
+      finalGamePath = fullPath.substring(0, 2) + fullPath.substring(3);
+    } else {
+      finalGamePath = fullPath;
+    }
+
     setState(() {
-      _gameConfig
-        ..clear()
-        ..addAll(cfg);
-      _xmxController.text = xmx;
-      _isFullScreen = isFullScreen;
-      _widthController.text = width;
-      _width = width;
-      _heightController.text = height;
-      _height = height;
-      _type = type;
-      if (Platform.isWindows) {
-        _gamePath = fullPath.substring(0,2)+fullPath.substring(3);
-      }
-    else {
-      _gamePath = fullPath;
-    }
-  });
+      _gamePath = finalGamePath;
+    });
+
+    await _checkDirectory();
   }
 
-  // 保存游戏配置
-  Future<void> _saveGameConfig() async {
-    final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString('SelectedPath') ?? '';
-    final game = prefs.getString('SelectedGame') ?? '';
-    final gameName = '_$game';
-
-    await prefs.setStringList('Config_$path$gameName', [
-      _xmxController.text,
-      _isFullScreen ? '1' : '0',
-      _widthController.text,
-      _heightController.text,
-      _type,
-    ]);
-  }
-
-    // 删除版本提示框
-  void _showDeleteDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('删除版本'),
-        content: Text('确定删除版本 $_gamePath 吗？文件将会全部消失'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-            TextButton(
-            onPressed: _deleteVersion,
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 删除版本
-  Future<void> _deleteVersion() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final path = prefs.getString('SelectedPath') ?? '';
-      final game = prefs.getString('SelectedGame') ?? '';
-      final gamePath = prefs.getString('Path_$path') ?? '';
-      final gameName = '_$game';
-      await prefs.remove('Config_$path$gameName');
-      final gamesList = prefs.getStringList('Game_$path') ?? [];
-      if (gamesList.contains(game)) {
-        gamesList.remove(game);
-        await prefs.setStringList('Game_$path', gamesList);
-      }
-      final versionPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game';
-      final directory = Directory(versionPath);
-      if (await directory.exists()) {
-        await directory.delete(recursive: true);
-        LogUtil.log('已删除版本文件夹: $versionPath', level: 'INFO');
-      } else {
-        LogUtil.log('版本文件夹不存在: $versionPath', level: 'WARN');
-      }
-      await prefs.remove('SelectedGame');
-      LogUtil.log('已清空 SelectedGame', level: 'INFO');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('版本已成功删除')),
-        );
-      }
-    } catch (e) {
-      LogUtil.log('删除版本时出错: ${e.toString()}', level: 'ERROR');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除版本时出错: ${e.toString()}')),
-        );
-      }
-    } finally {
-      Navigator.pop(context);
-      Navigator.pop(context);
-    }
-  }
-
-  // 文件夹检查功能
-  Future<bool> checkDirectoryFuture(String path) async {
+  Future<bool> _checkDirectoryFuture(String path) async {
     final dir = Directory(path);
     return await dir.exists();
   }
 
-  //检查文件夹
   Future<void> _checkDirectory() async {
     final prefs = await SharedPreferences.getInstance();
     final selectedPath = prefs.getString('SelectedPath') ?? '';
     final game = prefs.getString('SelectedGame') ?? '';
     final gamePath = prefs.getString('Path_$selectedPath') ?? '';
-    final path = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game';
+    final path =
+        '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game';
     // 检查存档文件夹
-    final savesExists = await checkDirectoryFuture('$path${Platform.pathSeparator}saves');
+    final savesExists = await _checkDirectoryFuture(
+      '$path${Platform.pathSeparator}saves',
+    );
     if (savesExists) {
-      setState(() {
-        _save = true;
-        _savesPath = '$_gamePath${Platform.pathSeparator}saves';
-      });
+      _save = true;
+      _savesPath = '$_gamePath${Platform.pathSeparator}saves';
     }
-    final screenshotsExists = await checkDirectoryFuture('$path${Platform.pathSeparator}screenshots');
+    // 检查截图文件夹
+    final screenshotsExists = await _checkDirectoryFuture(
+      '$path${Platform.pathSeparator}screenshots',
+    );
     if (screenshotsExists) {
-      setState(() {
-        _screenshots = true;
-        _screenshotsPath = '$_gamePath${Platform.pathSeparator}screenshots';
-      });
+      _screenshots = true;
+      _screenshotsPath = '$_gamePath${Platform.pathSeparator}screenshots';
     }
     // 检查日志文件夹
-    final logsExists = await checkDirectoryFuture('$path${Platform.pathSeparator}logs');
+    final logsExists = await _checkDirectoryFuture(
+      '$path${Platform.pathSeparator}logs',
+    );
     if (logsExists) {
-      setState(() {
-        _logs = true;
-        _logsPath = '$_gamePath${Platform.pathSeparator}logs';
-      });
+      _logs = true;
+      _logsPath = '$_gamePath${Platform.pathSeparator}logs';
     }
     // 检查资源包文件夹
-    final resourcepacksExists = await checkDirectoryFuture('$path${Platform.pathSeparator}resourcepacks');
+    final resourcepacksExists = await _checkDirectoryFuture(
+      '$path${Platform.pathSeparator}resourcepacks',
+    );
     if (resourcepacksExists) {
-      setState(() {
-        _resourcepacks = true;
-        _resourcepacksPath = '$_gamePath${Platform.pathSeparator}resourcepacks';
-      });
+      _resourcepacks = true;
+      _resourcepacksPath = '$_gamePath${Platform.pathSeparator}resourcepacks';
     }
     // 检查模组文件夹
-    final modsExists = await checkDirectoryFuture('$path${Platform.pathSeparator}mods');
+    final modsExists = await _checkDirectoryFuture(
+      '$path${Platform.pathSeparator}mods',
+    );
     if (modsExists) {
-      setState(() {
-        _mods = true;
-        _modsPath = '$_gamePath${Platform.pathSeparator}mods';
-      });
+      _mods = true;
+      _modsPath = '$_gamePath${Platform.pathSeparator}mods';
     }
     // 检查光影文件夹
-    final shaderpacksExists = await checkDirectoryFuture('$path${Platform.pathSeparator}shaderpacks');
+    final shaderpacksExists = await _checkDirectoryFuture(
+      '$path${Platform.pathSeparator}shaderpacks',
+    );
     if (shaderpacksExists) {
-      setState(() {
-        _shaderpacks = true;
-        _shaderpacksPath = '$_gamePath${Platform.pathSeparator}shaderpacks';
-      });
+      _shaderpacks = true;
+      _shaderpacksPath = '$_gamePath${Platform.pathSeparator}shaderpacks';
     }
     // 检查原理图文件夹
-    final schematicsExists = await checkDirectoryFuture('$path${Platform.pathSeparator}schematics');
+    final schematicsExists = await _checkDirectoryFuture(
+      '$path${Platform.pathSeparator}schematics',
+    );
     if (schematicsExists) {
-      setState(() {
-        _schematics = true;
-        _schematicsPath = '$_gamePath${Platform.pathSeparator}schematics';
-      });
+      _schematics = true;
+      _schematicsPath = '$_gamePath${Platform.pathSeparator}schematics';
     }
+    _buildTabs();
+    setState(() {
+      _isLoading = false;
+    });
   }
 
-    // 打开文件夹
-  Future<void> _launchURL(String path) async {
-    try {
-      String url;
-      if (Platform.isWindows) {
-        // Windows 路径格式 file:///C:/xxx
-        String fixed = path.replaceAll('\\', '/');
-        if (RegExp(r'^[a-zA-Z]:').hasMatch(fixed)) {
-          url = 'file:///$fixed';
-        } else {
-          url = 'file:///$fixed';
-        }
-      } else {
-        url = 'file://$path';
-      }
-      final Uri uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('无法打开链接: $url')),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('发生错误: $e')),
+  void _buildTabs() {
+    _tabs = [];
+    _tabs.add(
+      _TabInfo(
+        tab: const Tab(text: '游戏设置'),
+        content: GameSettingsTab(
+          gamePath: _gamePath,
+          savesPath: _savesPath,
+          screenshotsPath: _screenshotsPath,
+          logsPath: _logsPath,
+          resourcepacksPath: _resourcepacksPath,
+          modsPath: _modsPath,
+          shaderpacksPath: _shaderpacksPath,
+          schematicsPath: _schematicsPath,
+          hasSaves: _save,
+          hasScreenshots: _screenshots,
+          hasLogs: _logs,
+        ),
+      ),
+    );
+    // 模组管理
+    if (_mods) {
+      _tabs.add(
+        _TabInfo(
+          tab: const Tab(text: 'Mod管理'),
+          content: ModManagementTab(modsPath: _modsPath),
+        ),
       );
-      LogUtil.log(e.toString(), level: 'ERROR');
+    }
+    // 资源包管理
+    if (_resourcepacks) {
+      _tabs.add(
+        _TabInfo(
+          tab: const Tab(text: '资源包管理'),
+          content: ResourcepackManagementTab(
+            resourcepacksPath: _resourcepacksPath,
+          ),
+        ),
+      );
+    }
+    // 光影管理
+    if (_shaderpacks) {
+      _tabs.add(
+        _TabInfo(
+          tab: const Tab(text: '光影管理'),
+          content: ShaderpackManagementTab(shaderpacksPath: _shaderpacksPath),
+        ),
+      );
+    }
+    // 原理图管理
+    if (_schematics) {
+      _tabs.add(
+        _TabInfo(
+          tab: const Tab(text: '原理图管理'),
+          content: SchematicManagementTab(schematicsPath: _schematicsPath),
+        ),
+      );
+    }
+    // 存档管理
+    if (_save) {
+      _tabs.add(
+        _TabInfo(
+          tab: const Tab(text: '存档管理'),
+          content: SavesManagementTab(savesPath: _savesPath),
+        ),
+      );
+    }
+    // 初始化 TabController
+    if (_tabs.length > 1) {
+      _tabController = TabController(length: _tabs.length, vsync: this);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('版本管理')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    // 只有游戏设置页面时隐藏 Tab 栏
+    if (_tabs.length == 1) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('版本管理')),
+        body: _tabs.first.content,
+      );
+    }
+    // 有多个 Tab 时显示 Tab 栏
     return Scaffold(
       appBar: AppBar(
-        title: const Text('版本设置'),
+        title: const Text('版本管理'),
+        bottom: TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          tabs: _tabs.map((t) => t.tab).toList(),
+        ),
       ),
-      body: Center(
-        child: _gameConfig.isEmpty
-            ? const Text('配置出错')
-            : ListView(
-                children: [
-                  Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: TextField(
-                      controller: _xmxController,
-                      decoration: const InputDecoration(
-                        labelText: '最大堆大小(-Xmx)',
-                        hintText: '单位: GB',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Column(
-                      children: [
-                        SwitchListTile(
-                          title: const Text('全屏'),
-                          value: _isFullScreen,
-                          onChanged: (value) {
-                            setState(() {
-                              _isFullScreen = value;
-                            });
-                          },
-                        ),
-                        if (!_isFullScreen) ...[
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: TextField(
-                              controller: _widthController,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: '宽度',
-                                hintText: '854',
-                                border: OutlineInputBorder(),
-                              ),
-                              onChanged: (value) => setState(() => _width = value),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: TextField(
-                              controller: _heightController,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: '高度',
-                                hintText: '480',
-                                border: OutlineInputBorder(),
-                              ),
-                              onChanged: (value) => setState(() => _height = value),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        title: const Text('打开游戏文件夹'),
-                        subtitle: Text(_gamePath),
-                        trailing: const Icon(Icons.open_in_new),
-                        onTap: () => _launchURL(_gamePath),
-                      ),
-                    ),
-                  if (_save)
-                    Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        title: const Text('打开存档文件夹'),
-                        subtitle: Text(_savesPath),
-                        trailing: const Icon(Icons.open_in_new),
-                        onTap: () => _launchURL(_savesPath),
-                      ),
-                    ),if (_screenshots)
-                    Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        title: const Text('打开截图文件夹'),
-                        subtitle: Text(_screenshotsPath),
-                        trailing: const Icon(Icons.open_in_new),
-                        onTap: () => _launchURL(_screenshotsPath),
-                      ),
-                    ),if (_logs)
-                    Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        title: const Text('打开日志文件夹'),
-                        subtitle: Text(_logsPath),
-                        trailing: const Icon(Icons.open_in_new),
-                        onTap: () => _launchURL(_logsPath),
-                      ),
-                    ),if (_resourcepacks)
-                    Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        title: const Text('打开资源包文件夹'),
-                        subtitle: Text(_resourcepacksPath),
-                        trailing: const Icon(Icons.open_in_new),
-                        onTap: () => _launchURL(_resourcepacksPath),
-                      ),
-                    ),if (_mods)
-                    Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        title: const Text('打开模组文件夹'),
-                        subtitle: Text(_modsPath),
-                        trailing: const Icon(Icons.open_in_new),
-                        onTap: () => _launchURL(_modsPath),
-                      ),
-                    ),if (_shaderpacks)
-                    Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        title: const Text('打开光影文件夹'),
-                        subtitle: Text(_shaderpacksPath),
-                        trailing: const Icon(Icons.open_in_new),
-                        onTap: () => _launchURL(_shaderpacksPath),
-                      ),
-                    ),if (_schematics)
-                    Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        title: const Text('打开原理图文件夹'),
-                        subtitle: Text(_schematicsPath),
-                        trailing: const Icon(Icons.open_in_new),
-                        onTap: () => _launchURL(_schematicsPath),
-                      ),
-                    ),
-                ],
-              ),
+      body: TabBarView(
+        controller: _tabController,
+        children: _tabs.map((t) => t.content).toList(),
       ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            heroTag: "save",
-            onPressed: () {
-              if (_xmxController.text.isEmpty || _widthController.text.isEmpty || _heightController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('请填写所有字段')),
-            );
-              return;
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('配置已保存')),
-              );
-              _saveGameConfig();
-              Navigator.of(context).pop();
-            }
-          },
-            child: const Icon(Icons.save),
-          ),
-          const SizedBox(height: 16),
-          FloatingActionButton(
-            heroTag: 'delete',
-            onPressed: () {
-              _showDeleteDialog();
-            },
-            child: const Icon(Icons.delete),
-          ),
-        ],
-      )
     );
   }
+}
+
+class _TabInfo {
+  final Tab tab;
+  final Widget content;
+
+  _TabInfo({required this.tab, required this.content});
 }
