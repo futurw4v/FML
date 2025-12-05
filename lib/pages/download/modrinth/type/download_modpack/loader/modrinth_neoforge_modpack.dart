@@ -1326,6 +1326,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Text('下载整合包 ${widget.name}'),
       ),
       body: ListView(

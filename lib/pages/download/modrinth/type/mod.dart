@@ -30,6 +30,7 @@ class ModPageState extends State<ModPage> {
   Set<String> availableGameVersions = {};
   String? selectedGameVersion;
   String savePath = '';
+  bool customLocation = false;
 
   @override
   void initState() {
@@ -120,34 +121,64 @@ class ModPageState extends State<ModPage> {
     });
   }
 
-  // 更新加载器筛选
-  Future<void> _updateLoaderFilter(String? loader) async {
-    setState(() {
-      selectedLoader = loader;
-      _applyFilters();
-    });
+  // 获取发布类型文本
+  String _getVersionTypeText(String? versionType) {
+    switch (versionType) {
+      case 'release':
+        return '正式版';
+      case 'beta':
+        return '测试版';
+      case 'alpha':
+        return '开发版';
+      default:
+        return '未知';
+    }
   }
 
-  // 更新游戏版本筛选
-  Future<void> _updateGameVersionFilter(String? gameVersion) async {
-    setState(() {
-      selectedGameVersion = gameVersion;
-      _applyFilters();
-    });
+  // 获取发布类型颜色
+  Color _getVersionTypeColor(String? versionType) {
+    switch (versionType) {
+      case 'release':
+        return Colors.green;
+      case 'beta':
+        return Colors.orange;
+      case 'alpha':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 
-  // 清除所有筛选条件
-  Future<void> _clearFilters() async {
-    setState(() {
-      selectedLoader = null;
-      selectedGameVersion = null;
-      filteredVersionsList = List.from(versionsList);
-    });
+  // 选择保存路径
+  Future<void> _selectSavePath() async {
+    String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+    if (selectedDirectory != null) {
+      setState(() {
+        savePath = selectedDirectory;
+      });
+    }
   }
 
-  // 下载
-  Future<void> _downloadVersion(Map<String, dynamic> version) async {
-    final files = version['files'] as List?;
+  // 获取当前版本目录
+  Future<String> _getCurrentVersionDirectory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pathStr = prefs.getString('Path_${prefs.getString('SelectedPath')}');
+    final game = prefs.getString('SelectedGame');
+    if (pathStr == null || game == null) return '';
+    savePath = '$pathStr${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}mods';
+    return savePath;
+  }
+
+  // 下载文件
+  Future<void> _downloadFile() async {
+    if (selectedVersion == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先选择一个文件')),
+      );
+      return;
+    }
+
+    final files = selectedVersion!['files'] as List?;
     if (files == null || files.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('没有找到可下载的文件')),
@@ -155,103 +186,29 @@ class ModPageState extends State<ModPage> {
       return;
     }
 
-    // 获取主文件
     final primaryFile = files.firstWhere(
       (file) => file['primary'] == true,
       orElse: () => files.first
     );
     final downloadUrl = primaryFile['url'];
     final fileName = primaryFile['filename'] ?? 'unknown.jar';
-    final fileSize = primaryFile['size'] ?? 0;
 
-    // 显示下载选项对话框
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('选择下载方式'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('文件名: $fileName'),
-            const SizedBox(height: 8),
-            Text('大小: ${_formatFileSize(fileSize)}'),
-            const SizedBox(height: 8),
-            Text('版本: ${version['version_number'] ?? "未知"}'),
-            const SizedBox(height: 8),
-            Text('游戏版本: ${(version['game_versions'] as List?)?.join(", ") ?? "未知"}'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _downloadToCurrentVersion(downloadUrl, fileName);
-            },
-            child: const Text('下载到当前版本'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _downloadToCustomDirectory(downloadUrl, fileName);
-            },
-            child: const Text('指定目录'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 格式化文件大小
-  String _formatFileSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(2)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-  }
-
-  // 下载到当前版本目录
-  Future<void> _downloadToCurrentVersion(String url, String fileName) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final path = prefs.getString('Path_${prefs.getString('SelectedPath')}');
-      final game = prefs.getString('SelectedGame');
-      if (game == null || path == null) {
+    if (savePath.isEmpty) {
+      savePath = await _getCurrentVersionDirectory();
+      if (savePath.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('未选择版本')),
+          const SnackBar(content: Text('未选择版本目录')),
         );
         return;
       }
-      savePath = '$path${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}mods${Platform.pathSeparator}$fileName';
-      if (!await Directory('$path${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}mods').exists()) {
-        await Directory('$path${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}mods').create(recursive: true);
-      }
-      _showDownloadProgressDialog(url, savePath);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('设置下载路径失败: $e')),
-      );
     }
-  }
 
-  // 下载到自定义目录
-  Future<void> _downloadToCustomDirectory(String url, String fileName) async {
-    try {
-      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
-      if (selectedDirectory == null) {
-        return;
-      }
-      final savePath = path.join(selectedDirectory, fileName);
-      _showDownloadProgressDialog(url, savePath);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('选择下载路径失败: $e')),
-      );
+    if (!await Directory(savePath).exists()) {
+      await Directory(savePath).create(recursive: true);
     }
+
+    final filePath = path.join(savePath, fileName);
+    _showDownloadProgressDialog(downloadUrl, filePath);
   }
 
   // 显示下载进度对话框
@@ -391,132 +348,198 @@ class ModPageState extends State<ModPage> {
             )
           : versionsList.isEmpty
             ? const Center(child: Text('没有可用版本'))
-            : Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '选择版本',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
+            : Column(
+              children: [
+                // 筛选器
+                Card(
+                  margin: const EdgeInsets.all(8.0),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (availableLoaders.isNotEmpty)
-                          Expanded(
-                            child: DropdownButton<String?>(
-                              isExpanded: true,
-                              value: selectedLoader,
-                              items: [
-                                const DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: Text('选择加载器'),
-                                ),
-                                ...availableLoaders.map((loader) =>
-                                  DropdownMenuItem<String?>(
-                                    value: loader,
-                                    child: Text(loader),
-                                  )
-                                ),
-                              ],
-                              onChanged: _updateLoaderFilter,
-                            ),
-                          ),
-                        const SizedBox(width: 12),
-                        if (availableGameVersions.isNotEmpty)
-                          Expanded(
-                            child: DropdownButton<String?>(
-                              isExpanded: true,
-                              value: selectedGameVersion,
-                              items: [
-                                const DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: Text('选择版本'),
-                                ),
-                                ...availableGameVersions.map((version) =>
-                                  DropdownMenuItem<String?>(
-                                    value: version,
-                                    child: Text(version),
-                                  )
-                                ),
-                              ],
-                              onChanged: _updateGameVersionFilter,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (selectedLoader != null || selectedGameVersion != null)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '已筛选 ${filteredVersionsList.length} 个结果',
-                              style: TextStyle(
-                                fontSize: 14,
+                        const Text('筛选', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                hint: const Text('游戏版本'),
+                                value: selectedGameVersion,
+                                items: [
+                                  const DropdownMenuItem(
+                                    value: null,
+                                    child: Text('全部版本'),
+                                  ),
+                                  ...availableGameVersions.map((v) =>
+                                    DropdownMenuItem(value: v, child: Text(v))
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    selectedGameVersion = value;
+                                  });
+                                  _applyFilters();
+                                },
                               ),
                             ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                hint: const Text('加载器'),
+                                value: selectedLoader,
+                                items: [
+                                  const DropdownMenuItem(
+                                    value: null,
+                                    child: Text('全部'),
+                                  ),
+                                  ...availableLoaders.map((l) =>
+                                    DropdownMenuItem(value: l, child: Text(l))
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    selectedLoader = value;
+                                  });
+                                  _applyFilters();
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // 文件列表
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: filteredVersionsList.length,
+                    itemBuilder: (context, index) {
+                      final version = filteredVersionsList[index];
+                      final isSelected = selectedVersion == version;
+                      final versionType = version['version_type'] as String?;
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                        color: isSelected ? Theme.of(context).colorScheme.primaryContainer : null,
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.insert_drive_file,
+                            color: _getVersionTypeColor(versionType),
                           ),
-                          TextButton(
-                            onPressed: _clearFilters,
-                            child: const Text('清除筛选'),
-                          ),
-                        ],
-                      ),
-                    const SizedBox(height: 8),
-                    if (filteredVersionsList.isEmpty)
-                      Expanded(
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          title: Text(version['name'] ?? version['version_number'] ?? '未知文件'),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('没有找到符合条件的版本'),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _clearFilters,
-                                child: const Text('清除所有筛选'),
+                              Text('${_getVersionTypeText(versionType)} - ${version['version_number'] ?? ''}'),
+                              Wrap(
+                                spacing: 4,
+                                children: [
+                                  ...(version['loaders'] as List? ?? [])
+                                      .take(3)
+                                      .map<Widget>((v) => Chip(
+                                            label: Text(v.toString()),
+                                            labelStyle: const TextStyle(fontSize: 10),
+                                            padding: EdgeInsets.zero,
+                                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            visualDensity: VisualDensity.compact,
+                                          )),
+                                  ...(version['game_versions'] as List? ?? [])
+                                      .take(3)
+                                      .map<Widget>((v) => Chip(
+                                            label: Text(v.toString()),
+                                            labelStyle: const TextStyle(fontSize: 10),
+                                            padding: EdgeInsets.zero,
+                                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            visualDensity: VisualDensity.compact,
+                                          )),
+                                ],
                               ),
                             ],
                           ),
-                        ),
-                      )
-                    else
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: filteredVersionsList.length,
-                          itemBuilder: (context, index) {
-                            final version = filteredVersionsList[index];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(vertical: 4.0),
-                              child: ListTile(
-                                title: Text(version['version_number'] ?? '未知版本'),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('发布日期: ${version['date_published'] ?? "未知日期"}'),
-                                    Text(
-                                      '加载器: ${(version['loaders'] as List?)?.join(", ") ?? "未知"}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    Text(
-                                      '游戏版本: ${(version['game_versions'] as List?)?.join(", ") ?? "未知"}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                                onTap: () => _downloadVersion(version),
-                                trailing: const Icon(Icons.download),
-                              ),
-                            );
+                          isThreeLine: true,
+                          onTap: () async {
+                            final currentVersion = await _getCurrentVersionDirectory();
+                            setState(() {
+                              selectedVersion = version;
+                              savePath = currentVersion;
+                            });
                           },
                         ),
-                      ),
-                  ],
+                      );
+                    },
+                  ),
                 ),
-              ),
+                // 下载区域
+                Card(
+                  margin: const EdgeInsets.all(8.0),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('下载', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        if (selectedVersion != null)
+                          Text('已选择: ${selectedVersion!['name'] ?? selectedVersion!['version_number']}'),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Switch(
+                              value: customLocation,
+                              onChanged: (value) async {
+                                if (value) {
+                                  final currentVersion = await _getCurrentVersionDirectory();
+                                  setState(() {
+                                    customLocation = value;
+                                    savePath = currentVersion;
+                                  });
+                                } else {
+                                  setState(() {
+                                    customLocation = value;
+                                    savePath = '';
+                                  });
+                                }
+                              },
+                            ),
+                            const Text('自定义保存位置'),
+                          ],
+                        ),
+                        if (customLocation) ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  savePath.isEmpty ? '未选择保存路径' : savePath,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: _selectSavePath,
+                                child: const Text('选择路径'),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: selectedVersion != null
+                                ? _downloadFile
+                                : null,
+                            icon: const Icon(Icons.download),
+                            label: Text(customLocation ? '下载到自定义位置' : '下载到当前版本目录'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
