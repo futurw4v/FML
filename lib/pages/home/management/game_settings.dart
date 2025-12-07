@@ -293,19 +293,6 @@ class GameSettingsTabState extends State<GameSettingsTab> {
                       onTap: () => _launchURL(widget.gamePath),
                     ),
                   ),
-                  if (widget.hasSaves)
-                    Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      child: ListTile(
-                        title: const Text('打开存档文件夹'),
-                        subtitle: Text(widget.savesPath),
-                        trailing: const Icon(Icons.open_in_new),
-                        onTap: () => _launchURL(widget.savesPath),
-                      ),
-                    ),
                   if (widget.hasScreenshots)
                     Card(
                       margin: const EdgeInsets.symmetric(

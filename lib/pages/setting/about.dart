@@ -156,11 +156,18 @@ class AboutPageState extends State<AboutPage> {
                   subtitle: const Text('下载源 BMCLAPI 维护者\nhttps://bmclapidoc.bangbang93.com'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://bmclapidoc.bangbang93.com'),
-                ),ListTile(
+                ),
+                ListTile(
                   title: const Text('Modrinth'),
                   subtitle: const Text('资源下载\nhttps://modrinth.com'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://modrinth.com'),
+                ),
+                ListTile(
+                  title: const Text('CurseForge'),
+                  subtitle: const Text('资源下载\nhttps://www.curseforge.com'),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://www.curseforge.com'),
                 ),
                 ListTile(
                   title: const Text('Sawaratsuki'),
