@@ -4,21 +4,21 @@ import 'package:dart_nbt/dart_nbt.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class SaveInfoPage extends StatefulWidget {
+class SaveInfoTab extends StatefulWidget {
   final String savePath;
   final String saveName;
 
-  const SaveInfoPage({
+  const SaveInfoTab({
     super.key,
     required this.savePath,
     required this.saveName,
   });
 
   @override
-  State<SaveInfoPage> createState() => _SaveInfoPageState();
+  State<SaveInfoTab> createState() => _SaveInfoTabState();
 }
 
-class _SaveInfoPageState extends State<SaveInfoPage> {
+class _SaveInfoTabState extends State<SaveInfoTab> {
   bool _isLoading = true;
   String? _error;
   NbtCompound? _levelData;
@@ -44,7 +44,7 @@ class _SaveInfoPageState extends State<SaveInfoPage> {
     _loadLevelData();
   }
 
-// 加载存档信息
+  // 加载存档信息
   Future<void> _loadLevelData() async {
     setState(() {
       _isLoading = true;
@@ -98,7 +98,7 @@ class _SaveInfoPageState extends State<SaveInfoPage> {
     }
   }
 
-// 加载玩家数据
+  // 加载玩家数据
   Future<void> _loadPlayerData() async {
     setState(() {
       _isLoadingPlayers = true;
@@ -263,9 +263,6 @@ class _SaveInfoPageState extends State<SaveInfoPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('存档信息 - ${widget.saveName}'),
-      ),
       body: _buildBody(),
       floatingActionButton: FloatingActionButton(
         onPressed: _saveAllData,

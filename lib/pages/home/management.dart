@@ -50,6 +50,7 @@ class ManagementPageState extends State<ManagementPage>
     super.dispose();
   }
 
+  // 加载游戏路径
   Future<void> _loadGamePath() async {
     final prefs = await SharedPreferences.getInstance();
     final path = prefs.getString('SelectedPath') ?? '';
@@ -57,26 +58,25 @@ class ManagementPageState extends State<ManagementPage>
     final gamePath = prefs.getString('Path_$path') ?? '';
     final fullPath =
         '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game';
-
     String finalGamePath;
     if (Platform.isWindows) {
       finalGamePath = fullPath.substring(0, 2) + fullPath.substring(3);
     } else {
       finalGamePath = fullPath;
     }
-
     setState(() {
       _gamePath = finalGamePath;
     });
-
     await _checkDirectory();
   }
 
+  // 检查文件夹是否存在
   Future<bool> _checkDirectoryFuture(String path) async {
     final dir = Directory(path);
     return await dir.exists();
   }
 
+  // 检查各个管理文件夹
   Future<void> _checkDirectory() async {
     final prefs = await SharedPreferences.getInstance();
     final selectedPath = prefs.getString('SelectedPath') ?? '';
@@ -146,7 +146,8 @@ class ManagementPageState extends State<ManagementPage>
     });
   }
 
-  void _buildTabs() {
+  // 构建 Tab 列表
+  Future<void> _buildTabs() async {
     _tabs = [];
     _tabs.add(
       _TabInfo(

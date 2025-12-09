@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fml/function/log.dart';
 import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:fml/pages/home/management/saves_management/save_info.dart';
+import 'package:fml/pages/home/management/saves_management/save.dart';
 
 class SavesManagementTab extends StatefulWidget {
   final String savesPath;
@@ -27,7 +27,6 @@ class SavesManagementTabState extends State<SavesManagementTab> {
     setState(() {
       _isLoading = true;
     });
-
     if (widget.savesPath.isEmpty) {
       setState(() {
         _isLoading = false;
@@ -39,7 +38,6 @@ class SavesManagementTabState extends State<SavesManagementTab> {
     if (await dir.exists()) {
       final List<SaveInfo> saves = [];
       final entities = dir.listSync();
-
       for (final entity in entities) {
         if (entity is Directory) {
           final folderName = entity.path.split(Platform.pathSeparator).last;
@@ -47,11 +45,9 @@ class SavesManagementTabState extends State<SavesManagementTab> {
               '${entity.path}${Platform.pathSeparator}level.dat';
           final levelDatOldPath =
               '${entity.path}${Platform.pathSeparator}level.dat_old';
-
           // 检查是否存在 level.dat 和 level.dat_old 文件
           final levelDatExists = await File(levelDatPath).exists();
           final levelDatOldExists = await File(levelDatOldPath).exists();
-
           if (levelDatExists && levelDatOldExists) {
             saves.add(
               SaveInfo(
@@ -63,7 +59,6 @@ class SavesManagementTabState extends State<SavesManagementTab> {
           }
         }
       }
-
       setState(() {
         _saveFiles = saves;
         _isLoading = false;
@@ -109,23 +104,11 @@ class SavesManagementTabState extends State<SavesManagementTab> {
     }
   }
 
-  // 查看存档信息
-  void _viewSaveInfo(SaveInfo save) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            SaveInfoPage(saveName: save.folderName, savePath: save.folderPath),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-
     if (_saveFiles.isEmpty) {
       return Center(
         child: Column(
@@ -142,7 +125,6 @@ class SavesManagementTabState extends State<SavesManagementTab> {
         ),
       );
     }
-
     return Column(
       children: [
         Padding(
@@ -178,7 +160,15 @@ class SavesManagementTabState extends State<SavesManagementTab> {
                     trailing: IconButton(
                       icon: const Icon(Icons.info_outline),
                       tooltip: '查看存档信息',
-                      onPressed: () => _viewSaveInfo(save),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SavePage(
+                            savePath: save.folderPath,
+                            saveName: save.folderName,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 );
