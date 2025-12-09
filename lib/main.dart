@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/home.dart';
@@ -193,15 +194,15 @@ class MyAppState extends State<MyApp> {
       themeMode: _themeMode,
       home: const MyHomePage(),
       onGenerateRoute: (settings) {
-    if (settings.name == '/online/owner') {
-      final int port = settings.arguments as int;
-      final String etServer = settings.arguments as String;
-      return MaterialPageRoute(
-        builder: (context) => OwnerPage(port: port, etServer: etServer),
-      );
-    }
-    return null;
-  },
+        if (settings.name == '/online/owner') {
+          final int port = settings.arguments as int;
+          final String etServer = settings.arguments as String;
+          return MaterialPageRoute(
+            builder: (context) => OwnerPage(port: port, etServer: etServer),
+          );
+        }
+        return null;
+      },
     );
   }
 }
@@ -356,7 +357,8 @@ class MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // 主界面内容
+    Widget mainContent = Scaffold(
       appBar: AppBar(title: const Text('Flutter Minecraft Launcher')),
       body: Row(
         children: [
@@ -391,5 +393,80 @@ class MyHomePageState extends State<MyHomePage> {
         ],
       ),
     );
+    // macOS 菜单栏
+    if (Platform.isMacOS) {
+      return PlatformMenuBar(
+        menus: [
+          // FML 菜单
+          PlatformMenu(
+            label: 'Flutter Minecraft Launcher',
+            menus: [
+              PlatformMenuItem(
+                label: '关于',
+                onSelected: () => _showAboutDialog(context),
+              ),
+              PlatformMenuItem(
+                label: '检查更新',
+                onSelected: () => _checkUpdate(),
+              ),
+              PlatformMenuItem(
+                label: '设置',
+                shortcut: const SingleActivator(LogicalKeyboardKey.comma, meta: true),
+                onSelected: () => setState(() => _selectedIndex = 3),
+              ),
+              PlatformMenuItem(
+                label: '退出',
+                shortcut: const SingleActivator(LogicalKeyboardKey.keyQ, meta: true),
+                onSelected: () => exit(0),
+              ),
+            ],
+          ),
+          // 导航菜单
+          PlatformMenu(
+            label: '导航',
+            menus: [
+              PlatformMenuItem(
+                label: '启动',
+                shortcut: const SingleActivator(LogicalKeyboardKey.digit1, meta: true),
+                onSelected: () => setState(() => _selectedIndex = 0),
+              ),
+              PlatformMenuItem(
+                label: '联机',
+                shortcut: const SingleActivator(LogicalKeyboardKey.digit2, meta: true),
+                onSelected: () => setState(() => _selectedIndex = 1),
+              ),
+              PlatformMenuItem(
+                label: '下载',
+                shortcut: const SingleActivator(LogicalKeyboardKey.digit3, meta: true),
+                onSelected: () => setState(() => _selectedIndex = 2),
+              ),
+              PlatformMenuItem(
+                label: '设置',
+                shortcut: const SingleActivator(LogicalKeyboardKey.digit4, meta: true),
+                onSelected: () => setState(() => _selectedIndex = 3),
+              ),
+            ],
+          ),
+          // 帮助菜单
+          PlatformMenu(
+            label: '帮助',
+            menus: [
+              PlatformMenuItem(
+                label: '访问 GitHub',
+                onSelected: () => _launchURL('https://github.com/lxdklp/FML'),
+              ),
+            ],
+          ),
+        ],
+        child: mainContent,
+      );
+    }
+    return mainContent;
+  }
+
+  // 显示关于对话框
+  Future<void> _showAboutDialog(BuildContext context) async {
+    const channel = MethodChannel('lxdklp/fml_native');
+    await channel.invokeMethod('showAboutPanel');
   }
 }
