@@ -98,29 +98,34 @@ class AccountPageState extends State<AccountPage> {
   }
 
   // 删除账号
-  Future<void> _deleteAccount(String name) async {
+  Future<void> _deleteAccount(String name, String type) async {
     final prefs = await SharedPreferences.getInstance();
-    final offlineAccounts = prefs.getStringList('offline_accounts_list') ?? [];
-    final onlineAccounts = prefs.getStringList('online_accounts_list') ?? [];
-    final externalAccounts = prefs.getStringList('external_accounts_list') ?? [];
-    if (offlineAccounts.contains(name)) {
-      offlineAccounts.remove(name);
-      await prefs.setStringList('offline_accounts_list', offlineAccounts);
+    if (type == '0') {
+      final accountList = prefs.getStringList('offline_accounts_list') ?? [];
+      accountList.remove(name);
+      await prefs.setStringList('offline_accounts_list', accountList);
       await prefs.remove('offline_account_$name');
-    } else if (onlineAccounts.contains(name)) {
-      onlineAccounts.remove(name);
-      await prefs.setStringList('online_accounts_list', onlineAccounts);
+      LogUtil.log('已删除离线账号: $name', level: 'INFO');
+    }
+    if (type == '1') {
+      final accountList = prefs.getStringList('online_accounts_list') ?? [];
+      accountList.remove(name);
+      await prefs.setStringList('online_accounts_list', accountList);
       await prefs.remove('online_account_$name');
-    } else if (externalAccounts.contains(name)) {
-      externalAccounts.remove(name);
-      await prefs.setStringList('external_accounts_list', externalAccounts);
+      LogUtil.log('已删除正版账号: $name', level: 'INFO');
+    }
+    if (type == '2') {
+      final accountList = prefs.getStringList('external_accounts_list') ?? [];
+      accountList.remove(name);
+      await prefs.setStringList('external_accounts_list', accountList);
       await prefs.remove('external_account_$name');
+      LogUtil.log('已删除外置登录账号: $name', level: 'INFO');
     }
     if (name == prefs.getString('SelectedAccountName')) {
       await prefs.remove('SelectedAccountName');
       await prefs.remove('SelectedAccountType');
     }
-    LogUtil.log('已删除账号: $name', level: 'INFO');
+    _loadAccounts();
     if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -129,17 +134,27 @@ class AccountPageState extends State<AccountPage> {
   }
 
   // 删除账号提示框
-  Future<void> _showDeleteDialog(name) async{
+  Future<void> _showDeleteDialog(String name, String type) async{
+    String typeInfo;
+    if (type == '0') {
+      typeInfo = '离线登录';
+    } else if (type == '1') {
+      typeInfo = '正版登录';
+    } else if (type == '2') {
+      typeInfo = '外置登录';
+    } else {
+      typeInfo = '未知类型';
+    }
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('删除账号'),
-        content: Text('确定删除账号 $name ?'),
+        content: Text('确定删除 $typeInfo 账号 $name ?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
             TextButton(
             onPressed: () async {
-              _deleteAccount(name);
+              _deleteAccount(name, type);
             },
             child: const Text('删除', style: TextStyle(color: Colors.red)),
           ),
@@ -239,7 +254,7 @@ class AccountPageState extends State<AccountPage> {
                 trailing: IconButton(
                   icon: const Icon(Icons.delete),
                   onPressed: () async {
-                    _showDeleteDialog(name);
+                    _showDeleteDialog(name, type);
                   },
                 )
               ),
