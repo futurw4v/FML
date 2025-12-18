@@ -417,7 +417,7 @@ class MyHomePageState extends State<MyHomePage> {
               PlatformMenuItem(
                 label: '退出',
                 shortcut: const SingleActivator(LogicalKeyboardKey.keyQ, meta: true),
-                onSelected: () => exit(0),
+                onSelected: () => SystemNavigator.pop(),
               ),
             ],
           ),
