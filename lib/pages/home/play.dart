@@ -36,8 +36,13 @@ class PlayPageState extends State<PlayPage> {
       await vanillaLauncher(
       onProgress: (String message) {
           setState(() {
-            message = message;
+            _message = message;
           });
+          if (message == '游戏启动完成') {
+            setState(() {
+              _launching = true;
+            });
+          }
         },
         onError: (String error) {
           setState(() {

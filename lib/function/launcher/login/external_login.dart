@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
+import 'package:crypto/crypto.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/download.dart';
 import 'package:fml/function/crypto_util.dart';
@@ -9,7 +10,38 @@ import 'package:fml/function/crypto_util.dart';
 Future<bool> checkAuthlibInjector(String gamePath) async {
   File authlibFile = File('$gamePath${Platform.pathSeparator}authlib-injector.jar');
   if (authlibFile.existsSync()) {
-    LogUtil.log('authlib-injector 已存在，无需下载', level: 'INFO');
+    LogUtil.log('authlib-injector 已存在', level: 'INFO');
+    final stream = authlibFile.openRead();
+    final hash = await sha256.bind(stream).first;
+    final hashString = hash.toString();
+    final Dio dio = Dio();
+    final String appVersion = await _loadAppVersion();
+    final options = Options(
+      headers: {
+        'User-Agent': 'FML/$appVersion',
+      },
+    );
+    try {
+      final response = await dio.get(
+        'https://bmclapi2.bangbang93.com/mirrors/authlib-injector/artifact/latest.json',
+        options: options,
+      );
+      if (response.statusCode == 200 && response.data.isNotEmpty) {
+        final String? expectedHash = response.data['checksums']['sha256'];
+        if (expectedHash != null && expectedHash == hashString) {
+          LogUtil.log('authlib-injector 校验通过', level: 'INFO');
+        } else {
+          LogUtil.log('authlib-injector 校验失败，正在重新下载', level: 'WARNING');
+          return false;
+        }
+      } else {
+        LogUtil.log('获取 authlib-injector 版本信息失败，无法校验', level: 'WARNING');
+        return false;
+      }
+    } catch (e) {
+      LogUtil.log('获取 authlib-injector 版本信息失败: $e', level: 'ERROR');
+      return false;
+    }
     return true;
   }
   else {
