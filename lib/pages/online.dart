@@ -392,7 +392,7 @@ class OnlinePageState extends State<OnlinePage> {
                       );
                       return;
                     }
-                    if (_serverController.text.isEmpty) {
+                    if (_serverController.text.isEmpty && !OwnerPage.persistIsServerRunning) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('请先输入打洞/中转服务器地址')),
                       );

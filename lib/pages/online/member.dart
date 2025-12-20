@@ -8,8 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter_gbk2utf8/flutter_gbk2utf8.dart';
 import 'package:fml/function/log.dart';
-import 'package:fml/function/scaffolding/client.dart';
-import 'package:fml/function/fakeserver.dart';
+import 'package:fml/function/online/scaffolding/client.dart';
+import 'package:fml/function/online/fakeserver.dart';
 
 class EasyTierPeer {
   final String? ipv4;
@@ -290,7 +290,6 @@ class MemberPageState extends State<MemberPage> {
       setState(() {
         _machineId = machineId;
       });
-      LogUtil.log('机器ID: $_machineId', level: 'INFO');
     } catch (e) {
       final tempId = const Uuid().v4();
       setState(() {
@@ -515,7 +514,6 @@ class MemberPageState extends State<MemberPage> {
         }
         List<dynamic> peerList;
         peerList = jsonDecode(output);
-        LogUtil.log('解析到 ${peerList.length} 个peer节点', level: 'INFO');
         String? serverIP;
         int? serverPort;
         for (var peer in peerList) {
@@ -1138,7 +1136,6 @@ class MemberPageState extends State<MemberPage> {
           peers.add(unboundPlayerData);
         }
       }
-      LogUtil.log('解析对等节点数据成功，共${peers.length}个玩家(含未绑定节点的玩家), ${servers.length}个服务器节点', level: 'INFO');
     } catch (e) {
       LogUtil.log('解析对等节点数据失败: $e', level: 'ERROR');
     }

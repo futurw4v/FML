@@ -9,10 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter_gbk2utf8/flutter_gbk2utf8.dart';
 import 'package:fml/function/log.dart';
-import 'package:fml/function/launcher/vanilla.dart' as vanilla_launcher;
-import 'package:fml/function/launcher/fabric.dart' as fabric_launcher;
-import 'package:fml/function/launcher/neoforge.dart' as neoforge_launcher;
-import 'package:fml/function/scaffolding/server.dart';
+import 'package:fml/function/online/scaffolding/server.dart';
+import 'package:fml/function/online/scanner.dart';
 
 // EasyTier对等节点类
 class PlayerList {
@@ -60,7 +58,8 @@ class OwnerPage extends StatefulWidget {
   static String? _persistNetworkKey;
   static OnlineCenterServer? _persistTcpServer;
   static int _persistTcpServerPort = 25565;
-  static bool _persistIsServerRunning = false;
+  static int _persistPort = -1;
+  static bool persistIsServerRunning = false;
   static Process? _easyTierProcess;
   static String? _machineId;
   static String? _easytierId;
@@ -71,7 +70,6 @@ class OwnerPage extends StatefulWidget {
 
 class OwnerPageState extends State<OwnerPage> {
   int _port = -1;
-  StreamSubscription<int>? _lanPortSub;
   String? _roomCode;
   String? _networkName;
   String? _networkKey;
@@ -98,7 +96,8 @@ class OwnerPageState extends State<OwnerPage> {
     _networkKey = OwnerPage._persistNetworkKey;
     _tcpServer = OwnerPage._persistTcpServer;
     _tcpServerPort = OwnerPage._persistTcpServerPort;
-    _isServerRunning = OwnerPage._persistIsServerRunning;
+    _port = OwnerPage._persistPort;
+    _isServerRunning = OwnerPage.persistIsServerRunning;
     _easyTierProcess = OwnerPage._easyTierProcess;
     _machineId = OwnerPage._machineId;
     _easytierId = OwnerPage._easytierId;
@@ -108,30 +107,7 @@ class OwnerPageState extends State<OwnerPage> {
         _refreshPeerList();
       }
     });
-    final fabricPort = fabric_launcher.getLastDetectedPort();
-    final vanillaPort = vanilla_launcher.getLastDetectedPort();
-    final neoforgePort = neoforge_launcher.getLastDetectedPort();
-    final cachedPort = fabricPort ?? vanillaPort ?? neoforgePort;
-    if (cachedPort != null && cachedPort > 0) {
-      setState(() {
-        _port = cachedPort;
-      });
-      LogUtil.log('使用缓存的端口: $_port', level: 'INFO');
-      if (!_isServerRunning) {
-        _startTcpServer();
-      } else if (_tcpServer != null && _tcpServer!.minecraftServerPort != cachedPort) {
-        _restartTcpServer();
-      }
-    }
-    _lanPortSub = fabric_launcher.lanPortController.stream.listen((port) {
-      _handlePortChange(port);
-    });
-    vanilla_launcher.lanPortController.stream.listen((port) {
-      _handlePortChange(port);
-    });
-    neoforge_launcher.lanPortController.stream.listen((port) {
-      _handlePortChange(port);
-    });
+    _startTcpServer();
     if (_roomCode == null) {
       _generateRoomCode();
     }
@@ -151,7 +127,6 @@ class OwnerPageState extends State<OwnerPage> {
         _machineId = machineId;
       });
       OwnerPage._machineId = machineId;
-      LogUtil.log('机器ID: $_machineId', level: 'INFO');
     } catch (e) {
       final tempId = const Uuid().v4();
       setState(() {
@@ -207,30 +182,22 @@ class OwnerPageState extends State<OwnerPage> {
     }
   }
 
-  // 处理端口变化
-  Future<void> _handlePortChange(int port) async {
-    if (!mounted) return;
-    setState(() {
-      _port = port;
-    });
-    if (port > 0) {
-      LogUtil.log('收到新的端口事件: $port', level: 'INFO');
-      if (_isServerRunning && _tcpServer != null) {
-        _restartTcpServer();
-      } else {
-        _startTcpServer();
-      }
-    } else if (port == -1) {
-      LogUtil.log('局域网游戏已关闭', level: 'INFO');
-      if (_isServerRunning) {
-        await _stopTcpServer();
-      }
+  // 端口发现
+  Future<void> _scanningPort() async {
+    LogUtil.log('开始扫描', level: 'INFO');
+    final port = await getPort();
+    if (port != null) {
+      setState(() {
+        _port = port;
+      });
+      LogUtil.log('发现的端口: $port', level: 'INFO');
+    } else {
+      LogUtil.log('端口扫描超时，未发现新的端口', level: 'WARNING');
     }
   }
 
   @override
   void dispose() {
-    _lanPortSub?.cancel();
     _peerListRefreshTimer?.cancel();
     super.dispose();
   }
@@ -416,8 +383,10 @@ class OwnerPageState extends State<OwnerPage> {
             );
             OwnerPage._persistTcpServer = _tcpServer;
             OwnerPage._persistTcpServerPort = scaffoldingPort;
+            OwnerPage._persistPort = minecraftPort;
             setState(() {
               _tcpServerPort = scaffoldingPort;
+              _port = minecraftPort;
             });
             LogUtil.log('TCP服务器端口更新为: $scaffoldingPort', level: 'INFO');
           }
@@ -546,8 +515,10 @@ class OwnerPageState extends State<OwnerPage> {
       setState(() {
         _isEasyTierRunning = false;
         _easyTierProcess = null;
+        _port = -1;
       });
       OwnerPage._easyTierProcess = null;
+      OwnerPage._persistPort = -1;
       LogUtil.log('EasyTier已停止', level: 'INFO');
     } catch (e) {
       LogUtil.log('停止EasyTier失败: $e', level: 'ERROR');
@@ -560,12 +531,11 @@ class OwnerPageState extends State<OwnerPage> {
       LogUtil.log('TCP服务器已经在运行', level: 'INFO');
       return;
     }
+    await _scanningPort();
     if (_port <= 0) {
       LogUtil.log('Minecraft服务器尚未启动,无法启动TCP服务器', level: 'WARNING');
       return;
     }
-    setState(() {
-    });
     try {
       final appVersion = await _loadAppVersion();
       final coreVersion = await _checkCoreVersion();
@@ -586,7 +556,8 @@ class OwnerPageState extends State<OwnerPage> {
       });
       OwnerPage._persistTcpServer = _tcpServer;
       OwnerPage._persistTcpServerPort = _tcpServerPort;
-      OwnerPage._persistIsServerRunning = _isServerRunning;
+      OwnerPage._persistPort = _port;
+      OwnerPage.persistIsServerRunning = _isServerRunning;
       LogUtil.log('TCP服务器启动成功,端口: $_tcpServerPort', level: 'INFO');
       String message = '联机服务器启动成功,端口: $_tcpServerPort';
       if (!easyTierStarted) {
@@ -615,7 +586,7 @@ class OwnerPageState extends State<OwnerPage> {
         _isServerRunning = false;
       });
       OwnerPage._persistTcpServer = null;
-      OwnerPage._persistIsServerRunning = false;
+      OwnerPage.persistIsServerRunning = false;
       LogUtil.log('TCP服务器已停止', level: 'INFO');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('联机服务器已停止'))
@@ -624,12 +595,6 @@ class OwnerPageState extends State<OwnerPage> {
     } catch (e) {
       LogUtil.log('停止TCP服务器失败: $e', level: 'ERROR');
     }
-  }
-
-  // 重启TCP服务器
-  Future<void> _restartTcpServer() async {
-    await _stopTcpServer();
-    await _startTcpServer();
   }
 
   // 解析EasyTier对等节点数据
@@ -723,7 +688,6 @@ class OwnerPageState extends State<OwnerPage> {
           }
         }
       }
-      LogUtil.log('解析对等节点数据成功，共${peers.length}个玩家(含未绑定节点的玩家),${servers.length}个服务器节点', level: 'INFO');
     } catch (e) {
       LogUtil.log('解析对等节点数据失败: $e', level: 'ERROR');
     }
@@ -764,7 +728,6 @@ class OwnerPageState extends State<OwnerPage> {
             _servers = parsedData['servers'] ?? [];
           });
         }
-        LogUtil.log('刷新对等节点列表成功，共${_peers.length}个玩家节点，${_servers.length}个服务器节点', level: 'INFO');
       } else {
         LogUtil.log('执行easytier-cli peer命令失败,退出码:${result.exitCode}', level: 'ERROR');
         LogUtil.log('错误输出：${result.stderr}', level: 'ERROR');
@@ -781,7 +744,7 @@ class OwnerPageState extends State<OwnerPage> {
         title: const Text('创建房间'),
       ),
       body: Center(
-        child: _port < 0
+        child: (_port < 0 && !_isServerRunning)
             ? const Text('正在等待局域网游戏启动...\n请在单人游戏中打开局域网开放')
             : ListView(
                 padding: const EdgeInsets.all(16.0),

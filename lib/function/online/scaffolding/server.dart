@@ -361,7 +361,6 @@ class OnlineCenterServer {
       socketId: 'local-host',
     ));
     LogUtil.log('添加房主: $hostName ($hostVendor) easytierID: $easytierId, machineID: $machineId', level: 'INFO');
-    LogUtil.log('当前玩家列表总数: ${_players.length}, HOST玩家数: ${_players.where((p) => p.kind == 'HOST').length}', level: 'DEBUG');
   }
 }
 
