@@ -258,201 +258,168 @@ Future<void> fabricLauncher({
   ErrorCallback? onError,
   PortCallback? onPortOpen,
 }) async {
-    try {
-    onProgress?.call('正在准备启动');
-    final prefs = await SharedPreferences.getInstance();
-    // 游戏参数
-    onProgress?.call('正在获取游戏参数');
-    final java = prefs.getString('SelectedJavaPath') ?? 'java';
-    final selectedPath = prefs.getString('SelectedPath') ?? '';
-    final gamePath = prefs.getString('Path_$selectedPath') ?? '';
-    final game = prefs.getString('SelectedGame') ?? '';
-    final nativesPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}natives';
-    final version = prefs.getString('version') ?? '';
-    final cfg = prefs.getStringList('Config_${selectedPath}_$game') ?? [];
-    final jsonPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}$game.json';
-    final libraries = await loadLibraryArtifactPaths(jsonPath, gamePath);
-    final separator = Platform.isWindows ? ';' : ':';
-    final gameJar = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}$game.jar';
-    final assetIndex = await getAssetIndex(jsonPath) ?? '';
-    // 从fabric.json获取Fabric信息
-    onProgress?.call('正在获取Fabric参数');
-    final fabricInfo = await getFabricInfoFromFabricJson(gamePath, game);
-    // 基础路径
-    onProgress?.call('正在构建路径');
-    final fabricLoader = '$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}net${Platform.pathSeparator}fabricmc${Platform.pathSeparator}fabric-loader${Platform.pathSeparator}${fabricInfo['loader'] ?? ''}${Platform.pathSeparator}fabric-loader-${fabricInfo['loader'] ?? ''}.jar';
-    final intermediary = '$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}net${Platform.pathSeparator}fabricmc${Platform.pathSeparator}intermediary${Platform.pathSeparator}${fabricInfo['intermediary'] ?? ''}${Platform.pathSeparator}intermediary-${fabricInfo['intermediary'] ?? ''}.jar';
-    // 构建Fabric依赖库路径
-    onProgress?.call('正在构建Fabric依赖库路径');
-    final List<String> fabricLibraryPaths = [];
-    for (final lib in (fabricInfo['libraries'] as List<String>? ?? [])) {
-      fabricLibraryPaths.add('$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}$lib');
-    }
-    // 过滤原版库中与Fabric提供的ASM组件冲突的版本
-    onProgress?.call('正在准备ASM组件');
-    final Map<String, String> fabricAsmVersions = fabricInfo['asm'] as Map<String, String>? ?? {};
-    final List<String> filteredLibraries = [];
-    for (final lib in libraries) {
-      bool shouldExclude = false;
-      // 检查是否是ASM组件
-      if (lib.contains('${Platform.pathSeparator}org${Platform.pathSeparator}ow2${Platform.pathSeparator}asm${Platform.pathSeparator}')) {
-        for (final asmComponent in fabricAsmVersions.keys) {
-          // 如果路径中包含ASM组件名称
-          if (lib.contains('${Platform.pathSeparator}$asmComponent${Platform.pathSeparator}')) {
-            // 检查版本是否不同于Fabric提供的版本
-            final libParts = p.split(lib);
-            for (int i = 0; i < libParts.length - 1; i++) {
-              if (libParts[i] == asmComponent && i > 0) {
-                final version = libParts[i-1];
-                if (version != fabricAsmVersions[asmComponent]) {
-                  shouldExclude = true;
-                  LogUtil.log('排除冲突的ASM组件: $lib (版本 $version 与Fabric提供的版本 ${fabricAsmVersions[asmComponent]} 冲突)', level: 'INFO');
-                  break;
-                }
+  onProgress?.call('正在准备启动');
+  final prefs = await SharedPreferences.getInstance();
+  // 游戏参数
+  onProgress?.call('正在获取游戏参数');
+  final java = prefs.getString('SelectedJavaPath') ?? 'java';
+  final selectedPath = prefs.getString('SelectedPath') ?? '';
+  final gamePath = prefs.getString('Path_$selectedPath') ?? '';
+  final game = prefs.getString('SelectedGame') ?? '';
+  final nativesPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}natives';
+  final version = prefs.getString('version') ?? '';
+  final cfg = prefs.getStringList('Config_${selectedPath}_$game') ?? [];
+  final jsonPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}$game.json';
+  final libraries = await loadLibraryArtifactPaths(jsonPath, gamePath);
+  final separator = Platform.isWindows ? ';' : ':';
+  final gameJar = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}$game.jar';
+  final assetIndex = await getAssetIndex(jsonPath) ?? '';
+  // 从fabric.json获取Fabric信息
+  onProgress?.call('正在获取Fabric参数');
+  final fabricInfo = await getFabricInfoFromFabricJson(gamePath, game);
+  // 基础路径
+  onProgress?.call('正在构建路径');
+  final fabricLoader = '$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}net${Platform.pathSeparator}fabricmc${Platform.pathSeparator}fabric-loader${Platform.pathSeparator}${fabricInfo['loader'] ?? ''}${Platform.pathSeparator}fabric-loader-${fabricInfo['loader'] ?? ''}.jar';
+  final intermediary = '$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}net${Platform.pathSeparator}fabricmc${Platform.pathSeparator}intermediary${Platform.pathSeparator}${fabricInfo['intermediary'] ?? ''}${Platform.pathSeparator}intermediary-${fabricInfo['intermediary'] ?? ''}.jar';
+  // 构建Fabric依赖库路径
+  onProgress?.call('正在构建Fabric依赖库路径');
+  final List<String> fabricLibraryPaths = [];
+  for (final lib in (fabricInfo['libraries'] as List<String>? ?? [])) {
+    fabricLibraryPaths.add('$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}$lib');
+  }
+  // 过滤原版库中与Fabric提供的ASM组件冲突的版本
+  onProgress?.call('正在准备ASM组件');
+  final Map<String, String> fabricAsmVersions = fabricInfo['asm'] as Map<String, String>? ?? {};
+  final List<String> filteredLibraries = [];
+  for (final lib in libraries) {
+    bool shouldExclude = false;
+    // 检查是否是ASM组件
+    if (lib.contains('${Platform.pathSeparator}org${Platform.pathSeparator}ow2${Platform.pathSeparator}asm${Platform.pathSeparator}')) {
+      for (final asmComponent in fabricAsmVersions.keys) {
+        // 如果路径中包含ASM组件名称
+        if (lib.contains('${Platform.pathSeparator}$asmComponent${Platform.pathSeparator}')) {
+          // 检查版本是否不同于Fabric提供的版本
+          final libParts = p.split(lib);
+          for (int i = 0; i < libParts.length - 1; i++) {
+            if (libParts[i] == asmComponent && i > 0) {
+              final version = libParts[i-1];
+              if (version != fabricAsmVersions[asmComponent]) {
+                shouldExclude = true;
+                LogUtil.log('排除冲突的ASM组件: $lib (版本 $version 与Fabric提供的版本 ${fabricAsmVersions[asmComponent]} 冲突)', level: 'INFO');
+                break;
               }
             }
-            break;
           }
+          break;
         }
       }
-      if (!shouldExclude) {
-        filteredLibraries.add(lib);
-      }
     }
-    // 添加所有依赖库到类路径
-    onProgress?.call('正在构建依赖');
-    var cp = filteredLibraries.join(separator);
-    cp += '$separator$gameJar$separator$fabricLoader$separator$intermediary';
-    for (final lib in fabricLibraryPaths) {
-      cp += '$separator$lib';
+    if (!shouldExclude) {
+      filteredLibraries.add(lib);
     }
-    // 检查关键文件是否存在
-    onProgress?.call('正在检查文件完整性');
-    LogUtil.log('Fabric Loader 文件存在: ${File(fabricLoader).existsSync()}', level: 'INFO');
-    LogUtil.log('Intermediary 文件存在: ${File(intermediary).existsSync()}', level: 'INFO');
-    for (final lib in fabricLibraryPaths) {
-      if (lib.contains('sponge-mixin')) {
-        LogUtil.log('Sponge Mixin 文件存在: ${File(lib).existsSync()}', level: 'INFO');
-      }
+  }
+  // 添加所有依赖库到类路径
+  onProgress?.call('正在构建依赖');
+  var cp = filteredLibraries.join(separator);
+  cp += '$separator$gameJar$separator$fabricLoader$separator$intermediary';
+  for (final lib in fabricLibraryPaths) {
+    cp += '$separator$lib';
+  }
+  // 检查关键文件是否存在
+  onProgress?.call('正在检查文件完整性');
+  LogUtil.log('Fabric Loader 文件存在: ${File(fabricLoader).existsSync()}', level: 'INFO');
+  LogUtil.log('Intermediary 文件存在: ${File(intermediary).existsSync()}', level: 'INFO');
+  for (final lib in fabricLibraryPaths) {
+    if (lib.contains('sponge-mixin')) {
+      LogUtil.log('Sponge Mixin 文件存在: ${File(lib).existsSync()}', level: 'INFO');
     }
-    final accountName = prefs.getString('SelectedAccountName') ?? '';
-    final accountType = prefs.getString('SelectedAccountType') ?? '';
-    final accountInfo = prefs.getStringList('${_getLoginMode(accountType)}_account_$accountName') ?? [];
-    // 账号信息
-    String uuid = '';
-    String token = '';
-    onProgress?.call('正在获取账号信息');
-    if (accountInfo[0] == '0') {
-      if (accountInfo[2] == '1') {
-        uuid = accountInfo[3];
-      } else {
-        uuid = accountInfo[1];
-      }
-    }
-    if (accountInfo[0] == '1') {
+  }
+  final accountName = prefs.getString('SelectedAccountName') ?? '';
+  final accountType = prefs.getString('SelectedAccountType') ?? '';
+  final accountInfo = prefs.getStringList('${_getLoginMode(accountType)}_account_$accountName') ?? [];
+  // 账号信息
+  String uuid = '';
+  String token = '';
+  onProgress?.call('正在获取账号信息');
+  if (accountInfo[0] == '0') {
+    if (accountInfo[2] == '1') {
+      uuid = accountInfo[3];
+    } else {
       uuid = accountInfo[1];
-      token = await microsoft_login.login(accountInfo[2]);
     }
-    if (accountInfo[0] == '2') {
-      if (await external_login.checkAuthlibInjector(gamePath)) {
-        onProgress?.call('AuthlibInjector已存在');
-      }
-      else {
-        onProgress?.call('正在下载AuthlibInjector');
-        await external_login.downloadAuthlibInjector(gamePath);
-      }
-      uuid = accountInfo[1];
-      onProgress?.call('正在检查令牌');
-      if (await external_login.checkToken(accountInfo[2], accountInfo[5], accountInfo[6])) {
-        token = accountInfo[5];
-      } else {
-        token = await external_login.refreshToken(
-          accountInfo[2],
-          accountInfo[5],
-          accountInfo[6],
-          accountName,
-          uuid
-        );
-      }
+  }
+  if (accountInfo[0] == '1') {
+    uuid = accountInfo[1];
+    token = await microsoft_login.login(accountInfo[2]);
+  }
+  if (accountInfo[0] == '2') {
+    if (await external_login.checkAuthlibInjector(gamePath)) {
+      onProgress?.call('AuthlibInjector已存在');
     }
-    // 启动参数
-    onProgress?.call('正在构建启动参数');
-    final args = <String>[
-      '-Xmx${cfg[0]}G',
-      '-XX:+UseG1GC',
-      '-Dstderr.encoding=UTF-8',
-      '-Dstdout.encoding=UTF-8',
-      '-XX:-OmitStackTraceInFastThrow',
-      '-Dfml.ignoreInvalidMinecraftCertificates=true',
-      '-Dfml.ignorePatchDiscrepancies=true',
-      '-Dminecraft.launcher.brand=FML',
-      "-Duser.home=null",
-      if (Platform.isMacOS) '-XstartOnFirstThread',
-      '-Djava.library.path=$nativesPath',
-      '-Djna.tmpdir=$nativesPath',
-      '-Dfabric.gameDir=$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game',
-      '-Dfabric.modsDir=$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}mods',
-      if (accountInfo[0] == '2') '-javaagent:$gamePath${Platform.pathSeparator}authlib-injector.jar=${accountInfo[2]}',
-      '-cp', cp,
-      'net.fabricmc.loader.impl.launch.knot.KnotClient',
-      '--username', accountName,
-      '--version', game,
-      '--gameDir', '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game',
-      '--assetsDir', '$gamePath${Platform.pathSeparator}assets',
-      '--assetIndex', assetIndex,
-      '--uuid', uuid,
-      if (accountInfo[0] == '0') '--accessToken', accountInfo[0],
-      if (accountInfo[0] == '0') '--clientId', '"\${clientid}"',
-      if (accountInfo[0] == '1' || accountInfo[0] == '2') '--accessToken', token,
-      if (accountInfo[0] == '1' || accountInfo[0] == '2') '--userType', 'mojang',
-      if (accountInfo[0] == '2') '--clientId', token,
-      '--versionType', '"FML $version"',
-      '--xuid', '"\${auth_xuid}"',
-      '--width', cfg[2],
-      '--height', cfg[3],
-      if (cfg[1] == '1') '--fullscreen'
-    ];
-    LogUtil.log('fab=$fabricLoader, intermediary=$intermediary', level: 'INFO');
-    LogUtil.log(args.join("\n"), level: 'INFO');
-    onProgress?.call('正在启动游戏');
-    final proc = await Process.start(
-    java,
-    args,
-    workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game'
-    );
-  final stdoutController = StreamController<String>();
-  proc.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((line) {
-    // 端口检测
-    if (line.contains('Started serving on')) {
-      final portMatch = RegExp(r'Started serving on (\d+)').firstMatch(line);
-      if (portMatch != null) {
-        final port = int.parse(portMatch.group(1)!);
-        LogUtil.log('检测到局域网游戏已开放，端口: $port', level: 'INFO');
-        _lastDetectedPort = port;
-        try {
-          lanPortController.add(port);
-        } catch (e) {
-          LogUtil.log('端口事件发送失败: $e', level: 'ERROR');
-        }
-      }
-    } else if (line.contains('Stopping server')) {
-      LogUtil.log('检测到局域网游戏已关闭', level: 'INFO');
-      clearPortCache();
+    else {
+      onProgress?.call('正在下载AuthlibInjector');
+      await external_login.downloadAuthlibInjector(gamePath);
     }
-    LogUtil.log('[MINECRAFT] $line', level: 'INFO');
-    stdoutController.add(line);
-  });
-  proc.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen(
-    (line) => LogUtil.log('[MINECRAFT] $line', level: 'ERROR')
+    uuid = accountInfo[1];
+    onProgress?.call('正在检查令牌');
+    if (await external_login.checkToken(accountInfo[2], accountInfo[5], accountInfo[6])) {
+      token = accountInfo[5];
+    } else {
+      token = await external_login.refreshToken(
+        accountInfo[2],
+        accountInfo[5],
+        accountInfo[6],
+        accountName,
+        uuid
+      );
+    }
+  }
+  // 启动参数
+  onProgress?.call('正在构建启动参数');
+  final args = <String>[
+    '-Xmx${cfg[0]}G',
+    '-XX:+UseG1GC',
+    '-Dstderr.encoding=UTF-8',
+    '-Dstdout.encoding=UTF-8',
+    '-XX:-OmitStackTraceInFastThrow',
+    '-Dfml.ignoreInvalidMinecraftCertificates=true',
+    '-Dfml.ignorePatchDiscrepancies=true',
+    '-Dminecraft.launcher.brand=FML',
+    "-Duser.home=null",
+    if (Platform.isMacOS) '-XstartOnFirstThread',
+    '-Djava.library.path=$nativesPath',
+    '-Djna.tmpdir=$nativesPath',
+    '-Dfabric.gameDir=$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game',
+    '-Dfabric.modsDir=$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}mods',
+    if (accountInfo[0] == '2') '-javaagent:$gamePath${Platform.pathSeparator}authlib-injector.jar=${accountInfo[2]}',
+    '-cp', cp,
+    'net.fabricmc.loader.impl.launch.knot.KnotClient',
+    '--username', accountName,
+    '--version', game,
+    '--gameDir', '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game',
+    '--assetsDir', '$gamePath${Platform.pathSeparator}assets',
+    '--assetIndex', assetIndex,
+    '--uuid', uuid,
+    if (accountInfo[0] == '0') '--accessToken', accountInfo[0],
+    if (accountInfo[0] == '0') '--clientId', '"\${clientid}"',
+    if (accountInfo[0] == '1' || accountInfo[0] == '2') '--accessToken', token,
+    if (accountInfo[0] == '1' || accountInfo[0] == '2') '--userType', 'mojang',
+    if (accountInfo[0] == '2') '--clientId', token,
+    '--versionType', '"FML $version"',
+    '--xuid', '"\${auth_xuid}"',
+    '--width', cfg[2],
+    '--height', cfg[3],
+    if (cfg[1] == '1') '--fullscreen'
+  ];
+  LogUtil.log('fab=$fabricLoader, intermediary=$intermediary', level: 'INFO');
+  LogUtil.log(args.join("\n"), level: 'INFO');
+  onProgress?.call('正在启动游戏');
+  final proc = await Process.start(
+  java,
+  args,
+  workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game'
   );
   onProgress?.call('游戏启动完成');
   final code = await proc.exitCode;
   LogUtil.log('退出码: $code', level: 'INFO');
-  }
-  catch (e) {
-    LogUtil.log('启动失败: $e', level: 'ERROR');
-    if (onError != null) {
-      onError('启动失败: $e');
-    }
-  }
 }

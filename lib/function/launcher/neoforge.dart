@@ -342,31 +342,6 @@ Future<void> neoforgeLauncher({
     args,
     workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game'
   );
-  final stdoutController = StreamController<String>();
-  proc.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((line) {
-    // 端口检测
-    if (line.contains('Started serving on')) {
-      final portMatch = RegExp(r'Started serving on (\d+)').firstMatch(line);
-      if (portMatch != null) {
-        final port = int.parse(portMatch.group(1)!);
-        LogUtil.log('检测到局域网游戏已开放，端口: $port', level: 'INFO');
-        _lastDetectedPort = port;
-        try {
-          lanPortController.add(port);
-        } catch (e) {
-          LogUtil.log('端口事件发送失败: $e', level: 'ERROR');
-        }
-      }
-    } else if (line.contains('Stopping server')) {
-      LogUtil.log('检测到局域网游戏已关闭', level: 'INFO');
-      clearPortCache();
-    }
-    LogUtil.log('[MINECRAFT] $line', level: 'INFO');
-    stdoutController.add(line);
-  });
-  proc.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen(
-    (line) => LogUtil.log('[MINECRAFT] $line', level: 'ERROR')
-  );
   onProgress?.call('游戏启动完成');
   final code = await proc.exitCode;
   LogUtil.log('退出码: $code', level: 'INFO');
