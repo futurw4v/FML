@@ -8,20 +8,6 @@ import 'package:fml/function/launcher/login/external_login.dart' as external_log
 
 typedef ProgressCallback = void Function(String message);
 typedef ErrorCallback = void Function(String error);
-typedef PortCallback = void Function(int port);
-final StreamController<int> lanPortController = StreamController<int>.broadcast();
-int? _lastDetectedPort;
-int? getLastDetectedPort() => _lastDetectedPort;
-
-// 清除端口缓存
-Future<void> clearPortCache() async {
-  _lastDetectedPort = null;
-  try {
-    lanPortController.add(-1);
-  } catch (_) {}
-  LogUtil.log('已清除端口缓存', level: 'INFO');
-}
-
 // library获取
 Future<List<String>> loadLibraryArtifactPaths(String versionJsonPath, String gamePath) async {
   final file = File(versionJsonPath);
@@ -98,7 +84,6 @@ String _getLoginMode(String loginMode) {
 Future<void> vanillaLauncher({
     ProgressCallback? onProgress,
     ErrorCallback? onError,
-    PortCallback? onPortOpen,
   }) async {
   onProgress?.call('正在准备启动');
   final prefs = await SharedPreferences.getInstance();

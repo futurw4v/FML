@@ -66,10 +66,6 @@ class PlayPageState extends State<PlayPage> {
           setState(() {
           });
         },
-        onPortOpen: (int port) {
-          if (!mounted) return;
-          Navigator.pushNamed(context, '/online/owner', arguments: port);
-        },
       );
     }
     if (type == 'NeoForge') {
