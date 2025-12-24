@@ -48,12 +48,10 @@ Future<String?> getAssetIndex(String versionJsonPath) async {
     return null;
   }
   if (root is! Map) return null;
-  // 优先：顶层 assetIndex.id
   final ai = root['assetIndex'];
   if (ai is Map && ai['id'] is String && (ai['id'] as String).isNotEmpty) {
     return ai['id'] as String;
   }
-  // 备选：patches[].assetIndex.id
   final patches = root['patches'];
   if (patches is List) {
     for (final p in patches) {
@@ -64,7 +62,6 @@ Future<String?> getAssetIndex(String versionJsonPath) async {
       }
     }
   }
-  // 最后回退：assets 字段（通常等于 id）
   final assets = root['assets'];
   if (assets is String && assets.isNotEmpty) return assets;
   return null;
@@ -144,7 +141,7 @@ Future<void> vanillaLauncher({
   // 启动参数
   onProgress?.call('正在准备启动参数');
   final args = <String>[
-    '-Xmx${cfg[0]}G',
+    '-Xmx${cfg[0]}M',
     '-XX:+UseG1GC',
     '-XX:-OmitStackTraceInFastThrow',
     '-Dfml.ignoreInvalidMinecraftCertificates=true',

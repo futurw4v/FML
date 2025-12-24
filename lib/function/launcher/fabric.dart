@@ -69,7 +69,6 @@ Future<String?> getAssetIndex(String versionJsonPath) async {
       }
     }
   }
-  // 最后回退：assets 字段（通常等于 id）
   final assets = root['assets'];
   if (assets is String && assets.isNotEmpty) return assets;
   return null;
@@ -114,13 +113,11 @@ Future<Map<String, dynamic>> getFabricInfo(String path) async {
       gameVer ??= v;
     } else if (id == 'fabric') {
       fabricVer ??= v;
-      // 在 fabric 补丁的 libraries 中查找 sponge-mixin 和其他依赖库
       final libs = patch['libraries'];
       if (libs is List) {
         for (final lib in libs) {
           if (lib is Map && lib['name'] is String) {
             final name = lib['name'] as String;
-            // 解析Maven坐标
             final parts = name.split(':');
             if (parts.length >= 3) {
               final groupIdParts = parts[0].split('.');
@@ -189,7 +186,6 @@ Future<Map<String, dynamic>> getFabricInfoFromFabricJson(String gamePath, String
     final List<String> libraries = [];
     final Map<String, String> asmVersions = {};
     String? mixinVersion;
-    // 处理libraries中的common部分
     if (json['launcherMeta'] is Map &&
         json['launcherMeta']['libraries'] is Map &&
         json['launcherMeta']['libraries']['common'] is List) {
@@ -197,7 +193,6 @@ Future<Map<String, dynamic>> getFabricInfoFromFabricJson(String gamePath, String
       for (final lib in commonLibs) {
         if (lib is Map && lib['name'] is String) {
           final name = lib['name'] as String;
-          // 解析Maven坐标
           final parts = name.split(':');
           if (parts.length >= 3) {
             final groupId = parts[0].replaceAll('.', Platform.pathSeparator);
@@ -205,11 +200,9 @@ Future<Map<String, dynamic>> getFabricInfoFromFabricJson(String gamePath, String
             final version = parts[2];
             final jarPath = '$groupId${Platform.pathSeparator}$artifactId${Platform.pathSeparator}$version${Platform.pathSeparator}$artifactId-$version.jar';
             libraries.add(jarPath);
-            // 检查是否是ASM组件
             if (name.startsWith('org.ow2.asm:')) {
               asmVersions[artifactId] = version;
             }
-            // 检查是否是Mixin
             if (name.contains('net.fabricmc:sponge-mixin')) {
               final mixinParts = version.split('+');
               if (mixinParts.isNotEmpty) {
@@ -363,7 +356,7 @@ Future<void> fabricLauncher({
   // 启动参数
   onProgress?.call('正在构建启动参数');
   final args = <String>[
-    '-Xmx${cfg[0]}G',
+    '-Xmx${cfg[0]}M',
     '-XX:+UseG1GC',
     '-Dstderr.encoding=UTF-8',
     '-Dstdout.encoding=UTF-8',

@@ -827,13 +827,13 @@ class DownloadFabricPageState extends State<DownloadFabricPage> {
   }
 
   // 获取系统内存
-  void _getMemory(){
+  Future<void> _getMemory() async {
     int bytes = SysInfo.getTotalPhysicalMemory();
     // 内存错误修正
     if (bytes > (1024 * 1024 * 1024 * 1024) && bytes % 16384 == 0) {
       bytes = bytes ~/ 16384;
     }
-    final physicalMemory = bytes ~/ (1024 * 1024 * 1024);
+    final physicalMemory = bytes ~/ (1024 * 1024);
     setState(() {
       _mem = physicalMemory;
     });

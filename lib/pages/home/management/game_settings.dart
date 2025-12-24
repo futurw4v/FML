@@ -3,6 +3,7 @@ import 'package:fml/function/log.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:system_info2/system_info2.dart';
 
 class GameSettingsTab extends StatefulWidget {
   final String gamePath;
@@ -45,6 +46,7 @@ class GameSettingsTabState extends State<GameSettingsTab> {
   String _width = '854';
   String _height = '480';
   String _type = '';
+  int memory = 0;
 
   @override
   void initState() {
@@ -52,6 +54,7 @@ class GameSettingsTabState extends State<GameSettingsTab> {
     _xmxController = TextEditingController();
     _widthController = TextEditingController();
     _heightController = TextEditingController();
+    _getMemory();
     _loadGameConfig();
   }
 
@@ -62,6 +65,20 @@ class GameSettingsTabState extends State<GameSettingsTab> {
     _heightController.dispose();
     super.dispose();
   }
+
+  // 获取系统内存
+  Future<void> _getMemory() async {
+    int bytes = SysInfo.getTotalPhysicalMemory();
+    // 内存错误修正
+    if (bytes > (1024 * 1024 * 1024 * 1024) && bytes % 16384 == 0) {
+      bytes = bytes ~/ 16384;
+    }
+    final physicalMemory = bytes ~/ (1024 * 1024);
+    setState(() {
+      memory = physicalMemory;
+    });
+  }
+
 
   // 加载游戏配置
   Future<void> _loadGameConfig() async {
@@ -217,14 +234,26 @@ class GameSettingsTabState extends State<GameSettingsTab> {
                       horizontal: 16,
                       vertical: 8,
                     ),
-                    child: TextField(
-                      controller: _xmxController,
-                      decoration: const InputDecoration(
-                        labelText: '最大堆大小(-Xmx)',
-                        hintText: '单位: GB',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ListTile(
+                          title: const Text('最大堆内存 (-Xmx)'),
+                          subtitle: Text(
+                            '设备总内存: ${memory / 1024} GiB, 当前分配${_xmxController.text} MiB (约 ${(int.parse(_xmxController.text) / 1024).toStringAsFixed(1)} GiB)'),
+                        ),
+                        Slider(
+                          value: double.tryParse(_xmxController.text) ?? 1.0,
+                          min: 0,
+                          max: memory.toDouble(),
+                          onChanged: (value) {
+                            setState(() {
+                              _xmxController.text = value.toStringAsFixed(0);
+                            });
+                          },
+                        )
+                      ],
+                    )
                   ),
                   Card(
                     margin: const EdgeInsets.symmetric(
@@ -330,11 +359,15 @@ class GameSettingsTabState extends State<GameSettingsTab> {
                     FloatingActionButton(
                       heroTag: "save",
                       onPressed: () {
-                        if (_xmxController.text.isEmpty ||
-                            _widthController.text.isEmpty ||
+                        if (_widthController.text.isEmpty ||
                             _heightController.text.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('请填写所有字段')),
+                          );
+                          return;
+                        } if (_xmxController.text == "0") {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('最大堆内存不能为 0')),
                           );
                           return;
                         } else {

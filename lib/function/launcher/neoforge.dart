@@ -49,14 +49,12 @@ Set<String> buildLibraryPaths(List<Map<String, dynamic>> libraries, String gameP
   for (final lib in libraries) {
     final name = lib['name'];
     if (name is! String) continue;
-    // 解析Maven坐标 group:artifact:version[:classifier]
     final parts = name.split(':');
     if (parts.length < 3) continue;
     final group = parts[0].replaceAll('.', '/');
     final artifact = parts[1];
     String version = parts[2];
     String classifier = '';
-    // 处理classifier和版本
     if (parts.length > 3) {
       classifier = parts.length > 3 ? '-${parts[3]}' : '';
     }
@@ -80,12 +78,10 @@ Future<String?> getAssetIndex(String versionJsonPath) async {
     return null;
   }
   if (root is! Map) return null;
-  // 优先：顶层 assetIndex.id
   final ai = root['assetIndex'];
   if (ai is Map && ai['id'] is String && (ai['id'] as String).isNotEmpty) {
     return ai['id'] as String;
   }
-  // 备选：patches[].assetIndex.id
   final patches = root['patches'];
   if (patches is List) {
     for (final p in patches) {
@@ -172,19 +168,15 @@ Future<void> neoforgeLauncher({
   final version = prefs.getString('version') ?? '';
   final cfg = prefs.getStringList('Config_${selectedPath}_$game') ?? [];
   final jsonPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}$game.json';
-  // 加载NeoForge配置
   final neoForgeConfig = await loadNeoForgeConfig(gamePath, game);
   LogUtil.log('NeoForge配置加载${neoForgeConfig != null ? "成功" : "失败"}', level: 'INFO');
-  // 变量映射，用于替换配置中的占位符
   final variables = {
     'library_directory': '$gamePath${Platform.pathSeparator}libraries',
     'classpath_separator': Platform.isWindows ? ';' : ':',
     'version_name': game,
     'natives_directory': nativesPath,
   };
-  // 使用Map存储库路径，按库标识去重，确保优先使用NeoForge版本
   final Map<String, String> librariesMap = {};
-  // 首先从NeoForge.json加载库
   if (neoForgeConfig != null && neoForgeConfig.containsKey('libraries')) {
     final libraries = neoForgeConfig['libraries'] as List;
     for (final lib in libraries) {
@@ -224,7 +216,7 @@ Future<void> neoforgeLauncher({
   final assetIndex = await getAssetIndex(jsonPath) ?? '';
   // 基础JVM参数
   final jvmArgs = <String>[
-    '-Xmx${cfg[0]}G',
+    '-Xmx${cfg[0]}M',
     '-XX:+UseG1GC',
     '-Dstderr.encoding=UTF-8',
     '-Dstdout.encoding=UTF-8',
