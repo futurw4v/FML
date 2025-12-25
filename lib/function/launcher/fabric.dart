@@ -241,7 +241,7 @@ Future<void> fabricLauncher({
   final prefs = await SharedPreferences.getInstance();
   // 游戏参数
   onProgress?.call('正在获取游戏参数');
-  final java = prefs.getString('SelectedJavaPath') ?? 'java';
+  final java = prefs.getString('java') ?? 'java';
   final selectedPath = prefs.getString('SelectedPath') ?? '';
   final gamePath = prefs.getString('Path_$selectedPath') ?? '';
   final game = prefs.getString('SelectedGame') ?? '';
@@ -390,15 +390,11 @@ Future<void> fabricLauncher({
     '--height', cfg[3],
     if (cfg[1] == '1') '--fullscreen'
   ];
-  LogUtil.log('fab=$fabricLoader, intermediary=$intermediary', level: 'INFO');
-  LogUtil.log(args.join("\n"), level: 'INFO');
   onProgress?.call('正在启动游戏');
-  final proc = await Process.start(
+  await Process.start(
   java,
   args,
   workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game'
   );
   onProgress?.call('游戏启动完成');
-  final code = await proc.exitCode;
-  LogUtil.log('退出码: $code', level: 'INFO');
 }

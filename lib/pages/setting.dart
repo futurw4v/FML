@@ -36,7 +36,7 @@ class SettingPageState extends State<SettingPage> {
             Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: ListTile(
-                title: Text('\n 系统默认 Java 信息 \n'),
+                title: Text('\n Java 管理 \n'),
                 leading: Icon(Icons.code),
                 onTap: () {
                   Navigator.push(

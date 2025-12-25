@@ -160,7 +160,7 @@ Future<void> neoforgeLauncher({
   onProgress?.call('正在准备启动');
   final prefs = await SharedPreferences.getInstance();
   // 游戏参数
-  final java = prefs.getString('SelectedJavaPath') ?? 'java';
+  final java = prefs.getString('java') ?? 'java';
   final selectedPath = prefs.getString('SelectedPath') ?? '';
   final gamePath = prefs.getString('Path_$selectedPath') ?? '';
   final game = prefs.getString('SelectedGame') ?? '';
@@ -311,16 +311,13 @@ Future<void> neoforgeLauncher({
         gameArgs.add(processedArg);
       }
     }
-    LogUtil.log('添加了 ${gameArgsList.length} 个来自NeoForge.json的游戏参数', level: 'INFO');
   }
   final args = [...jvmArgs, mainClass, ...gameArgs];
   onProgress?.call('正在启动游戏');
-  final proc = await Process.start(
+  await Process.start(
     java,
     args,
     workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game'
   );
   onProgress?.call('游戏启动完成');
-  final code = await proc.exitCode;
-  LogUtil.log('退出码: $code', level: 'INFO');
 }

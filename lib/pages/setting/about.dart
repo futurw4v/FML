@@ -208,6 +208,11 @@ class AboutPageState extends State<AboutPage> {
                   subtitle: const Text('联机实现参考\nhttps://github.com/burningtnt/Terracotta'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/burningtnt/Terracotta'),
+                ),ListTile(
+                  title: const Text('HMCL'),
+                  subtitle: const Text('部分功能实现参考\nhttps://github.com/HMCL-dev/HMCL'),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://github.com/HMCL-dev/HMCL'),
                 ),
                 const ListTile(
                   title: Text('Github的各位'),
