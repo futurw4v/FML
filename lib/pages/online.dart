@@ -1,12 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:system_info2/system_info2.dart';
 import 'package:archive/archive.dart';
-import 'dart:async';
-
+import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/download.dart';
 import 'package:fml/pages/online/owner.dart';
@@ -23,6 +22,8 @@ class OnlinePageState extends State<OnlinePage> {
   bool _coreExists = false;
   bool _coredownloading = false;
   bool _coreExtracting = false;
+  bool _coreUpdate = false;
+  bool _macosError = false;
   double _downloadProgress = 0.0;
   String _appVersion = "1.0.0";
   String _coreVersion = "未知";
@@ -74,18 +75,62 @@ class OnlinePageState extends State<OnlinePage> {
     final String core = ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-core');
     try {
       final ProcessResult proc = await Process.run(core, ['--version']);
-      final String output = proc.stdout.toString().trim();
+      final String output = 'v${proc.stdout.toString().trim().substring(14, proc.stdout.toString().trim().length - 9)}';
       setState(() {
       _coreVersion = output;
-      LogUtil.log('EasyTier核心版本: $output', level: 'INFO');
     });
     } catch (e) {
       setState(() {
-        _coreVersion = "未知";
+        if (Platform.isMacOS) {
+          _macosError = true;
+        }
       });
       LogUtil.log('获取EasyTier核心版本失败: $e', level: 'ERROR');
       return;
     }
+  }
+
+  // 检查核心更新
+  Future<void> _checkCoreUpdate() async {
+    try {
+      Dio dio = Dio();
+      Options options = Options(
+        headers: {
+          'User-Agent': 'FML-App/$_appVersion',
+        },
+      );
+      final response = await dio.get(
+        'https://api.github.com/repos/EasyTier/EasyTier/releases/latest',
+        options: options,
+      );
+      if (response.statusCode == 200) {
+        Map<String, dynamic> loaderData = response.data;
+        String latestVersion = loaderData['tag_name'];
+        if (latestVersion != _coreVersion) {
+          LogUtil.log('检测到EasyTier核心新版本: $latestVersion', level: 'INFO');
+          setState(() {
+            _coreUpdate = true;
+          });
+        } else {
+          LogUtil.log('EasyTier核心已是最新版本: $_coreVersion', level: 'INFO');
+        }
+      }
+    } catch (e) {
+      LogUtil.log('检查EasyTier核心更新失败: $e', level: 'ERROR');
+      return;
+    }
+  }
+
+  // 更新核心
+  Future<void> _updateCore() async {
+    setState(() {
+      _coreExists = false;
+      _coredownloading = true;
+    });
+    await _installCore();
+    setState(() {
+      _coreUpdate = false;
+    });
   }
 
   // 读取App版本
@@ -324,6 +369,7 @@ class OnlinePageState extends State<OnlinePage> {
     _checkCoreExists();
     _loadAppVersion();
     _checkCoreVersion();
+    _checkCoreUpdate();
   }
 
   @override
@@ -355,8 +401,16 @@ class OnlinePageState extends State<OnlinePage> {
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: ListTile(
                   title: const Text('EasyTier 已安装'),
-                  subtitle: Text(_coreVersion),
+                  subtitle: _macosError ? Text('请在 设置-隐私与安全-安全性 中授权 EasyTier') : Text('当前版本: $_coreVersion ${_coreUpdate ? "有新版本可用" : "已为最新版本"}'),
                   leading: const Icon(Icons.check_circle),
+                  trailing: _coreUpdate && !_macosError
+                      ? IconButton(
+                          icon: const Icon(Icons.update),
+                          onPressed: () {
+                            _updateCore();
+                          },
+                        )
+                      : null,
                 ),
               ),
               Card(
