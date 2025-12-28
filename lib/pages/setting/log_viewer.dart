@@ -102,11 +102,12 @@ class LogViewerPageState extends State<LogViewerPage> {
       for (var log in logs) {
         final timestamp = log['timestamp'] as String;
         final level = log['level'] as String;
+        final caller = log['caller'] as String;
         final message = log['message'] as String;
         final dateTime = DateTime.parse(timestamp);
         final formattedTime = '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
             '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}';
-        logContent.writeln('[$formattedTime] [$level] $message');
+        logContent.writeln('[$formattedTime] [$level] [$caller] $message');
       }
       await logFile.writeAsString(logContent.toString());
       if (!mounted) return;
@@ -127,12 +128,13 @@ class LogViewerPageState extends State<LogViewerPage> {
   Future<void> _copySingleLog(Map<String, dynamic> log) async {
     final timestamp = log['timestamp'] as String;
     final level = log['level'] as String;
+    final caller = log['caller'] as String;
     final message = log['message'] as String;
     final dateTime = DateTime.parse(timestamp);
     final formattedTime =
         '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
         '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}';
-    final logText = '[$level] $formattedTime\n$message';
+    final logText = '[$formattedTime] [$level] [$caller] $message';
     await Clipboard.setData(ClipboardData(text: logText));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -167,8 +169,6 @@ class LogViewerPageState extends State<LogViewerPage> {
         return Icons.warning;
       case 'INFO':
         return Icons.info;
-      case 'DEBUG':
-        return Icons.bug_report;
       default:
         return Icons.article;
     }
@@ -234,6 +234,7 @@ class LogViewerPageState extends State<LogViewerPage> {
                     final log = logs[index];
                     final timestamp = log['timestamp'] as String;
                     final level = log['level'] as String;
+                    final caller = log['caller'] as String;
                     final message = log['message'] as String;
                     final dateTime = DateTime.parse(timestamp);
                     final formattedTime =
@@ -254,7 +255,7 @@ class LogViewerPageState extends State<LogViewerPage> {
                           style: const TextStyle(fontSize: 14),
                         ),
                         subtitle: Text(
-                          formattedTime,
+                          '$caller\n$formattedTime',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
