@@ -240,7 +240,7 @@ class GameSettingsTabState extends State<GameSettingsTab> {
                         ListTile(
                           title: const Text('最大堆内存 (-Xmx)'),
                           subtitle: Text(
-                            '设备总内存: ${memory / 1024} GiB, 当前分配${_xmxController.text} MiB (约 ${(int.parse(_xmxController.text) / 1024).toStringAsFixed(1)} GiB)'),
+                            '设备总内存: ${memory / 1024} GiB, 当前分配${_xmxController.text} MiB (约 ${(double.parse(_xmxController.text) / 1024).toStringAsFixed(1)} GiB)'),
                         ),
                         Slider(
                           value: double.tryParse(_xmxController.text) ?? 1.0,
