@@ -394,7 +394,8 @@ Future<void> fabricLauncher({
   await Process.start(
   java,
   args,
-  workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game'
+  workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game',
+  mode: ProcessStartMode.detached,
   );
   onProgress?.call('游戏启动完成');
 }

@@ -314,10 +314,17 @@ Future<void> neoforgeLauncher({
   }
   final args = [...jvmArgs, mainClass, ...gameArgs];
   onProgress?.call('正在启动游戏');
-  await Process.start(
-    java,
-    args,
-    workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game'
-  );
+  try {
+    await Process.start(
+      java,
+      args,
+      workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game',
+      mode: ProcessStartMode.detached,
+    );
+  } catch (e) {
+    LogUtil.log('启动游戏进程失败: $e', level: 'ERROR');
+    onError?.call('启动游戏失败: $e');
+    return;
+  }
   onProgress?.call('游戏启动完成');
 }
