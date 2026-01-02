@@ -15,6 +15,7 @@ class DownloadVersion extends StatefulWidget {
 
 class DownloadVersionState extends State<DownloadVersion> {
   final Dio dio = Dio();
+  int retry = 3;
   List<dynamic> _versionList = [];
   bool _isLoading = true;
   String? _error;
@@ -111,7 +112,12 @@ class DownloadVersionState extends State<DownloadVersion> {
       setState(() {
         _error = '网络请求失败: $e 可能是网络或者服务器问题,请稍后再试';
         _isLoading = false;
+        retry -= 1;
       });
+      if (retry > 0) {
+        LogUtil.log('正在重试请求，剩余重试次数: $retry', level: 'INFO');
+        await fetchVersionManifest();
+      }
     }
   }
 
