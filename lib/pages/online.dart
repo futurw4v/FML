@@ -100,11 +100,11 @@ class OnlinePageState extends State<OnlinePage> {
         },
       );
       final response = await dio.get(
-        'https://api.github.com/repos/EasyTier/EasyTier/releases/latest',
+        'https://api.github.com/repos/EasyTier/EasyTier/releases',
         options: options,
       );
       if (response.statusCode == 200) {
-        Map<String, dynamic> loaderData = response.data;
+        Map<String, dynamic> loaderData = response.data[0];
         String latestVersion = loaderData['tag_name'];
         if (latestVersion != _coreVersion) {
           LogUtil.log('检测到EasyTier核心新版本: $latestVersion', level: 'INFO');
@@ -228,11 +228,11 @@ class OnlinePageState extends State<OnlinePage> {
     );
     try {
       final response = await dio.get(
-        'https://api.github.com/repos/EasyTier/EasyTier/releases/latest',
+        'https://api.github.com/repos/EasyTier/EasyTier/releases',
         options: options,
       );
       if (response.statusCode == 200) {
-        Map<String, dynamic> loaderData = response.data;
+        Map<String, dynamic> loaderData = response.data[0];
         String architecture = _getSystemArchitecture();
         if (Platform.isMacOS) {
           if (architecture == 'X86_64') {
