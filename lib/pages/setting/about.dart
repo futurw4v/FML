@@ -158,6 +158,12 @@ class AboutPageState extends State<AboutPage> {
                   onTap: () => _launchURL('https://bmclapidoc.bangbang93.com'),
                 ),
                 ListTile(
+                  title: const Text('gh-proxy.com'),
+                  subtitle: const Text('GitHub 加速下载\nhttps://gh-proxy.com'),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://gh-proxy.com'),
+                ),
+                ListTile(
                   title: const Text('Modrinth'),
                   subtitle: const Text('资源下载\nhttps://modrinth.com'),
                   trailing: const Icon(Icons.open_in_new),

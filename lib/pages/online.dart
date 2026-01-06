@@ -309,6 +309,7 @@ class OnlinePageState extends State<OnlinePage> {
       );
       return;
     }
+    downloadUrl = 'https://edgeone.gh-proxy.org/$downloadUrl';
     LogUtil.log('开始下载: $downloadUrl', level: 'INFO');
     final prefs = await SharedPreferences.getInstance();
     final name = prefs.getString('SelectedPath') ?? '';
@@ -496,7 +497,7 @@ class OnlinePageState extends State<OnlinePage> {
                       children: [
                         ListTile(
                           title: const Text('EasyTier正在下载中...'),
-                          subtitle: const Text('请稍候，下载完成后即可使用联机功能'),
+                          subtitle: const Text('请稍候，下载完成后即可使用联机功能\nGitHub 加速由 gh-proxy.com 提供'),
                           leading: _coreExtracting
                               ? const CircularProgressIndicator()
                               : CircularProgressIndicator(),
