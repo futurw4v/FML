@@ -1,11 +1,12 @@
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/home.dart';
@@ -332,17 +333,56 @@ class MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  // 获取更新日志
+  Future<List<String>> _getUpdateInfo() async{
+    try {
+      Dio dio = Dio();
+      Options options = Options(
+        headers: {
+          'User-Agent': 'FML-App/$appVersion',
+        },
+      );
+      final response = await dio.get(
+        'https://api.github.com/repos/lxdklp/FML/releases',
+        options: options,
+      );
+      if (response.statusCode == 200) {
+        Map<String, dynamic> loaderData = response.data[0];
+        return [loaderData['name'], loaderData['body']];
+      }
+    } catch (e) {
+      LogUtil.log('获取更新日志失败: $e', level: 'ERROR');
+      return ['','请前往 GitHub 查看更新日志'];
+    }
+    return ['','请前往 GitHub 查看更新日志'];
+  }
+
   // 显示更新对话框
   Future<void> _showUpdateDialog(String latestVersion) async{
+    List<String>info = await _getUpdateInfo();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('发现新版本'),
-        content: Text('检测到新版本'),
+        title: Text('发现新版本 ${info[0]}'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: SingleChildScrollView(
+              child: Markdown(
+              data: info[1],
+              selectable: true,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              onTapLink: (text, href, title) {
+                if (href != null) _launchURL(href);
+              },
+            ),
+          )
+        ),
         actions: [
           TextButton(
             onPressed: () async {
-              _launchURL('https://github.com/lxdklp/FML/releases/');
+              _launchURL('https://github.com/lxdklp/FML/releases/latest');
             },
             child: const Text('前往Gtihub下载'),
           ),
