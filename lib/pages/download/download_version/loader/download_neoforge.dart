@@ -1037,7 +1037,7 @@ class DownloadNeoForgePageState extends State<DownloadNeoForgePage> {
                   ? const Icon(Icons.check)
                   : const CircularProgressIndicator(),
               ),
-            ),if (_parseAssetJson) ...[
+            ),if (_parseGameJson) ...[
               Card(
                 child: ListTile(
                   title: const Text('正在下载资源Json'),
