@@ -390,12 +390,16 @@ Future<void> fabricLauncher({
     '--height', cfg[3],
     if (cfg[1] == '1') '--fullscreen'
   ];
+  LogUtil.log('使用的Java: $java', level: 'INFO');
   onProgress?.call('正在启动游戏');
-  await Process.start(
+  final out = await Process.start(
   java,
   args,
   workingDirectory: '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game',
-  mode: ProcessStartMode.detached,
   );
+  out.stdout.listen((_) {});
+  out.stderr.listen((_) {});
   onProgress?.call('游戏启动完成');
+  final code = await out.exitCode;
+  LogUtil.log('退出码: $code', level: 'INFO');
 }
