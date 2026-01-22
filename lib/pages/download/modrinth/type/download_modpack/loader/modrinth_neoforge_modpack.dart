@@ -61,7 +61,6 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
   String _neoForgeURL = '';
 
   int _totalMods = 0;
-  int _downloadedMods = 0;
   int _mem = 1;
 
   List<String> _modsPath = [];
@@ -75,14 +74,8 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
   List<String> librariesURL = [];
   List<String> lwjglNativeNames = [];
   List<String> lwjglNativePaths = [];
-  List<Map<String, String>> _failedLibraries = [];
-  List<Map<String, String>> _failedAssets = [];
   List<String> neoForgeLibrariesPath = [];
   List<String> neoForgeLibrariesURL = [];
-
-  bool _isRetrying = false;
-  final int _maxRetries = 3;  // 最大重试次数
-  int _currentRetryCount = 0;
 
   // BMCLAPI 镜像
   String replaceWithMirror(String url) {
@@ -161,7 +154,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
       final mrpackFile = File('$versionPath${Platform.pathSeparator}${widget.name}.mrpack');
       final extractPath = '$versionPath${Platform.pathSeparator}mrpack';
       if (!await mrpackFile.exists()) {
-        throw Exception('Mrpack文件不存在: ${mrpackFile.path}');
+        throw Exception('Mrpack文件不存在 ${mrpackFile.path}');
       }
       final bytes = await mrpackFile.readAsBytes();
       final archive = ZipDecoder().decodeBytes(bytes);
@@ -179,7 +172,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
           await LogUtil.log('解压文件: $filename', level: 'INFO');
         }
       }
-      await LogUtil.log('Mrpack解压完成到: $extractPath', level: 'INFO');
+      await LogUtil.log('Mrpack解压完成: $extractPath', level: 'INFO');
       setState(() {
         _unzipMrpack = true;
       });
@@ -239,11 +232,10 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
     try {
       setState(() {
         _downloadModsStatus = false;
-        _downloadedMods = 0;
         _progress = 0.0;
       });
       final extractPath = '$versionPath${Platform.pathSeparator}mrpack';
-      await LogUtil.log('开始处理 $_totalMods 个模组文件', level: 'INFO');
+      await LogUtil.log('开始处理$_totalMods 个模组文件', level: 'INFO');
       final modsDir = Directory('$versionPath${Platform.pathSeparator}mods');
       if (!await modsDir.exists()) {
         await modsDir.create(recursive: true);
@@ -252,6 +244,8 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
       if (!await resourcepacksDir.exists()) {
         await resourcepacksDir.create(recursive: true);
       }
+      List<Map<String, String>> downloadTasks = [];
+      int copiedCount = 0;
       for (int i = 0; i < _modsPath.length; i++) {
         final path = _modsPath[i];
         final url = i < _modsUrl.length ? _modsUrl[i] : '';
@@ -278,57 +272,45 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
         if (!await targetFile.parent.exists()) {
           await targetFile.parent.create(recursive: true);
         }
-        bool fileHandled = false;
+        // 优先从本地复制
         final String localFilePath = '$extractPath${Platform.pathSeparator}${path.replaceAll('/', Platform.pathSeparator)}';
         final File localFile = File(localFilePath);
         if (await localFile.exists()) {
           try {
             await localFile.copy(targetPath);
-            await LogUtil.log('复制文件 (${_downloadedMods+1}/$_totalMods): $fileName', level: 'INFO');
-            fileHandled = true;
+            copiedCount++;
+            await LogUtil.log('复制文件 ($copiedCount): $fileName', level: 'INFO');
           } catch (e) {
             await LogUtil.log('复制文件失败: $fileName - $e', level: 'ERROR');
-          }
-        }
-        if (!fileHandled && url.isNotEmpty) {
-          await LogUtil.log('正在下载 (${_downloadedMods+1}/$_totalMods): $fileName', level: 'INFO');
-          try {
-            await DownloadUtils.downloadFile(
-              url: url,
-              savePath: targetPath,
-              onProgress: (progress) {
-                setState(() {
-                  _progress = (_downloadedMods + progress) / _totalMods;
-                });
-              },
-              onSuccess: () async {
-                await LogUtil.log('下载成功: $fileName', level: 'INFO');
-                fileHandled = true;
-              },
-              onError: (error) async {
-                await LogUtil.log('下载失败: $fileName - $error', level: 'ERROR');
-              }
-            );
-            final downloadedFile = File(targetPath);
-            if (await downloadedFile.exists()) {
-              fileHandled = true;
+            if (url.isNotEmpty) {
+              downloadTasks.add({'url': url, 'path': targetPath});
             }
-          } catch (e) {
-            await LogUtil.log('下载异常: $fileName - $e', level: 'ERROR');
           }
-        }
-        if (!fileHandled) {
+        } else if (url.isNotEmpty) {
+          downloadTasks.add({'url': url, 'path': targetPath});
+        } else {
           await LogUtil.log('无法处理文件: $fileName - 本地不存在且下载URL为空', level: 'ERROR');
         }
-        _downloadedMods++;
-        setState(() {
-          _progress = _downloadedMods / _totalMods;
-        });
+      }
+      await LogUtil.log('本地复制完成: $copiedCount 个文件 需要下载 ${downloadTasks.length} 个文件', level: 'INFO');
+      // 多线程下载剩余文件
+      if (downloadTasks.isNotEmpty) {
+        final downloadResult = await DownloadUtils.batchDownload(
+          tasks: downloadTasks,
+          fileType: '模组文件',
+          onProgress: (progress) {
+            setState(() {
+              _progress = (copiedCount + progress * downloadTasks.length) / _totalMods;
+            });
+          },
+        );
+        await LogUtil.log('下载完成: 总数=${downloadResult.totalCount}, 成功=${downloadResult.completedCount}, 失败=${downloadResult.failedList.length}', level: 'INFO');
       }
       setState(() {
         _downloadModsStatus = true;
+        _progress = 1.0;
       });
-      await LogUtil.log('所有模组文件处理完成', level: 'INFO');
+      await LogUtil.log('所有模组文件处理完成, 状态已更新', level: 'INFO');
     } catch (e) {
       await LogUtil.log('下载模组失败: $e', level: 'ERROR');
       await _showNotification('模组下载失败', '无法完成模组下载: $e');
@@ -336,55 +318,64 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
     }
   }
 
-  // 获取游戏Json
+  // 获取游戏 Json
   Future<void> _saveMinecraftJson(String versionPath) async {
-    try {
-      final options = Options(
-        headers: {
-          'User-Agent': 'FML/$_appVersion',
-        },
-        responseType: ResponseType.plain,
-      );
-      LogUtil.log('开始请求版本清单', level: 'INFO');
-      final response = await dio.get(
-        'https://bmclapi2.bangbang93.com/mc/game/version_manifest.json',
-        options: options,
-      );
-      if (response.statusCode == 200) {
-        LogUtil.log('成功获取版本清单', level: 'INFO');
-        dynamic parsedData;
-        if (response.data is String) {
-          parsedData = jsonDecode(response.data);
-        } else {
-          parsedData = response.data;
-        }
-        if (parsedData != null && parsedData.containsKey('versions')) {
-        final versions = parsedData['versions'];
-        for (var version in versions) {
-          if (version['id'] == _minecraftVersion) {
-            final versionUrl = version['url'];
-            final gameJsonURL = replaceWithMirror(versionUrl);
-            LogUtil.log('找到版本 $_minecraftVersion 的URL: $versionUrl BMCLAPI: $gameJsonURL', level: 'INFO');
-            try {
-              await _downloadFile('$versionPath${Platform.pathSeparator}${widget.name}.json', gameJsonURL);
-              setState(() {
-                _downloadMinecraftJson = true;
-              });
-            } catch (e) {
-              await _showNotification('下载失败', '版本Json下载失败\n$e');
-              setState(() {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('下载版本Json失败: $e')),
-                );
-              });
-              return;
+    final options = Options(
+      headers: {
+        'User-Agent': 'FML/$_appVersion',
+      },
+      responseType: ResponseType.plain,
+    );
+    int retry = 0;
+    while (true) {
+      try {
+        await LogUtil.log('请求版本清单 (尝试第 ${retry + 1} 次)', level: 'INFO');
+        final response = await dio.get(
+          'https://bmclapi2.bangbang93.com/mc/game/version_manifest.json',
+          options: options,
+        );
+        if (response.statusCode == 200) {
+          await LogUtil.log('成功获取版本清单', level: 'INFO');
+          dynamic parsedData;
+          if (response.data is String) {
+            parsedData = jsonDecode(response.data);
+          } else {
+            parsedData = response.data;
+          }
+          if (parsedData != null && parsedData.containsKey('versions')) {
+            final versions = parsedData['versions'] as List<dynamic>;
+            for (var v in versions) {
+              if (v is Map && v['id'] == _minecraftVersion) {
+                final url = v['url'];
+                if (url != null) {
+                  try {
+                    final resp = await dio.get(url, options: Options(responseType: ResponseType.plain));
+                    if (resp.statusCode == 200) {
+                      final filePath = '$versionPath${Platform.pathSeparator}${widget.name}.json';
+                      await File(filePath).writeAsString(resp.data is String ? resp.data : jsonEncode(resp.data));
+                      await LogUtil.log('已保存游戏 JSON 到: $filePath', level: 'INFO');
+                      setState(() {
+                        _downloadMinecraftJson = true;
+                      });
+                    }
+                  } catch (e) {
+                    await LogUtil.log('下载游戏 JSON 失败: $e', level: 'ERROR');
+                  }
+                }
+                break;
+              }
             }
           }
+          return;
+        } else {
+          throw Exception('HTTP ${response.statusCode}');
         }
+      } catch (e) {
+        retry++;
+        final delayMs = (300 * (1 << ((retry - 1).clamp(0, 8)))).clamp(300, 30000);
+        await LogUtil.log('请求版本清单失败 (第 $retry 次): $e —— ${delayMs}ms 后重试', level: 'WARNING');
+        await Future.delayed(Duration(milliseconds: delayMs));
       }
-      }
-    } catch (e) {
-      LogUtil.log('请求出错: $e', level: 'ERROR');
     }
   }
 
@@ -393,7 +384,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
     try {
       final file = File(jsonFilePath);
       if (!file.existsSync()) {
-        throw Exception('JSON文件不存在: $jsonFilePath');
+        throw Exception('JSON文件不存在 $jsonFilePath');
       }
       final jsonString = await file.readAsString();
       final jsonData = jsonDecode(jsonString);
@@ -446,7 +437,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
     try {
       final file = File(assetIndexPath);
       if (!file.existsSync()) {
-        throw Exception('资产索引文件不存在: $assetIndexPath');
+        throw Exception('资产索引文件不存在 $assetIndexPath');
       }
       final jsonString = await file.readAsString();
       final jsonData = jsonDecode(jsonString);
@@ -460,7 +451,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
           _assetHash.add(info['hash']);
         }
       });
-      await LogUtil.log('已解析 ${_assetHash.length} 个资产哈希值', level: 'INFO');
+      await LogUtil.log('已解析${_assetHash.length} 个资产哈希', level: 'INFO');
       setState(() {
         _parseAssetJson = true;
       });
@@ -471,32 +462,24 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
   }
 
 
-  // 下载库
-  Future<void> _downloadLibraries({int concurrentDownloads = 20}) async {
+  // 下载库文件
+  Future<void> _downloadLibraries() async {
     if (librariesURL.isEmpty || librariesPath.isEmpty) {
-      await _showNotification('库文件列表为空', '无法下载库文件');
+      await _showNotification('库文件列表为空, 无法下载库文件', '');
       await LogUtil.log('库文件列表为空，无法下载库文件', level: 'ERROR');
       return;
-    }
-    if (!_isRetrying) {
-      _failedLibraries.clear();
     }
     final prefs = await SharedPreferences.getInstance();
     final selectedGamePath = prefs.getString('SelectedPath') ?? '';
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     List<Map<String, String>> downloadTasks = [];
-    if (_isRetrying && _failedLibraries.isNotEmpty) {
-      await LogUtil.log('正在重试下载 ${_failedLibraries.length} 个失败的库文件', level: 'INFO');
-      downloadTasks = _failedLibraries;
-    } else {
-      for (int i = 0; i < librariesURL.length; i++) {
-        final url = librariesURL[i];
-        final relativePath = librariesPath[i];
-        final fullPath = '$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}$relativePath';
-        final file = File(fullPath);
-        if (!file.existsSync()) {
-          downloadTasks.add({'url': url, 'path': fullPath});
-        }
+    for (int i = 0; i < librariesURL.length; i++) {
+      final url = librariesURL[i];
+      final relativePath = librariesPath[i];
+      final fullPath = '$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}$relativePath';
+      final file = File(fullPath);
+      if (!file.existsSync()) {
+        downloadTasks.add({'url': url, 'path': fullPath});
       }
     }
     final totalLibraries = downloadTasks.length;
@@ -507,96 +490,39 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
       });
       return;
     }
-    int completedLibraries = 0;
-    List<Map<String, String>> newFailedList = [];
-    void updateProgress() {
-      setState(() {
-        _progress = completedLibraries / totalLibraries;
-      });
-    }
-    await LogUtil.log('开始下载 $totalLibraries 个库文件，并发数: $concurrentDownloads', level: 'INFO');
-    for (int i = 0; i < downloadTasks.length; i += concurrentDownloads) {
-      int end = i + concurrentDownloads;
-      if (end > downloadTasks.length) end = downloadTasks.length;
-      List<Future<void>> batch = [];
-      for (int j = i; j < end; j++) {
-        final task = downloadTasks[j];
-        batch.add(() async {
-          try {
-            await DownloadUtils.downloadFile(
-              url: task['url']!,
-              savePath: task['path']!,
-              onProgress: (_) {},
-              onSuccess: () {
-                completedLibraries++;
-                updateProgress();
-              },
-              onError: (error) async{
-                completedLibraries++;
-                newFailedList.add(task);
-                await LogUtil.log('下载库文件失败: $error, URL: ${task['url']}', level: 'ERROR');
-              }
-            );
-          } catch (e) {
-            completedLibraries++;
-            newFailedList.add(task);
-            await LogUtil.log('下载库文件异常: $e, URL: ${task['url']}', level: 'ERROR');
-          }
-        }());
-      }
-      await Future.wait(batch);
-      updateProgress();
-      await LogUtil.log('已完成: $completedLibraries/$totalLibraries, 失败: ${newFailedList.length}');
-    }
-    _failedLibraries = newFailedList;
-    if (newFailedList.isNotEmpty && _currentRetryCount < _maxRetries) {
-      _currentRetryCount++;
-      await LogUtil.log('准备重试下载 ${newFailedList.length} 个失败的库文件 (第 $_currentRetryCount 次重试)');
-      setState(() {
-        _isRetrying = true;
-      });
-      await _downloadLibraries(concurrentDownloads: concurrentDownloads);
-    } else if (newFailedList.isNotEmpty) {
-      await LogUtil.log('已达最大并发重试次数，开始单线程无限重试 ${newFailedList.length} 个库文件', level: 'WARNING');
-      await _singleThreadRetryDownload(newFailedList, "库文件", (progress) {
+    await LogUtil.log('开始下载 $totalLibraries 个库文件', level: 'INFO');
+    await DownloadUtils.batchDownload(
+      tasks: downloadTasks,
+      onProgress: (progress) {
         setState(() {
           _progress = progress;
         });
-      });
-    }
+      },
+    );
     setState(() {
-      _isRetrying = false;
-      _currentRetryCount = 0;
       _downloadLibrary = true;
     });
   }
 
   // 下载资源
-  Future<void> _downloadAssets({int concurrentDownloads = 30}) async {
+  Future<void> _downloadAssets() async {
     final prefs = await SharedPreferences.getInstance();
     final selectedGamePath = prefs.getString('SelectedPath') ?? '';
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
-    if (!_isRetrying) {
-      _failedAssets.clear();
-    }
     List<Map<String, String>> downloadTasks = [];
-    if (_isRetrying && _failedAssets.isNotEmpty) {
-      downloadTasks = _failedAssets;
-    } else {
-      for (int i = 0; i < _assetHash.length; i++) {
-        final hash = _assetHash[i];
-        final hashPrefix = hash.substring(0, 2);
-        final assetDir = '$gamePath${Platform.pathSeparator}assets${Platform.pathSeparator}objects${Platform.pathSeparator}$hashPrefix';
-        final assetPath = '$assetDir${Platform.pathSeparator}$hash';
-        final directory = Directory(assetDir);
-        if (!directory.existsSync()) {
-          directory.createSync(recursive: true);
-        }
-        final file = File(assetPath);
-        if (!file.existsSync()) {
-          final url = 'https://bmclapi2.bangbang93.com/assets/$hashPrefix/$hash';
-          downloadTasks.add({'url': url, 'path': assetPath});
-        }
+    for (int i = 0; i < _assetHash.length; i++) {
+      final hash = _assetHash[i];
+      final hashPrefix = hash.substring(0, 2);
+      final assetDir = '$gamePath${Platform.pathSeparator}assets${Platform.pathSeparator}objects${Platform.pathSeparator}$hashPrefix';
+      final assetPath = '$assetDir${Platform.pathSeparator}$hash';
+      final directory = Directory(assetDir);
+      if (!directory.existsSync()) {
+        directory.createSync(recursive: true);
+      }
+      final file = File(assetPath);
+      if (!file.existsSync()) {
+        final url = 'https://bmclapi2.bangbang93.com/assets/$hashPrefix/$hash';
+        downloadTasks.add({'url': url, 'path': assetPath});
       }
     }
     final totalAssets = downloadTasks.length;
@@ -607,69 +533,16 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
       });
       return;
     }
-    await LogUtil.log('需要下载 $totalAssets 个资源文件，并发数: $concurrentDownloads', level: 'INFO');
-    int completedAssets = 0;
-    List<Map<String, String>> newFailedList = [];
-    void updateProgress() {
-      setState(() {
-        _progress = completedAssets / totalAssets;
-      });
-    }
-    for (int i = 0; i < downloadTasks.length; i += concurrentDownloads) {
-      int end = i + concurrentDownloads;
-      if (end > downloadTasks.length) end = downloadTasks.length;
-      List<Future<void>> batch = [];
-      for (int j = i; j < end; j++) {
-        final task = downloadTasks[j];
-        batch.add(() async {
-          try {
-            await DownloadUtils.downloadFile(
-              url: task['url']!,
-              savePath: task['path']!,
-              onProgress: (_) {},
-              onSuccess: () {
-                completedAssets++;
-                if (completedAssets % 20 == 0 || completedAssets == totalAssets) {
-                  updateProgress();
-                }
-              },
-              onError: (error) async {
-                completedAssets++;
-                newFailedList.add(task);
-                if (newFailedList.length % 10 == 0) {
-                  await LogUtil.log('已有 ${newFailedList.length} 个资源文件下载失败: $error, URL: ${task['url']}', level: 'ERROR');
-                }
-              }
-            );
-          } catch (e) {
-            completedAssets++;
-            newFailedList.add(task);
-          }
-        }());
-      }
-      await Future.wait(batch);
-      updateProgress();
-      await LogUtil.log('已完成: $completedAssets/$totalAssets, 失败: ${newFailedList.length}', level: 'INFO');
-    }
-    _failedAssets = newFailedList;
-    if (newFailedList.isNotEmpty && _currentRetryCount < _maxRetries) {
-      _currentRetryCount++;
-      await LogUtil.log('准备重试下载 ${newFailedList.length} 个失败的资源文件 (第 $_currentRetryCount 次重试)', level: 'INFO');
-      setState(() {
-        _isRetrying = true;
-      });
-      await _downloadAssets(concurrentDownloads: concurrentDownloads);
-    } else if (newFailedList.isNotEmpty) {
-      await LogUtil.log('已达最大并发重试次数，开始单线程重试 ${newFailedList.length} 个资源文件', level: 'WARNING');
-      await _singleThreadRetryDownload(newFailedList, "资源文件", (progress) {
+    await LogUtil.log('需要下载 $totalAssets 个资源文件', level: 'INFO');
+    await DownloadUtils.batchDownload(
+      tasks: downloadTasks,
+      onProgress: (progress) {
         setState(() {
           _progress = progress;
         });
-      });
-    }
+      },
+    );
     setState(() {
-      _isRetrying = false;
-      _currentRetryCount = 0;
       _downloadAsset = true;
     });
   }
@@ -680,7 +553,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
     final pathsList = <String>[];
     final file = File(jsonFilePath);
     if (!await file.exists()) {
-      await LogUtil.log('版本JSON文件不存在: $jsonFilePath', level: 'ERROR');
+      await LogUtil.log('版本JSON文件不存在 $jsonFilePath', level: 'ERROR');
       await _showNotification('版本JSON文件不存在', jsonFilePath);
       setState(() {
         lwjglNativeNames = namesList;
@@ -722,7 +595,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
       final path = artifact['path'];
       if (path is! String || path.isEmpty) continue;
       final fileName = path.split('/').last;
-      // 检查是否为所需的LWJGL库
+      // 检查是否为所需的LWJGL本地库文件
       if ((fileName.startsWith('lwjgl-') && fileName.contains('-natives-')) ||
           (fileName.startsWith('lwjgl-freetype-') && fileName.contains('-natives-')) ||
           (fileName.startsWith('lwjgl-glfw-') && fileName.contains('-natives-')) ||
@@ -734,10 +607,10 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
         String nativePath = path.replaceAll('/', Platform.pathSeparator);
         final fullPath = ('$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}$nativePath');
         pathsList.add(fullPath);
-        await LogUtil.log('找到LWJGL库: $fileName, 路径: $fullPath', level: 'INFO');
+        await LogUtil.log('找到LWJGL本地库文件 $fileName, 路径: $fullPath', level: 'INFO');
       }
     }
-    await LogUtil.log('总共找到${namesList.length}个LWJGL本地库', level: 'INFO');
+    await LogUtil.log('总共找到${namesList.length}个LWJGL本地库文件', level: 'INFO');
     setState(() {
       lwjglNativeNames = namesList;
       lwjglNativePaths = pathsList;
@@ -748,7 +621,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
   // 提取LWJGL Natives
   Future<void> _extractLwjglNatives() async {
     if (lwjglNativePaths.isEmpty || lwjglNativeNames.isEmpty) {
-      await LogUtil.log('没有找到LWJGL本地库，跳过提取', level: 'WARNING');
+      await LogUtil.log('没有找到LWJGL本地库, 跳过提取', level: 'WARNING');
       setState(() {
         _extractedLwjglNativesPath = true;
       });
@@ -777,14 +650,14 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
         if (extracted.isNotEmpty) {
           successCount++;
           extractedFiles.addAll(extracted);
-          await LogUtil.log('成功从 $fileName 提取了 ${extracted.length} 个文件');
+          await LogUtil.log('成功提取 $fileName 共 ${extracted.length} 个文件', level: 'INFO');
         }
       } catch (e) {
-        await LogUtil.log('提取 $fileName 时出错: $e', level: 'ERROR');
+        await LogUtil.log('提取 $fileName 时出现错误 $e', level: 'ERROR');
       }
     }
-    await LogUtil.log('完成LWJGL本地库提取, 共处理 ${lwjglNativePaths.length} 个文件, 成功: $successCount', level: 'INFO');
-    await LogUtil.log('提取的文件: ${extractedFiles.join(', ')}', level: 'INFO');
+    await LogUtil.log('完成LWJGL本地库提取 共处理${lwjglNativePaths.length} 个文件 成功: $successCount', level: 'INFO');
+    await LogUtil.log('提取的文件 ${extractedFiles.join(', ')}', level: 'INFO');
     setState(() {
       _extractedLwjglNatives = true;
     });
@@ -816,7 +689,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
         throw Exception('无法从安装器中提取install_profile.json');
       }
     } catch (e) {
-      throw Exception('提取NeoForge安装器失败: $e');
+      throw Exception('提取NeoForge安装器失败 $e');
     }
     setState(() {
       _extractNeoForgeInstallerStatus = true;
@@ -879,40 +752,30 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
   }
 
   // 下载NeoForge库
-  Future<void> _downloadNeoForgeLibraries({int concurrentDownloads = 20}) async {
+  Future<void> _downloadNeoForgeLibraries() async {
     if (neoForgeLibrariesURL.isEmpty || neoForgeLibrariesPath.isEmpty) {
       await LogUtil.log('NeoForge库文件列表为空', level: 'ERROR');
       await _showNotification('下载失败', 'NeoForge库文件列表为空');
       setState(() {
-        _downloadNeoForgeLibrary = false;
-        _currentRetryCount = 0;
         _downloadNeoForgeLibrary = true;
       });
       return;
-    }
-    if (!_isRetrying) {
-      _failedLibraries.clear();
     }
     final prefs = await SharedPreferences.getInstance();
     final selectedGamePath = prefs.getString('SelectedPath') ?? '';
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     List<Map<String, String>> downloadTasks = [];
-    if (_isRetrying && _failedLibraries.isNotEmpty) {
-      await LogUtil.log('正在重试下载 ${_failedLibraries.length} 个失败的NeoForge库文件', level: 'INFO');
-      downloadTasks = _failedLibraries;
-    } else {
-      final libraryDir = Directory('$gamePath${Platform.pathSeparator}libraries');
-      if (!await libraryDir.exists()) {
-        await libraryDir.create(recursive: true);
-      }
-      for (int i = 0; i < neoForgeLibrariesURL.length; i++) {
-        final url = neoForgeLibrariesURL[i];
-        final relativePath = neoForgeLibrariesPath[i];
-        final fullPath = '$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}$relativePath';
-        final file = File(fullPath);
-        if (!file.existsSync()) {
-          downloadTasks.add({'url': url, 'path': fullPath});
-        }
+    final libraryDir = Directory('$gamePath${Platform.pathSeparator}libraries');
+    if (!await libraryDir.exists()) {
+      await libraryDir.create(recursive: true);
+    }
+    for (int i = 0; i < neoForgeLibrariesURL.length; i++) {
+      final url = neoForgeLibrariesURL[i];
+      final relativePath = neoForgeLibrariesPath[i];
+      final fullPath = '$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}$relativePath';
+      final file = File(fullPath);
+      if (!file.existsSync()) {
+        downloadTasks.add({'url': url, 'path': fullPath});
       }
     }
     final totalLibraries = downloadTasks.length;
@@ -923,66 +786,16 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
       });
       return;
     }
-    await LogUtil.log('开始下载 $totalLibraries 个NeoForge库文件,并发数: $concurrentDownloads', level: 'INFO');
-    int completedLibraries = 0;
-    List<Map<String, String>> newFailedList = [];
-    void updateProgress() {
-      setState(() {
-        _progress = completedLibraries / totalLibraries;
-      });
-    }
-    for (int i = 0; i < downloadTasks.length; i += concurrentDownloads) {
-      int end = i + concurrentDownloads;
-      if (end > downloadTasks.length) end = downloadTasks.length;
-      List<Future<void>> batch = [];
-      for (int j = i; j < end; j++) {
-        final task = downloadTasks[j];
-        batch.add(() async {
-          try {
-            await DownloadUtils.downloadFile(
-              url: task['url']!,
-              savePath: task['path']!,
-              onProgress: (_) {},
-              onSuccess: () {
-                completedLibraries++;
-                updateProgress();
-              },
-              onError: (error) async {
-                completedLibraries++;
-                newFailedList.add(task);
-                await LogUtil.log('下载NeoForge库文件失败: $error, URL: ${task['url']}', level: 'ERROR');
-              }
-            );
-          } catch (e) {
-            completedLibraries++;
-            newFailedList.add(task);
-            await LogUtil.log('下载NeoForge库文件异常: $e, URL: ${task['url']}', level: 'ERROR');
-          }
-        }());
-      }
-      await Future.wait(batch);
-      updateProgress();
-      await LogUtil.log('已完成: $completedLibraries/$totalLibraries, 失败: ${newFailedList.length}', level: 'INFO');
-    }
-    _failedLibraries = newFailedList;
-    if (newFailedList.isNotEmpty && _currentRetryCount < _maxRetries) {
-      _currentRetryCount++;
-      await LogUtil.log('准备重试下载 ${newFailedList.length} 个失败的NeoForge库文件 (第 $_currentRetryCount 次重试)', level: 'INFO');
-      setState(() {
-        _isRetrying = true;
-      });
-      await _downloadNeoForgeLibraries(concurrentDownloads: concurrentDownloads);
-    } else if (newFailedList.isNotEmpty) {
-      await LogUtil.log('已达最大并发重试次数,开始单线程重试 ${newFailedList.length} 个NeoForge库文件', level: 'WARNING');
-      await _singleThreadRetryDownload(newFailedList, "NeoForge库文件", (progress) {
+    await LogUtil.log('开始下载 $totalLibraries 个NeoForge库文件', level: 'INFO');
+    await DownloadUtils.batchDownload(
+      tasks: downloadTasks,
+      onProgress: (progress) {
         setState(() {
           _progress = progress;
         });
-      });
-    }
+      },
+    );
     setState(() {
-      _isRetrying = false;
-      _currentRetryCount = 0;
       _downloadNeoForgeLibrary = true;
     });
   }
@@ -994,7 +807,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     final installerPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}${Platform.pathSeparator}neoforge-installer.jar';
     final neoForgeJson = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}neoforge-$_neoforgeVersion${Platform.pathSeparator}neoforge-$_neoforgeVersion.json';
-    await LogUtil.log('开始执行NeoForge安装器: $installerPath', level: 'INFO');
+    await LogUtil.log('开始执行NeoForge安装器 $installerPath', level: 'INFO');
     final result = await Process.run('java', [
       '-jar', installerPath,
       '--installClient', gamePath
@@ -1009,10 +822,10 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
     final code = result.exitCode;
     await LogUtil.log('NeoForge安装器退出码: $code', level: 'INFO');
     if (code != 0) {
-      throw Exception('NeoForge安装器执行失败,退出码: $code');
+      throw Exception('NeoForge安装器执行失败 退出码: $code');
     }
     await LogUtil.log('NeoForge安装器执行成功', level: 'INFO');
-    await LogUtil.log('移动$neoForgeJson 配置文件到: $gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}${Platform.pathSeparator}NeoForge.json', level: 'INFO');
+    await LogUtil.log('移动$neoForgeJson 配置文件到 $gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}${Platform.pathSeparator}NeoForge.json', level: 'INFO');
     await _moveFile(neoForgeJson, '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}${Platform.pathSeparator}NeoForge.json');
     setState(() {
       _neoForgeInstalled = true;
@@ -1038,53 +851,6 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
       await LogUtil.log('移动文件时发生错误: $e', level: 'ERROR');
       await _showNotification('移动文件时发生错误', e.toString());
     }
-  }
-
-  // 单线程重新尝试
-  Future<void> _singleThreadRetryDownload(List<Map<String, String>> failedList, String fileType,
-      Function(double) updateProgressCallback) async {
-    int total = failedList.length;
-    int completed = 0;
-    List<Map<String, String>> currentFailedList = List.from(failedList);
-    while (currentFailedList.isNotEmpty) {
-      List<Map<String, String>> nextRetryList = [];
-      for (var task in currentFailedList) {
-        bool success = false;
-        int retryCount = 0;
-        while (!success) {
-          try {
-            retryCount++;
-            LogUtil.log('正在尝试下载$fileType: ${task['url']} (第 $retryCount 次尝试)', level: 'INFO');
-            bool downloadComplete = false;
-            await DownloadUtils.downloadFile(
-              url: task['url']!,
-              savePath: task['path']!,
-              onProgress: (_) {},
-              onSuccess: () async{
-                downloadComplete = true;
-                await LogUtil.log('$fileType下载成功: ${task['url']}', level: 'INFO');
-              },
-              onError: (error) async{
-                await LogUtil.log('$fileType下载失败: $error, URL: ${task['url']}', level: 'ERROR');
-              }
-            );
-            if (downloadComplete) {
-              success = true;
-              completed++;
-              updateProgressCallback(completed / total);
-              await LogUtil.log('已完成: $completed/$total $fileType', level: 'INFO');
-            } else {
-              await Future.delayed(Duration(milliseconds: 500));
-            }
-          } catch (e) {
-            await LogUtil.log('$fileType下载异常: $e, URL: ${task['url']}', level: 'ERROR');
-            await Future.delayed(Duration(seconds: 1));
-          }
-        }
-      }
-      currentFailedList = nextRetryList;
-    }
-    await LogUtil.log('所有$fileType已成功下载', level: 'INFO');
   }
 
   // 文件下载
@@ -1119,7 +885,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
     }
   }
 
-  // 复制整合包内容
+  // 复制整合包内 overrides 内容
   Future<void> _copyOverridesContent(String versionPath) async {
     try {
       final overridesDir = Directory('$versionPath${Platform.pathSeparator}mrpack${Platform.pathSeparator}overrides');
@@ -1192,7 +958,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
     await prefs.setStringList(key, defaultConfig);
     gameList.add(widget.name);
     await prefs.setStringList('Game_$_name', gameList);
-    await LogUtil.log('已将 ${widget.name} 添加到游戏列表,当前列表: $gameList', level: 'INFO');
+    await LogUtil.log('已将 ${widget.name} 添加到游戏列表, 当前列表: $gameList', level: 'INFO');
     setState(() {
       _writeConfig = true;
     });
@@ -1206,7 +972,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
   final versionPath = '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}';
   try{
     await LogUtil.log('正在下载整合包 ${widget.name}', level: 'INFO');
-    await _showNotification('开始下载', '正在下载 ${widget.name} \n你可以将启动器置于后台,安装完成将有通知提醒');
+    await _showNotification('开始下载', '正在下载 ${widget.name} \n你可以将启动器置于后台, 安装完成将有通知提醒');
     // 创建文件夹
     await _createGameDirectories();
     // 下载整合包信息
@@ -1252,7 +1018,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
         }
         // 解析资产索引文件
         await _parseAssetIndex(assetIndexPath);
-        // 下载客户端
+        // 下载客户端文件
         try {
           await _downloadFile('$versionPath${Platform.pathSeparator}${widget.name}.jar', clientURL);
           setState(() {
@@ -1267,15 +1033,15 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
           return;
         }
               // 下载库文件
-        await _downloadLibraries(concurrentDownloads: 30);
+        await _downloadLibraries();
         // 下载资源文件
-        await _downloadAssets(concurrentDownloads: 30);
+        await _downloadAssets();
         // 提取LWJGL本地库路径
         await extractLwjglNativeLibrariesPath('$versionPath${Platform.pathSeparator}${widget.name}.json',gamePath);
         // 提取LWJGL Natives
         await _extractLwjglNatives();
         // 下载NeoForge安装器
-        LogUtil.log('开始下载: $versionPath,$_neoForgeURL', level: 'INFO');
+        LogUtil.log('开始下载 $versionPath, $_neoForgeURL', level: 'INFO');
         try {
           await _downloadFile('$versionPath${Platform.pathSeparator}neoforge-installer.jar',_neoForgeURL);
           setState(() {
@@ -1297,7 +1063,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
         await _downloadNeoForgeLibraries();
         // 执行NeoForge安装器
         await _executeNeoForgeInstaller();
-        // 复制整合包内容
+        // 复制整合包内 overrides 内容
         await _copyOverridesContent(versionPath);
         // 写入游戏配置文件
         await _writeGameConfig();
@@ -1558,7 +1324,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
                 children: [
                   ListTile(
                     title: const Text('正在下载NeoForge库文件'),
-                    subtitle: Text(_downloadNeoForgeLibrary ? '下载完成' : '下载中... 已下载${(_progress * 100).toStringAsFixed(2)}%'),
+                    subtitle: Text(_downloadNeoForgeLibrary ? '下载完成' : '下载中... 已下载 ${(_progress * 100).toStringAsFixed(2)}%'),
                     trailing: _downloadNeoForgeLibrary
                       ? const Icon(Icons.check)
                       : const CircularProgressIndicator(),

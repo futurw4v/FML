@@ -49,11 +49,6 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
   final List<String> _assetHash = [];
   List<String> lwjglNativeNames = [];
   List<String> lwjglNativePaths = [];
-  List<Map<String, String>> _failedLibraries = [];
-  List<Map<String, String>> _failedAssets = [];
-  bool _isRetrying = false;
-  final int _maxRetries = 3;  // 最大重试次数
-  int _currentRetryCount = 0;
 
   // BMCLAPI 镜像
   String replaceWithMirror(String url) {
@@ -207,204 +202,91 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
   }
 
   // 下载库
-  Future<void> _downloadLibraries({int concurrentDownloads = 20}) async {
+  Future<void> _downloadLibraries() async {
     if (librariesURL.isEmpty || librariesPath.isEmpty) {
       await _showNotification('库文件列表为空', '无法下载库文件');
       await LogUtil.log('库文件列表为空,无法下载库文件', level: 'ERROR');
       return;
     }
-    if (!_isRetrying) {
-      _failedLibraries.clear();
-    }
     final prefs = await SharedPreferences.getInstance();
     final selectedGamePath = prefs.getString('SelectedPath') ?? '';
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     List<Map<String, String>> downloadTasks = [];
-    if (_isRetrying && _failedLibraries.isNotEmpty) {
-      downloadTasks = _failedLibraries;
-    } else {
-      for (int i = 0; i < librariesURL.length; i++) {
-        final url = librariesURL[i];
-        final relativePath = librariesPath[i];
-        final fullPath = '$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}$relativePath';
-        final file = File(fullPath);
-        if (!file.existsSync()) {
-          downloadTasks.add({'url': url, 'path': fullPath});
-        }
+    for (int i = 0; i < librariesURL.length; i++) {
+      final url = librariesURL[i];
+      final relativePath = librariesPath[i];
+      final fullPath = '$gamePath${Platform.pathSeparator}libraries${Platform.pathSeparator}$relativePath';
+      final file = File(fullPath);
+      if (!file.existsSync()) {
+        downloadTasks.add({'url': url, 'path': fullPath});
       }
     }
-    final totalLibraries = downloadTasks.length;
-    if (totalLibraries == 0) {
+    if (downloadTasks.isEmpty) {
       await LogUtil.log('所有库文件已存在,无需下载', level: 'INFO');
       setState(() {
         _downloadLibrary = true;
       });
       return;
     }
-    int completedLibraries = 0;
-    List<Map<String, String>> newFailedList = [];
-    void updateProgress() {
-      setState(() {
-        _progress = completedLibraries / totalLibraries;
-      });
-    }
-    await LogUtil.log('开始下载 $totalLibraries 个库文件,并发数: $concurrentDownloads', level: 'INFO');
-    for (int i = 0; i < downloadTasks.length; i += concurrentDownloads) {
-      int end = i + concurrentDownloads;
-      if (end > downloadTasks.length) end = downloadTasks.length;
-      List<Future<void>> batch = [];
-      for (int j = i; j < end; j++) {
-        final task = downloadTasks[j];
-        batch.add(() async {
-          try {
-            await DownloadUtils.downloadFile(
-              url: task['url']!,
-              savePath: task['path']!,
-              onProgress: (_) {},
-              onSuccess: () {
-                completedLibraries++;
-                updateProgress();
-              },
-              onError: (error) async{
-                completedLibraries++;
-                newFailedList.add(task);
-                await LogUtil.log('下载库文件失败: $error, URL: ${task['url']}', level: 'ERROR');
-              }
-            );
-          } catch (e) {
-            completedLibraries++;
-            newFailedList.add(task);
-            await LogUtil.log('下载库文件异常: $e, URL: ${task['url']}', level: 'ERROR');
-          }
-        }());
-      }
-      await Future.wait(batch);
-      updateProgress();
-      await LogUtil.log('已完成: $completedLibraries/$totalLibraries, 失败: ${newFailedList.length}', level: 'INFO');
-    }
-    _failedLibraries = newFailedList;
-    if (newFailedList.isNotEmpty && _currentRetryCount < _maxRetries) {
-      _currentRetryCount++;
-      await LogUtil.log('准备重试下载 ${newFailedList.length} 个失败的库文件 (第 $_currentRetryCount 次重试)', level: 'INFO');
-      setState(() {
-        _isRetrying = true;
-      });
-      await _downloadLibraries(concurrentDownloads: concurrentDownloads);
-    } else if (newFailedList.isNotEmpty) {
-      await LogUtil.log('已达最大并发重试次数,开始单线程重试 ${newFailedList.length} 个库文件', level: 'WARNING');
-      await _singleThreadRetryDownload(newFailedList, "库文件", (progress) {
+    final result = await DownloadUtils.batchDownload(
+      tasks: downloadTasks,
+      onProgress: (progress) {
         setState(() {
           _progress = progress;
         });
-      });
+      },
+      fileType: '库文件',
+    );
+    if (!result.success) {
+      await LogUtil.log('库文件下载完成,失败 ${result.failedList.length} 个', level: 'WARNING');
     }
     setState(() {
-      _isRetrying = false;
-      _currentRetryCount = 0;
       _downloadLibrary = true;
       _progress = 0;
     });
   }
 
   // 下载资源
-  Future<void> _downloadAssets({int concurrentDownloads = 30}) async {
+  Future<void> _downloadAssets() async {
     final prefs = await SharedPreferences.getInstance();
     final selectedGamePath = prefs.getString('SelectedPath') ?? '';
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
-    if (!_isRetrying) {
-      _failedAssets.clear();
-    }
     List<Map<String, String>> downloadTasks = [];
-    if (_isRetrying && _failedAssets.isNotEmpty) {
-      downloadTasks = _failedAssets;
-    } else {
-      for (int i = 0; i < _assetHash.length; i++) {
-        final hash = _assetHash[i];
-        final hashPrefix = hash.substring(0, 2);
-        final assetDir = '$gamePath${Platform.pathSeparator}assets${Platform.pathSeparator}objects${Platform.pathSeparator}$hashPrefix';
-        final assetPath = '$assetDir${Platform.pathSeparator}$hash';
-        final directory = Directory(assetDir);
-        if (!directory.existsSync()) {
-          directory.createSync(recursive: true);
-        }
-        final file = File(assetPath);
-        if (!file.existsSync()) {
-          final url = 'https://bmclapi2.bangbang93.com/assets/$hashPrefix/$hash';
-          downloadTasks.add({'url': url, 'path': assetPath});
-        }
+    for (int i = 0; i < _assetHash.length; i++) {
+      final hash = _assetHash[i];
+      final hashPrefix = hash.substring(0, 2);
+      final assetDir = '$gamePath${Platform.pathSeparator}assets${Platform.pathSeparator}objects${Platform.pathSeparator}$hashPrefix';
+      final assetPath = '$assetDir${Platform.pathSeparator}$hash';
+      final directory = Directory(assetDir);
+      if (!directory.existsSync()) {
+        directory.createSync(recursive: true);
+      }
+      final file = File(assetPath);
+      if (!file.existsSync()) {
+        final url = 'https://bmclapi2.bangbang93.com/assets/$hashPrefix/$hash';
+        downloadTasks.add({'url': url, 'path': assetPath});
       }
     }
-    final totalAssets = downloadTasks.length;
-    if (totalAssets == 0) {
+    if (downloadTasks.isEmpty) {
       await LogUtil.log('所有资源文件已存在,无需下载', level: 'INFO');
       setState(() {
         _downloadAsset = true;
       });
       return;
     }
-    await LogUtil.log('需要下载 $totalAssets 个资源文件,并发数: $concurrentDownloads', level: 'INFO');
-    int completedAssets = 0;
-    List<Map<String, String>> newFailedList = [];
-    void updateProgress() {
-      setState(() {
-        _progress = completedAssets / totalAssets;
-      });
-    }
-    for (int i = 0; i < downloadTasks.length; i += concurrentDownloads) {
-      int end = i + concurrentDownloads;
-      if (end > downloadTasks.length) end = downloadTasks.length;
-      List<Future<void>> batch = [];
-      for (int j = i; j < end; j++) {
-        final task = downloadTasks[j];
-        batch.add(() async {
-          try {
-            await DownloadUtils.downloadFile(
-              url: task['url']!,
-              savePath: task['path']!,
-              onProgress: (_) {},
-              onSuccess: () {
-                completedAssets++;
-                if (completedAssets % 20 == 0 || completedAssets == totalAssets) {
-                  updateProgress();
-                }
-              },
-              onError: (error) async {
-                completedAssets++;
-                newFailedList.add(task);
-                if (newFailedList.length % 10 == 0) {
-                  await LogUtil.log('已有 ${newFailedList.length} 个资源文件下载失败: $error, URL: ${task['url']}', level: 'ERROR');
-                }
-              }
-            );
-          } catch (e) {
-            completedAssets++;
-            newFailedList.add(task);
-          }
-        }());
-      }
-      await Future.wait(batch);
-      updateProgress();
-      await LogUtil.log('已完成: $completedAssets/$totalAssets, 失败: ${newFailedList.length}', level: 'INFO');
-    }
-    _failedAssets = newFailedList;
-    if (newFailedList.isNotEmpty && _currentRetryCount < _maxRetries) {
-      _currentRetryCount++;
-      await LogUtil.log('准备重试下载 ${newFailedList.length} 个失败的资源文件 (第 $_currentRetryCount 次重试)', level: 'INFO');
-      setState(() {
-        _isRetrying = true;
-      });
-      await _downloadAssets(concurrentDownloads: concurrentDownloads);
-    } else if (newFailedList.isNotEmpty) {
-      await LogUtil.log('已达最大并发重试次数,开始单线程重试 ${newFailedList.length} 个资源文件', level: 'WARNING');
-      await _singleThreadRetryDownload(newFailedList, "资源文件", (progress) {
+    final result = await DownloadUtils.batchDownload(
+      tasks: downloadTasks,
+      onProgress: (progress) {
         setState(() {
           _progress = progress;
         });
-      });
+      },
+      fileType: '资源文件',
+    );
+    if (!result.success) {
+      await LogUtil.log('资源文件下载完成,失败 ${result.failedList.length} 个', level: 'WARNING');
     }
     setState(() {
-      _isRetrying = false;
-      _currentRetryCount = 0;
       _downloadAsset = true;
     });
   }
@@ -520,53 +402,6 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
     setState(() {
       _extractedLwjglNatives = true;
     });
-  }
-
-  // 单线程
-  Future<void> _singleThreadRetryDownload(List<Map<String, String>> failedList, String fileType,
-      Function(double) updateProgressCallback) async {
-    int total = failedList.length;
-    int completed = 0;
-    List<Map<String, String>> currentFailedList = List.from(failedList);
-    while (currentFailedList.isNotEmpty) {
-      List<Map<String, String>> nextRetryList = [];
-      for (var task in currentFailedList) {
-        bool success = false;
-        int retryCount = 0;
-        while (!success) {
-          try {
-            retryCount++;
-            await LogUtil.log('正在尝试下载$fileType: ${task['url']} (第 $retryCount 次尝试)', level: 'INFO');
-            bool downloadComplete = false;
-            await DownloadUtils.downloadFile(
-              url: task['url']!,
-              savePath: task['path']!,
-              onProgress: (_) {},
-              onSuccess: () async{
-                downloadComplete = true;
-                await LogUtil.log('$fileType下载成功: ${task['url']}', level: 'INFO');
-              },
-              onError: (error)async{
-                await LogUtil.log('$fileType下载失败: $error, URL: ${task['url']}', level: 'ERROR');
-              }
-            );
-            if (downloadComplete) {
-              success = true;
-              completed++;
-              updateProgressCallback(completed / total);
-              await LogUtil.log('已完成: $completed/$total $fileType', level: 'INFO');
-            } else {
-              await Future.delayed(Duration(milliseconds: 500));
-            }
-          } catch (e) {
-            await LogUtil.log('$fileType下载异常: $e, URL: ${task['url']}', level: 'ERROR');
-            await Future.delayed(Duration(seconds: 1));
-          }
-        }
-      }
-      currentFailedList = nextRetryList;
-    }
-    await LogUtil.log('所有$fileType已成功下载', level: 'INFO');
   }
 
   // 文件下载
@@ -709,9 +544,9 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
         return;
       }
       // 下载库文件
-      await _downloadLibraries(concurrentDownloads: 30);
+      await _downloadLibraries();
       // 下载游戏资源
-      await _downloadAssets(concurrentDownloads: 30);
+      await _downloadAssets();
       // 提取LWJGL本地库路径
       await _extractLwjglNativeLibrariesPath('$versionPath${Platform.pathSeparator}${widget.name}.json',gamePath);
       // 提取LWJGL Natives
