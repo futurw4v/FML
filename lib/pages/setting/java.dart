@@ -43,6 +43,15 @@ class JavaPageState extends State<JavaPage> {
     });
   }
 
+  // 设置为系统 Java
+  Future<void> _setSystemJava() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('java');
+    setState(() {
+      _currentJavaPath = 'java';
+    });
+  }
+
   // 获取系统默认 Java 信息
   Future<JavaInfo?> _getSystemDefaultJavaInfo() async {
     try {
@@ -188,7 +197,7 @@ class JavaPageState extends State<JavaPage> {
                         Chip(label: Text(info.vendor ?? 'Unknown')),
                       ],
                     ),
-                    onTap: () => _setCurrentJavaPath('java'),
+                    onTap: () => _setSystemJava(),
                   ),
                 );
               }
