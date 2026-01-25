@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fml/function/slide_page_route.dart';
 import 'package:fml/pages/setting/theme.dart';
 import 'package:fml/pages/setting/log_viewer.dart';
 import 'package:fml/pages/setting/about.dart';
@@ -15,8 +16,7 @@ class SettingPageState extends State<SettingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-      ),
+      appBar: AppBar(),
       body: Center(
         child: ListView(
           children: [
@@ -28,7 +28,7 @@ class SettingPageState extends State<SettingPage> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ThemePage()),
+                    SlidePageRoute(page: const ThemePage()),
                   );
                 },
               ),
@@ -41,7 +41,7 @@ class SettingPageState extends State<SettingPage> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => JavaPage()),
+                    SlidePageRoute(page: const JavaPage()),
                   );
                 },
               ),
@@ -54,7 +54,7 @@ class SettingPageState extends State<SettingPage> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => LogViewerPage()),
+                    SlidePageRoute(page: const LogViewerPage()),
                   );
                 },
               ),
@@ -67,7 +67,7 @@ class SettingPageState extends State<SettingPage> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => AboutPage()),
+                    SlidePageRoute(page: const AboutPage()),
                   );
                 },
               ),
