@@ -151,7 +151,7 @@ class ModPageState extends State<ModPage> {
 
   // 选择保存路径
   Future<void> _selectSavePath() async {
-    String? selectedDirectory = await FilePicker.getDirectoryPath();
+    String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
     if (selectedDirectory != null) {
       setState(() {
         savePath = selectedDirectory;
