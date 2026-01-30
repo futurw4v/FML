@@ -108,7 +108,9 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
         linux: initializationSettingsLinux,
         windows: initializationSettingsWindows,
       );
-      await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+      await flutterLocalNotificationsPlugin.initialize(
+        settings: initializationSettings,
+      );
     }
   }
 
@@ -122,7 +124,10 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
         linux: linuxDetails,
       );
       await flutterLocalNotificationsPlugin.show(
-        0, title, body, platformChannelSpecifics,
+        id: 0,
+        title: title,
+        body: body,
+        notificationDetails: platformChannelSpecifics,
       );
     }
   }

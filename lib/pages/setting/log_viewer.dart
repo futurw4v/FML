@@ -68,7 +68,7 @@ class LogViewerPageState extends State<LogViewerPage> {
 
   // 文件夹选择器
   Future<void> _selectDirectory() async {
-    final path = await FilePicker.platform.getDirectoryPath(
+    final path = await FilePicker.getDirectoryPath(
       dialogTitle: '选择版本路径',
     );
     if (!mounted) return;

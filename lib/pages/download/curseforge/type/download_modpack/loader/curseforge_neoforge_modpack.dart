@@ -105,7 +105,9 @@ class CurseforgeNeoForgeModpackPageState extends State<CurseforgeNeoForgeModpack
         linux: initializationSettingsLinux,
         windows: initializationSettingsWindows,
       );
-      await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+      await flutterLocalNotificationsPlugin.initialize(
+        settings: initializationSettings,
+      );
     }
   }
 
@@ -119,7 +121,10 @@ class CurseforgeNeoForgeModpackPageState extends State<CurseforgeNeoForgeModpack
         linux: linuxDetails,
       );
       await flutterLocalNotificationsPlugin.show(
-        0, title, body, platformChannelSpecifics,
+        id: 0,
+        title: title,
+        body: body,
+        notificationDetails: platformChannelSpecifics,
       );
     }
   }

@@ -104,7 +104,9 @@ class FabricModpackPageState extends State<FabricModpackPage> {
         linux: initializationSettingsLinux,
         windows: initializationSettingsWindows,
       );
-      await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+      await flutterLocalNotificationsPlugin.initialize(
+        settings: initializationSettings,
+      );
     }
   }
 
@@ -118,7 +120,10 @@ class FabricModpackPageState extends State<FabricModpackPage> {
         linux: linuxDetails,
       );
       await flutterLocalNotificationsPlugin.show(
-        0, title, body, platformChannelSpecifics,
+        id: 0,
+        title: title,
+        body: body,
+        notificationDetails: platformChannelSpecifics,
       );
     }
   }
