@@ -28,7 +28,7 @@ Future<void> _showCodeDialog(BuildContext context, String code) async {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Text('验证代码'),
-        content: Text('验证代码 $code 已复制到剪贴板,请在稍后显示的浏览器中打开的网页中输入'),
+        content: Text('验证代码 $code 已复制到剪贴板,请在3秒后弹出的浏览器中打开的网页中输入'),
         actions: [
           TextButton(
             onPressed:() => Clipboard.setData(ClipboardData(text: code)),
@@ -127,6 +127,7 @@ Future<List<String>> _getMsToken(context, String userCode, String deviceCode) as
   final appVersion = prefs.getString('version') ?? 'unknown';
   await Clipboard.setData(ClipboardData(text: userCode));
   await _showCodeDialog(context, userCode);
+  await Future.delayed(Duration(seconds: 3));
   await _launchURL();
   while (true) {
     try {
