@@ -939,7 +939,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
     if (bytes > (1024 * 1024 * 1024 * 1024) && bytes % 16384 == 0) {
       bytes = bytes ~/ 16384;
     }
-    final physicalMemory = bytes ~/ (1024 * 1024 * 1024);
+    final physicalMemory = bytes ~/ (1024 * 1024);
     setState(() {
       _mem = physicalMemory;
     });
