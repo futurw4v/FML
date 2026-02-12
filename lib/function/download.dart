@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fml/constants.dart';
 import 'dart:io';
 import 'dart:async';
 import 'package:fml/function/log.dart';
@@ -31,10 +31,7 @@ class _ProgressUpdater {
   DateTime _lastUpdateTime = DateTime.now();
   Timer? _pendingTimer;
 
-  _ProgressUpdater({
-    this.onProgress,
-    required this.totalTasks,
-  });
+  _ProgressUpdater({this.onProgress, required this.totalTasks});
 
   // 增加成功计数
   Future<void> incrementSuccess() async {
@@ -56,7 +53,7 @@ class _ProgressUpdater {
   }
 
   // 执行进度更新
-  Future<void> _doUpdate() async{
+  Future<void> _doUpdate() async {
     if (onProgress == null || totalTasks == 0) return;
     final newProgress = _successCount / totalTasks;
     if (newProgress > _lastReportedProgress) {
@@ -79,35 +76,32 @@ class DownloadUtils {
   static const int _maxRetries = 5;
   static const int _concurrentDownloads = 64;
   static Dio? _sharedDio;
-  static String? _cachedUserAgent;
+
   static Future<Dio> _getSharedDio() async {
     if (_sharedDio == null) {
       _sharedDio = Dio();
       // 配置 HttpClient
-      (_sharedDio!.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-        final client = HttpClient();
-        client.maxConnectionsPerHost = _concurrentDownloads;
-        client.idleTimeout = const Duration(seconds: 30);
-        client.connectionTimeout = const Duration(seconds: 15);
-        return client;
-      };
+      (_sharedDio!.httpClientAdapter as IOHttpClientAdapter).createHttpClient =
+          () {
+            final client = HttpClient();
+            client.maxConnectionsPerHost = _concurrentDownloads;
+            client.idleTimeout = const Duration(seconds: 30);
+            client.connectionTimeout = const Duration(seconds: 15);
+            return client;
+          };
       _sharedDio!.options.connectTimeout = const Duration(seconds: 15);
       _sharedDio!.options.receiveTimeout = const Duration(minutes: 5);
       _sharedDio!.options.sendTimeout = const Duration(seconds: 30);
     }
-    if (_cachedUserAgent == null) {
-      final prefs = await SharedPreferences.getInstance();
-      final appVersion = prefs.getString('version') ?? 'unknown';
-      _cachedUserAgent = 'FML/$appVersion';
-    }
     return _sharedDio!;
   }
+
   /// 获取对应 URL 的 User-Agent
   static String _getUserAgent(String url) {
     if (url.contains('bmclapi2.bangbang93.com')) {
-      return _cachedUserAgent ?? 'FML/unknown';
+      return gAppUserAgent;
     } else {
-      return 'lxdklp/${_cachedUserAgent ?? 'FML/unknown'} (fml.lxdklp.top)';
+      return 'lxdklp/$gAppUserAgent (fml.lxdklp.top)';
     }
   }
 
@@ -132,14 +126,14 @@ class DownloadUtils {
     const int maxRetries = 5;
     for (int retry = 0; retry <= maxRetries; retry++) {
       try {
-        final directory = Directory(savePath.substring(0, savePath.lastIndexOf(Platform.pathSeparator)));
+        final directory = Directory(
+          savePath.substring(0, savePath.lastIndexOf(Platform.pathSeparator)),
+        );
         if (!directory.existsSync()) {
           directory.createSync(recursive: true);
         }
         final options = Options(
-          headers: {
-            'User-Agent': userAgent,
-          },
+          headers: {'User-Agent': userAgent},
           responseType: ResponseType.stream,
         );
         await dio.download(
@@ -166,7 +160,10 @@ class DownloadUtils {
           return cancelToken;
         }
         final delayMs = (300 * (1 << retry)).clamp(300, 30000);
-        await LogUtil.log('下载失败 (第 ${retry + 1} 次): $url - $e —— ${delayMs}ms 后重试', level: 'WARNING');
+        await LogUtil.log(
+          '下载失败 (第 ${retry + 1} 次): $url - $e —— ${delayMs}ms 后重试',
+          level: 'WARNING',
+        );
         await Future.delayed(Duration(milliseconds: delayMs));
       }
     }
@@ -201,9 +198,15 @@ class DownloadUtils {
     );
     while (currentTasks.isNotEmpty && currentRetryCount <= _maxRetries) {
       if (currentRetryCount > 0) {
-        await LogUtil.log('准备重试下载 ${currentTasks.length} 个失败的$fileType (第 $currentRetryCount 次重试)', level: 'INFO');
+        await LogUtil.log(
+          '准备重试下载 ${currentTasks.length} 个失败的$fileType (第 $currentRetryCount 次重试)',
+          level: 'INFO',
+        );
       }
-      await LogUtil.log('开始下载${currentTasks.length}个$fileType,并发数 $_concurrentDownloads', level: 'INFO');
+      await LogUtil.log(
+        '开始下载${currentTasks.length}个$fileType,并发数 $_concurrentDownloads',
+        level: 'INFO',
+      );
       failedList = await _workerPoolDownload(
         tasks: currentTasks,
         fileType: fileType,
@@ -217,7 +220,10 @@ class DownloadUtils {
     }
     // 单线程无限重试剩余失败任务
     if (failedList.isNotEmpty) {
-      await LogUtil.log('已达最大并发重试次数，开始单线程重试 ${failedList.length} 个$fileType', level: 'WARNING');
+      await LogUtil.log(
+        '已达最大并发重试次数，开始单线程重试 ${failedList.length} 个$fileType',
+        level: 'WARNING',
+      );
       failedList = await _singleThreadRetryDownload(
         failedList: failedList,
         fileType: fileType,
@@ -232,6 +238,7 @@ class DownloadUtils {
       completedCount: progressUpdater.successCount,
     );
   }
+
   static Future<List<Map<String, String>>> _workerPoolDownload({
     required List<Map<String, String>> tasks,
     required String fileType,
@@ -270,12 +277,16 @@ class DownloadUtils {
         }
       }
     }
+
     final workers = List.generate(
       _concurrentDownloads.clamp(1, currentBatchSize),
       (index) => worker(index),
     );
     await Future.wait(workers);
-    await LogUtil.log('批次完成: 处理 $processedCount/$currentBatchSize, 失败: ${failedList.length}', level: 'INFO');
+    await LogUtil.log(
+      '批次完成: 处理 $processedCount/$currentBatchSize, 失败: ${failedList.length}',
+      level: 'INFO',
+    );
     return failedList;
   }
 
@@ -300,8 +311,7 @@ class DownloadUtils {
               onSuccess: () {
                 downloadComplete = true;
               },
-              onError: (error) {
-              }
+              onError: (error) {},
             );
             if (downloadComplete) {
               success = true;

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:fml/function/slide_page_route.dart';
+import 'package:fml/function/dio_client.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/download/modrinth/type/mod.dart';
@@ -22,11 +21,9 @@ class InfoPage extends StatefulWidget {
 }
 
 class InfoPageState extends State<InfoPage> {
-  final Dio dio = Dio();
   bool isLoading = true;
   Map<String, dynamic> projectDetails = {};
   String? error;
-  String _appVersion = '';
 
   // 项目类型映射
   final Map<String, String> projectTypeNames = {
@@ -39,7 +36,7 @@ class InfoPageState extends State<InfoPage> {
   @override
   void initState() {
     super.initState();
-    _loadAppVersion();
+    _fetchProjectDetails();
   }
 
   // 获取格式化的标题
@@ -53,16 +50,6 @@ class InfoPageState extends State<InfoPage> {
     return title;
   }
 
-  // 读取App版本
-  Future<void> _loadAppVersion() async {
-    final prefs = await SharedPreferences.getInstance();
-    final version = prefs.getString('version') ?? "UnknownVersion";
-    setState(() {
-      _appVersion = version;
-    });
-    _fetchProjectDetails();
-  }
-
   // 获取模组详情
   Future<void> _fetchProjectDetails() async {
     if (widget.slug.isEmpty) {
@@ -73,13 +60,9 @@ class InfoPageState extends State<InfoPage> {
       return;
     }
     try {
-      final options = Options(
-        headers: {'User-Agent': 'lxdklp/FML/$_appVersion (fml.lxdklp.top)'},
-      );
       LogUtil.log('正在获取模组详情: ${widget.slug}', level: 'INFO');
-      final response = await dio.get(
+      final response = await DioClient().dio.get(
         'https://api.modrinth.com/v2/project/${widget.slug}',
-        options: options,
       );
       if (response.statusCode == 200) {
         setState(() {

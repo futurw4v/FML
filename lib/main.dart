@@ -1,31 +1,43 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fml/function/slide_page_route.dart';
+import 'package:fml/function/dio_client.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:dio/dio.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
+import 'package:fml/constants.dart';
 import 'package:fml/function/log.dart';
+import 'package:fml/pages/download.dart';
 import 'package:fml/pages/home.dart';
 import 'package:fml/pages/online.dart';
-import 'package:fml/pages/download.dart';
-import 'package:fml/pages/setting.dart';
 import 'package:fml/pages/online/owner.dart';
+import 'package:fml/pages/setting.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await initVersionInfo();
+  await initLogs();
+
+  runApp(const FMLBaseApp());
+}
 
 // 软件版本
-late String appVersion;
-late int buildNumber;
 Future<void> initVersionInfo() async {
-  final PackageInfo packageInfo = await PackageInfo.fromPlatform();
-  appVersion = packageInfo.version;
-  buildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
+  final packageInfo = await PackageInfo.fromPlatform();
+
+  gAppVersion = packageInfo.version;
+  gAppUserAgent = 'FML/$gAppVersion';
+  gAppBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
+
   final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('version', appVersion);
-  await prefs.setInt('build', buildNumber);
+  await prefs.setString('version', gAppVersion);
+  await prefs.setInt('build', gAppBuildNumber);
 }
 
 // 日志
@@ -35,43 +47,26 @@ Future<void> initLogs() async {
   if (autoClearLog) {
     await LogUtil.clearLogs();
   }
-  if (kDebugMode) {
-    await LogUtil.log(
-      '启动FML,平台:${Platform.operatingSystem},版本: $appVersion,构建号: $buildNumber,debug模式',
-      level: 'INFO',
-    );
-  } else {
-    await LogUtil.log(
-      '启动FML,平台:${Platform.operatingSystem},版本: $appVersion,构建号: $buildNumber',
-      level: 'INFO',
-    );
-  }
+
+  await LogUtil.log(
+    '启动FML, 平台:${Platform.operatingSystem}, 版本: $gAppVersion, 构建号: $gAppBuildNumber${kDebugMode ? ", debug模式" : ""}',
+    level: 'INFO',
+  );
 }
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await initVersionInfo();
-  await initLogs();
-  runApp(const MyApp());
-}
+class FMLBaseApp extends StatefulWidget {
+  const FMLBaseApp({super.key});
 
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
-
-  static MyAppState of(BuildContext context) =>
-      context.findAncestorStateOfType<MyAppState>()!;
+  static FMLBaseAppState of(BuildContext context) =>
+      context.findAncestorStateOfType<FMLBaseAppState>()!;
 
   @override
-  MyAppState createState() => MyAppState();
+  FMLBaseAppState createState() => FMLBaseAppState();
 }
 
-class MyAppState extends State<MyApp> {
+class FMLBaseAppState extends State<FMLBaseApp> {
   ThemeMode _themeMode = ThemeMode.system;
   Color _themeColor = Colors.blue;
-  static const double bodyWght = 520; // 正文
-  static const double labelWght = 520; // 标签/按钮
-  static const double titleWght = 700; // 标题
-  static const double headlineWght = 850; // 更大标题
 
   ThemeMode get themeMode => _themeMode;
   Color get themeColor => _themeColor;
@@ -150,21 +145,21 @@ class MyAppState extends State<MyApp> {
       fontVariations: [FontVariation('wght', w)],
     );
     return base.copyWith(
-      bodySmall: setW(base.bodySmall, bodyWght),
-      bodyMedium: setW(base.bodyMedium, bodyWght),
-      bodyLarge: setW(base.bodyLarge, bodyWght),
-      labelSmall: setW(base.labelSmall, labelWght),
-      labelMedium: setW(base.labelMedium, labelWght),
-      labelLarge: setW(base.labelLarge, labelWght),
-      titleSmall: setW(base.titleSmall, titleWght),
-      titleMedium: setW(base.titleMedium, titleWght),
-      titleLarge: setW(base.titleLarge, titleWght),
-      headlineSmall: setW(base.headlineSmall, headlineWght),
-      headlineMedium: setW(base.headlineMedium, headlineWght),
-      headlineLarge: setW(base.headlineLarge, headlineWght),
-      displaySmall: setW(base.displaySmall, headlineWght),
-      displayMedium: setW(base.displayMedium, headlineWght),
-      displayLarge: setW(base.displayLarge, headlineWght),
+      bodySmall: setW(base.bodySmall, AppFontWeights.bodyWght),
+      bodyMedium: setW(base.bodyMedium, AppFontWeights.bodyWght),
+      bodyLarge: setW(base.bodyLarge, AppFontWeights.bodyWght),
+      labelSmall: setW(base.labelSmall, AppFontWeights.labelWght),
+      labelMedium: setW(base.labelMedium, AppFontWeights.labelWght),
+      labelLarge: setW(base.labelLarge, AppFontWeights.labelWght),
+      titleSmall: setW(base.titleSmall, AppFontWeights.titleWght),
+      titleMedium: setW(base.titleMedium, AppFontWeights.titleWght),
+      titleLarge: setW(base.titleLarge, AppFontWeights.titleWght),
+      headlineSmall: setW(base.headlineSmall, AppFontWeights.headlineWght),
+      headlineMedium: setW(base.headlineMedium, AppFontWeights.headlineWght),
+      headlineLarge: setW(base.headlineLarge, AppFontWeights.headlineWght),
+      displaySmall: setW(base.displaySmall, AppFontWeights.headlineWght),
+      displayMedium: setW(base.displayMedium, AppFontWeights.headlineWght),
+      displayLarge: setW(base.displayLarge, AppFontWeights.headlineWght),
     );
   }
 
@@ -199,13 +194,13 @@ class MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Minecraft Launcher',
+      title: kAppName,
       theme: _buildTheme(Brightness.light),
       darkTheme: _buildTheme(Brightness.dark),
       themeMode: _themeMode,
-      home: const MyHomePage(),
+      home: const MainStartPage(),
       onGenerateRoute: (settings) {
-        if (settings.name == '/online/owner') {
+        if (settings.name == kOnlineOwnerRoute) {
           final int port = settings.arguments as int;
           final String etServer = settings.arguments as String;
           return SlidePageRoute(
@@ -218,29 +213,21 @@ class MyAppState extends State<MyApp> {
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key});
+class MainStartPage extends StatefulWidget {
+  const MainStartPage({super.key});
   @override
-  MyHomePageState createState() => MyHomePageState();
+  MainStartPageState createState() => MainStartPageState();
 }
 
-class MyHomePageState extends State<MyHomePage> {
+class MainStartPageState extends State<MainStartPage> {
   int _selectedIndex = 0;
   bool? _javaInstalled;
 
   @override
   void initState() {
     super.initState();
-    _writeVersionInfo();
     _checkJavaInstalled();
     _checkUpdate();
-  }
-
-  // 写入版本信息
-  Future<void> _writeVersionInfo() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('version', appVersion);
-    await prefs.setInt('build', buildNumber);
   }
 
   // 构建页面
@@ -287,9 +274,7 @@ class MyHomePageState extends State<MyHomePage> {
           content: const Text('未检测到 Java 环境或者 Java 环境未正确配置，请先安装 Java 后再打开启动器'),
           actions: [
             TextButton(
-              onPressed: () => _launchURL(
-                'https://www.oracle.com/cn/java/technologies/downloads/',
-              ),
+              onPressed: () => _launchURL(AppUrls.javaDownload),
               child: const Text('打开Java下载页面'),
             ),
           ],
@@ -322,28 +307,19 @@ class MyHomePageState extends State<MyHomePage> {
   Future<void> _checkUpdate() async {
     try {
       LogUtil.log('正在检查更新', level: 'INFO');
-      final dio = Dio();
-      if (kDebugMode) {
-        dio.options.headers['User-Agent'] =
-            'FML/${Platform.operatingSystem}/$appVersion debug';
-      } else {
-        dio.options.headers['User-Agent'] =
-            'FML/${Platform.operatingSystem}/$appVersion';
-      }
-      final response = await dio.get(
-        'https://api.lxdklp.top/v1/fml/get_version',
-      );
-      LogUtil.log('status: ${response.statusCode}', level: 'INFO');
-      LogUtil.log('data: ${response.data}', level: 'INFO');
+
+      final response = await DioClient().dio.get(AppUrls.latestVersionApi);
+
       if (response.statusCode == 200) {
         String rawVersionData = response.data.toString();
         String cleanedVersionString = rawVersionData
             .replaceAll("[", "")
             .replaceAll("]", "");
         final int latestVersion =
-            int.tryParse(cleanedVersionString) ?? buildNumber;
+            int.tryParse(cleanedVersionString) ?? gAppBuildNumber;
         LogUtil.log('最新版本: $latestVersion');
-        if (latestVersion > buildNumber && mounted) {
+
+        if (latestVersion > gAppBuildNumber && mounted) {
           _showUpdateDialog(latestVersion.toString());
         }
       }
@@ -355,12 +331,8 @@ class MyHomePageState extends State<MyHomePage> {
   // 获取更新日志
   Future<List<String>> _getUpdateInfo() async {
     try {
-      Dio dio = Dio();
-      Options options = Options(headers: {'User-Agent': 'FML-App/$appVersion'});
-      final response = await dio.get(
-        'https://api.github.com/repos/lxdklp/FML/releases',
-        options: options,
-      );
+      final response = await DioClient().dio.get(AppUrls.githubReleasesApi);
+
       if (response.statusCode == 200) {
         Map<String, dynamic> loaderData = response.data[0];
         return [loaderData['name'], loaderData['body']];
@@ -397,9 +369,9 @@ class MyHomePageState extends State<MyHomePage> {
         actions: [
           TextButton(
             onPressed: () async {
-              _launchURL('https://github.com/lxdklp/FML/releases/latest');
+              _launchURL(AppUrls.githubLatestRelease);
             },
-            child: const Text('前往Gtihub下载'),
+            child: const Text('前往GitHub下载'),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -414,7 +386,7 @@ class MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     // 主界面内容
     Widget mainContent = Scaffold(
-      appBar: AppBar(title: const Text('Flutter Minecraft Launcher')),
+      appBar: AppBar(title: const Text(kAppName)),
       body: Row(
         children: [
           NavigationRail(
@@ -452,7 +424,7 @@ class MyHomePageState extends State<MyHomePage> {
         menus: [
           // FML 菜单
           PlatformMenu(
-            label: 'Flutter Minecraft Launcher',
+            label: kAppName,
             menus: [
               PlatformMenuItem(
                 label: '关于',
@@ -521,7 +493,7 @@ class MyHomePageState extends State<MyHomePage> {
             menus: [
               PlatformMenuItem(
                 label: '访问 GitHub',
-                onSelected: () => _launchURL('https://github.com/lxdklp/FML'),
+                onSelected: () => _launchURL(AppUrls.githubProject),
               ),
             ],
           ),
@@ -534,7 +506,7 @@ class MyHomePageState extends State<MyHomePage> {
 
   // 显示关于对话框
   Future<void> _showAboutDialog(BuildContext context) async {
-    const channel = MethodChannel('lxdklp/fml_native');
+    const channel = MethodChannel(kNativeMethodChannel);
     await channel.invokeMethod('showAboutPanel');
   }
 }
