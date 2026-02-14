@@ -147,7 +147,7 @@ class AboutPageState extends State<AboutPage> {
               children: [
                 const ListTile(
                   title: Text('鸣谢'),
-                  subtitle: Text('没有你们就没有这个项目!'),
+                  subtitle: Text('排名不分先后顺序'),
                 ),
                 ListTile(
                   title: const Text('bangbang93'),
@@ -245,8 +245,16 @@ class AboutPageState extends State<AboutPage> {
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/HMCL-dev/HMCL'),
                 ),
+                ListTile(
+                  title: const Text('futurw4v'),
+                  subtitle: const Text(
+                    '贡献者\nhttps://github.com/futurw4v',
+                  ),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://github.com/futurw4v'),
+                ),
                 const ListTile(
-                  title: Text('GitHub的各位'),
+                  title: Text('GitHub 上提出 Issue 等的各位'),
                   subtitle: Text('谢谢大家'),
                 ),
               ],
