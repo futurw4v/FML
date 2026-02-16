@@ -93,7 +93,7 @@ class AboutPageState extends State<AboutPage> {
                       textAlign: TextAlign.center,
                     ),
                     Text(
-                      'Copyright © 2025 lxdklp. All rights reserved\n',
+                      'Copyright © 2026 lxdklp. All rights reserved\n',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -247,6 +247,12 @@ class AboutPageState extends State<AboutPage> {
                   subtitle: const Text('贡献者\nhttps://github.com/futurw4v'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/futurw4v'),
+                ),
+                ListTile(
+                  title: const Text('图标画师'),
+                  subtitle: const Text('https://github.com/lxdklp/FML/pull/7'),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://github.com/lxdklp/FML/pull/7'),
                 ),
                 const ListTile(
                   title: Text('GitHub 上提出 Issue 等的各位'),
