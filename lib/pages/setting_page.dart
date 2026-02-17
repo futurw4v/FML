@@ -97,7 +97,7 @@ class SettingPageState extends State<SettingPage> {
                           kDefaultPadding,
                         ),
                         child: Text(
-                          '下载',
+                          '设置',
                           style: theme.textTheme.headlineMedium,
                         ),
                       ),
