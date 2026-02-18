@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:fml/constants.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/slide_page_route.dart';
 import 'package:fml/pages/setting/log_viewer/log_setting.dart';
@@ -14,26 +15,182 @@ class LogViewerPage extends StatefulWidget {
 }
 
 class LogViewerPageState extends State<LogViewerPage> {
+  late Future<List<Map<String, dynamic>>> _logsFuture;
   List<Map<String, dynamic>> logs = [];
-  bool isLoading = true;
   String _dirPath = '';
 
   @override
   void initState() {
     super.initState();
-    _loadLogs();
+    _logsFuture = LogUtil.getLogs();
   }
 
-  // 加载日志
-  Future<void> _loadLogs() async {
-    setState(() {
-      isLoading = true;
-    });
-    final loadedLogs = await LogUtil.getLogs();
-    setState(() {
-      logs = loadedLogs.reversed.toList();
-      isLoading = false;
-    });
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: kDefaultPadding),
+      child: Column(
+        children: [
+          // 大标题
+          Padding(
+            padding: const EdgeInsets.only(
+              left: kDefaultPadding / 2,
+              top: kDefaultPadding,
+              bottom: kDefaultPadding,
+            ),
+            child: Row(
+              children: [
+                Text('日志', style: Theme.of(context).textTheme.headlineMedium),
+
+                IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () => Navigator.push(
+                    context,
+                    SlidePageRoute(page: LogSettingPage()),
+                  ),
+                ),
+
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () {
+                    if (!mounted) return;
+                    setState(() {
+                      _logsFuture = LogUtil.getLogs();
+                    });
+                  }, // _loadLogs,
+                  tooltip: '刷新',
+                ),
+
+                IconButton(
+                  icon: const Icon(Icons.file_download),
+                  onPressed: logs.isEmpty ? null : _exportAllLogs,
+                  tooltip: '导出全部日志',
+                ),
+
+                IconButton(
+                  icon: const Icon(Icons.delete_sweep),
+                  onPressed: logs.isEmpty ? null : _clearLogs,
+                  tooltip: '清除日志',
+                ),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: Center(
+              child: FutureBuilder(
+                future: _logsFuture,
+                builder: (context, snapshot) {
+                  // 加载时显示CircularProgressIndicator
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const CircularProgressIndicator();
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(child: Text('加载失败：${snapshot.error}'));
+                  }
+
+                  logs = snapshot.data ?? [];
+
+                  if (logs.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.inbox,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '暂无日志',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    itemCount: logs.length,
+
+                    itemBuilder: (context, index) {
+                      final log = logs[index];
+                      final timestamp = log['timestamp'] as String;
+                      final level = log['level'] as String;
+                      final caller = log['caller'] as String;
+                      final message = log['message'] as String;
+                      final dateTime = DateTime.parse(timestamp);
+                      final formattedTime =
+                          '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
+                          '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}';
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+
+                        child: ListTile(
+                          leading: Icon(
+                            _getLevelIcon(level),
+                            color: _getLevelColor(level),
+                          ),
+
+                          title: Text(
+                            message,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+
+                          subtitle: Text(
+                            '$caller\n$formattedTime',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+
+                            decoration: BoxDecoration(
+                              color: _getLevelColor(
+                                level,
+                              ).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+
+                            child: Text(
+                              level,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: _getLevelColor(level),
+                              ),
+                            ),
+                          ),
+
+                          onLongPress: () => _copySingleLog(log),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // 清除所有日志
@@ -57,7 +214,6 @@ class LogViewerPageState extends State<LogViewerPage> {
     );
     if (confirmed == true) {
       await LogUtil.clearLogs();
-      _loadLogs();
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -83,7 +239,9 @@ class LogViewerPageState extends State<LogViewerPage> {
     });
   }
 
-  // 导出全部日志
+  ///
+  /// 导出全部日志
+  ///
   Future<void> _exportAllLogs() async {
     await _selectDirectory();
     if (_dirPath.isEmpty) {
@@ -182,106 +340,5 @@ class LogViewerPageState extends State<LogViewerPage> {
       default:
         return Icons.article;
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('日志查看器'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () =>
-                Navigator.push(context, SlidePageRoute(page: const LogSettingPage())),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadLogs,
-            tooltip: '刷新',
-          ),
-          IconButton(
-            icon: const Icon(Icons.file_download),
-            onPressed: logs.isEmpty ? null : _exportAllLogs,
-            tooltip: '导出全部日志',
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_sweep),
-            onPressed: logs.isEmpty ? null : _clearLogs,
-            tooltip: '清除日志',
-          ),
-        ],
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : logs.isEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.inbox, size: 64, color: Colors.grey[400]),
-                    const SizedBox(height: 16),
-                    Text(
-                      '暂无日志',
-                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : ListView.builder(
-              itemCount: logs.length,
-              itemBuilder: (context, index) {
-                final log = logs[index];
-                final timestamp = log['timestamp'] as String;
-                final level = log['level'] as String;
-                final caller = log['caller'] as String;
-                final message = log['message'] as String;
-                final dateTime = DateTime.parse(timestamp);
-                final formattedTime =
-                    '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
-                    '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}';
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  child: ListTile(
-                    leading: Icon(
-                      _getLevelIcon(level),
-                      color: _getLevelColor(level),
-                    ),
-                    title: Text(message, style: const TextStyle(fontSize: 14)),
-                    subtitle: Text(
-                      '$caller\n$formattedTime',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getLevelColor(level).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        level,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: _getLevelColor(level),
-                        ),
-                      ),
-                    ),
-                    onLongPress: () => _copySingleLog(log),
-                  ),
-                );
-              },
-            ),
-    );
   }
 }
