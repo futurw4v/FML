@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart' hide LicensePage;
 import 'package:fml/constants.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AboutPage extends StatefulWidget {
@@ -11,43 +10,9 @@ class AboutPage extends StatefulWidget {
 }
 
 class AboutPageState extends State<AboutPage> {
-  String _appVersion = "unknown";
-
-  Future<void> _loadAppVersion() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _appVersion = prefs.getString('version') ?? "unknown";
-    });
-  }
-
-  // 打开URL
-  Future<void> _launchURL(String url) async {
-    try {
-      final Uri uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('无法打开链接: $url')));
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('发生错误: $e')));
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAppVersion();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('关于')),
       body: ListView(
         children: [
           Card(
@@ -65,6 +30,7 @@ class AboutPageState extends State<AboutPage> {
                       ),
                       textAlign: TextAlign.center,
                     ),
+
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -83,15 +49,18 @@ class AboutPageState extends State<AboutPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+
+                    const SizedBox(height: kDefaultPadding),
+
                     Text(
-                      '$kAppName Version $_appVersion',
+                      '$kAppName Version $gAppVersion',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.center,
                     ),
+
                     Text(
                       'Copyright © 2026 lxdklp. All rights reserved\n',
                       style: TextStyle(
@@ -105,6 +74,7 @@ class AboutPageState extends State<AboutPage> {
               ),
             ),
           ),
+
           Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: ListTile(
@@ -114,6 +84,7 @@ class AboutPageState extends State<AboutPage> {
               onTap: () => _launchURL(AppUrls.officialWebsite),
             ),
           ),
+
           Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: ListTile(
@@ -123,6 +94,7 @@ class AboutPageState extends State<AboutPage> {
               onTap: () => _launchURL(AppUrls.githubProject),
             ),
           ),
+
           Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: ListTile(
@@ -132,6 +104,7 @@ class AboutPageState extends State<AboutPage> {
               onTap: () => _launchURL('${AppUrls.githubProject}/issues'),
             ),
           ),
+
           Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: ListTile(
@@ -141,6 +114,7 @@ class AboutPageState extends State<AboutPage> {
               onTap: () => showLicensePage(context: context),
             ),
           ),
+
           Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Column(
@@ -154,24 +128,28 @@ class AboutPageState extends State<AboutPage> {
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://bmclapidoc.bangbang93.com'),
                 ),
+
                 ListTile(
                   title: const Text('gh-proxy.com'),
                   subtitle: const Text('GitHub 加速下载\nhttps://gh-proxy.com'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://gh-proxy.com'),
                 ),
+
                 ListTile(
                   title: const Text('Modrinth'),
                   subtitle: const Text('资源下载\nhttps://modrinth.com'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://modrinth.com'),
                 ),
+
                 ListTile(
                   title: const Text('CurseForge'),
                   subtitle: const Text('资源下载\nhttps://www.curseforge.com'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://www.curseforge.com'),
                 ),
+
                 ListTile(
                   title: const Text('Sawaratsuki'),
                   subtitle: const Text(
@@ -181,6 +159,7 @@ class AboutPageState extends State<AboutPage> {
                   onTap: () =>
                       _launchURL('https://github.com/SAWARATSUKI/KawaiiLogos'),
                 ),
+
                 ListTile(
                   title: const Text('Noto CJK fonts'),
                   subtitle: const Text(
@@ -190,6 +169,7 @@ class AboutPageState extends State<AboutPage> {
                   onTap: () =>
                       _launchURL('https://github.com/notofonts/noto-cjk'),
                 ),
+
                 ListTile(
                   title: const Text('GNU General Public License Version 3'),
                   subtitle: const Text(
@@ -199,6 +179,7 @@ class AboutPageState extends State<AboutPage> {
                   onTap: () =>
                       _launchURL('https://www.gnu.org/licenses/gpl-3.0.html'),
                 ),
+
                 ListTile(
                   title: const Text('authlib-injector'),
                   subtitle: const Text(
@@ -209,12 +190,14 @@ class AboutPageState extends State<AboutPage> {
                     'https://github.com/yushijinhun/authlib-injector',
                   ),
                 ),
+
                 ListTile(
                   title: const Text('EasyTier'),
                   subtitle: const Text('异地组网\nhttps://easytier.cn/'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://easytier.cn/'),
                 ),
+
                 ListTile(
                   title: const Text('Scaffolding-MC'),
                   subtitle: const Text(
@@ -225,6 +208,7 @@ class AboutPageState extends State<AboutPage> {
                     'https://github.com/Scaffolding-MC/Scaffolding-MC',
                   ),
                 ),
+
                 ListTile(
                   title: const Text('Terracotta'),
                   subtitle: const Text(
@@ -234,6 +218,7 @@ class AboutPageState extends State<AboutPage> {
                   onTap: () =>
                       _launchURL('https://github.com/burningtnt/Terracotta'),
                 ),
+
                 ListTile(
                   title: const Text('HMCL'),
                   subtitle: const Text(
@@ -242,6 +227,7 @@ class AboutPageState extends State<AboutPage> {
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchURL('https://github.com/HMCL-dev/HMCL'),
                 ),
+
                 ListTile(
                   title: const Text('futurw4v'),
                   subtitle: const Text('贡献者\nhttps://github.com/futurw4v'),
@@ -252,7 +238,8 @@ class AboutPageState extends State<AboutPage> {
                   title: const Text('图标画师'),
                   subtitle: const Text('https://github.com/lxdklp/FML/pull/7'),
                   trailing: const Icon(Icons.open_in_new),
-                  onTap: () => _launchURL('https://github.com/lxdklp/FML/pull/7'),
+                  onTap: () =>
+                      _launchURL('https://github.com/lxdklp/FML/pull/7'),
                 ),
                 const ListTile(
                   title: Text('GitHub 上提出 Issue 等的各位'),
@@ -264,5 +251,26 @@ class AboutPageState extends State<AboutPage> {
         ],
       ),
     );
+  }
+
+  ///
+  /// 打开URL
+  ///
+  Future<void> _launchURL(String url) async {
+    try {
+      final Uri uri = Uri.parse(url);
+
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('无法打开链接: $url')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('发生错误: $e')));
+    }
   }
 }
