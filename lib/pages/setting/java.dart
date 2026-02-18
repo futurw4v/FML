@@ -36,7 +36,7 @@ class JavaPageState extends State<JavaPage> {
           // 大标题
           Padding(
             padding: const EdgeInsets.only(
-              left: kDefaultPadding,
+              left: kDefaultPadding / 2,
               top: kDefaultPadding,
               bottom: kDefaultPadding,
             ),
