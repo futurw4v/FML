@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:fml/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/java/java_manager.dart';
@@ -17,6 +18,117 @@ class JavaPageState extends State<JavaPage> {
   late Future<List<JavaRuntime>> _future;
   String? _currentJavaPath;
   late Future<JavaInfo?> _systemDefaultJavaInfo;
+
+  // 每个设置间的间距
+  static const _itemsPadding = Padding(
+    padding: EdgeInsets.symmetric(vertical: kDefaultPadding / 2),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: kDefaultPadding),
+
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+
+        children: [
+          // 大标题
+          Padding(
+            padding: const EdgeInsets.only(
+              left: kDefaultPadding,
+              top: kDefaultPadding,
+              bottom: kDefaultPadding,
+            ),
+            child: Text(
+              '设备上的Java列表',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+          ),
+
+          _itemsPadding,
+
+          // 确保FutureBuilder占满剩余空间
+          Expanded(
+            child: FutureBuilder<List<dynamic>>(
+              future: Future.wait([_systemDefaultJavaInfo, _future]),
+
+              builder: (context, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snap.hasError) {
+                  return Center(child: Text('检测失败：${snap.error}'));
+                }
+
+                final data = snap.data ?? [];
+
+                final JavaInfo? sys = data.isNotEmpty
+                    ? data[0] as JavaInfo?
+                    : null;
+
+                final List<JavaRuntime> list = data.length > 1
+                    ? (data[1] as List).cast<JavaRuntime>()
+                    : [];
+
+                final int sysCount = sys != null ? 1 : 0;
+                final total = sysCount + list.length;
+
+                if (total == 0) {
+                  return const Center(child: Text('未检测到 Java'));
+                }
+
+                return ListView.separated(
+                  itemCount: total,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    if (sysCount == 1 && index == 0) {
+                      final info = sys!;
+                      return Card(
+                        // 裁剪掉ListTile超出圆角的部分
+                        clipBehavior: Clip.antiAlias,
+
+                        elevation: 0,
+
+                        shape: RoundedRectangleBorder(
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+
+                        child: ListTile(
+                          title: Text(info.version),
+                          subtitle: Text(
+                            info.path.isNotEmpty ? info.path : '路径未知',
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Chip(label: Text('系统默认')),
+                              const SizedBox(width: 8),
+                              Chip(label: Text(info.vendor ?? 'Unknown')),
+                            ],
+                          ),
+
+                          onTap: () => _setSystemJava(),
+                        ),
+                      );
+                    }
+
+                    final idx = index - sysCount;
+                    final jt = list[idx];
+                    return _buildJavaItem(jt);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -59,7 +171,9 @@ class JavaPageState extends State<JavaPage> {
       if (result.exitCode != 0) {
         LogUtil.log('获取系统默认 Java 信息失败，退出码：${result.exitCode}', level: 'WARN');
       }
-      final output = (result.stderr as String).isNotEmpty ? result.stderr as String : result.stdout as String;
+      final output = (result.stderr as String).isNotEmpty
+          ? result.stderr as String
+          : result.stdout as String;
       final parsed = _parseVersionOutput(output);
       if (parsed == null) {
         LogUtil.log('无法解析系统默认 Java 版本信息', level: 'WARN');
@@ -99,8 +213,14 @@ class JavaPageState extends State<JavaPage> {
     final lines = out.split('\n');
     for (final l in lines) {
       final s = l.trim();
+
       if (s.isEmpty) continue;
-      final matches = RegExp(r'(?:(OpenJDK|java|IBM|AdoptOpenJDK|Microsoft).*?)?version\s+"([^"]+)"', caseSensitive: false).firstMatch(s);
+
+      final matches = RegExp(
+        r'(?:(OpenJDK|java|IBM|AdoptOpenJDK|Microsoft).*?)?version\s+"([^"]+)"',
+        caseSensitive: false,
+      ).firstMatch(s);
+
       if (matches != null) {
         String? vendor;
         if (matches.group(1) == 'java') {
@@ -111,7 +231,9 @@ class JavaPageState extends State<JavaPage> {
         final version = matches.group(2);
         return {'version': version ?? '', 'vendor': vendor};
       }
+
       final alt = RegExp(r'"([0-9._-]+)"').firstMatch(s);
+
       if (alt != null) return {'version': alt.group(1) ?? '', 'vendor': null};
     }
     return null;
@@ -128,12 +250,29 @@ class JavaPageState extends State<JavaPage> {
   // 构建 Java 条目
   Widget _buildJavaItem(JavaRuntime javaRuntime) {
     return Card(
+      // 裁剪掉ListTile超出圆角的部分
+      clipBehavior: Clip.antiAlias,
+
+      elevation: 0,
+
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(12),
+      ),
+
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: javaRuntime.executable == _currentJavaPath ? Theme.of(context).colorScheme.primaryContainer : null,
+
+      color: javaRuntime.executable == _currentJavaPath
+          ? Theme.of(context).colorScheme.primaryContainer
+          : null,
+
       child: ListTile(
         title: Text(javaRuntime.info.version),
+
         subtitle: Text(javaRuntime.executable),
+
         isThreeLine: true,
+
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -142,71 +281,8 @@ class JavaPageState extends State<JavaPage> {
             Chip(label: Text(javaRuntime.info.vendor ?? 'Unknown')),
           ],
         ),
-        onTap: () => _setCurrentJavaPath(javaRuntime.executable)
-      )
-    );
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('设备上的 Java 列表'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: '刷新',
-            onPressed: _refresh,
-          ),
-        ],
-      ),
-      body: FutureBuilder<List<dynamic>>(
-        future: Future.wait([_systemDefaultJavaInfo, _future]),
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return Center(child: Text('检测失败：${snap.error}'));
-          }
-          final data = snap.data ?? [];
-          final JavaInfo? sys = data.isNotEmpty ? data[0] as JavaInfo? : null;
-          final List<JavaRuntime> list = data.length > 1 ? (data[1] as List).cast<JavaRuntime>() : [];
-          final int sysCount = sys != null ? 1 : 0;
-          final total = sysCount + list.length;
-          if (total == 0) {
-            return const Center(child: Text('未检测到 Java'));
-          }
-          return ListView.separated(
-            itemCount: total,
-            separatorBuilder: (_, _) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              if (sysCount == 1 && index == 0) {
-                final info = sys!;
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  color: _currentJavaPath == 'java' || _currentJavaPath == null ? Theme.of(context).colorScheme.primaryContainer : null,
-                  child: ListTile(
-                    title: Text(info.version),
-                    subtitle: Text(info.path.isNotEmpty ? info.path : '路径未知'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Chip(label: Text('系统默认')),
-                        const SizedBox(width: 8),
-                        Chip(label: Text(info.vendor ?? 'Unknown')),
-                      ],
-                    ),
-                    onTap: () => _setSystemJava(),
-                  ),
-                );
-              }
-              final idx = index - sysCount;
-              final jt = list[idx];
-              return _buildJavaItem(jt);
-            },
-          );
-        },
+        onTap: () => _setCurrentJavaPath(javaRuntime.executable),
       ),
     );
   }
