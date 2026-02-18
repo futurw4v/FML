@@ -47,39 +47,51 @@ class LogViewerPageState extends State<LogViewerPage> {
               children: [
                 Text('日志', style: Theme.of(context).textTheme.headlineMedium),
 
-                IconButton(
-                  icon: const Icon(Icons.settings),
-                  onPressed: () => Navigator.push(
-                    context,
-                    SlidePageRoute(page: LogSettingPage()),
-                  ),
-                ),
+                // 将按钮推到右边
+                Spacer(),
 
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    if (!mounted) return;
-                    setState(() {
-                      _logsFuture = LogUtil.getLogs();
-                    });
-                  }, // _loadLogs,
-                  tooltip: '刷新',
-                ),
+                Row(
+                  // 使按钮组紧贴
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.settings),
+                      onPressed: () => Navigator.push(
+                        context,
+                        SlidePageRoute(page: LogSettingPage()),
+                      ),
+                    ),
 
-                IconButton(
-                  icon: const Icon(Icons.file_download),
-                  onPressed: logs.isEmpty ? null : _exportAllLogs,
-                  tooltip: '导出全部日志',
-                ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh),
+                      onPressed: () {
+                        if (!mounted) return;
+                        setState(() {
+                          _logsFuture = LogUtil.getLogs();
+                        });
+                      }, // _loadLogs,
+                      tooltip: '刷新',
+                    ),
 
-                IconButton(
-                  icon: const Icon(Icons.delete_sweep),
-                  onPressed: logs.isEmpty ? null : _clearLogs,
-                  tooltip: '清除日志',
+                    IconButton(
+                      icon: const Icon(Icons.file_download),
+                      onPressed: logs.isEmpty ? null : _exportAllLogs,
+                      tooltip: '导出全部日志',
+                    ),
+
+                    IconButton(
+                      icon: const Icon(Icons.delete_sweep),
+                      onPressed: logs.isEmpty ? null : _clearLogs,
+                      tooltip: '清除日志',
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+
+          // 标题下的间距
+          const SizedBox(height: kDefaultPadding),
 
           Expanded(
             child: Center(
@@ -99,12 +111,15 @@ class LogViewerPageState extends State<LogViewerPage> {
 
                   if (logs.isEmpty) {
                     return Padding(
-                      padding: const EdgeInsets.all(32.0),
+                      padding: const EdgeInsets.all(kDefaultPadding),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
+
                         children: [
                           Icon(Icons.inbox, size: 64, color: Colors.grey[400]),
-                          const SizedBox(height: 16),
+
+                          const SizedBox(height: kDefaultPadding),
+
                           Text(
                             '暂无日志',
                             style: TextStyle(
@@ -131,9 +146,15 @@ class LogViewerPageState extends State<LogViewerPage> {
                       final formattedTime = _kDateFormat.format(dateTime);
 
                       return Card(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                        clipBehavior: Clip.antiAlias,
+
+                        elevation: 0,
+
+                        shape: RoundedRectangleBorder(
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
                         ),
 
                         child: ListTile(
@@ -156,11 +177,6 @@ class LogViewerPageState extends State<LogViewerPage> {
                           ),
 
                           trailing: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-
                             decoration: BoxDecoration(
                               color: _getLevelColor(
                                 level,
