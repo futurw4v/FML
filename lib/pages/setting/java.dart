@@ -15,14 +15,39 @@ class JavaPage extends StatefulWidget {
 }
 
 class JavaPageState extends State<JavaPage> {
-  late Future<List<JavaRuntime>> _future;
-  String? _currentJavaPath;
+  late Future<List<JavaRuntime>> _javaRuntimesFuture;
   late Future<JavaInfo?> _systemDefaultJavaInfo;
+
+  String? _currentJavaPath;
+
+  static final RegExp _vendorVersionRegExp = RegExp(
+    r'(?:(OpenJDK|java|IBM|AdoptOpenJDK|Microsoft).*?)?version\s+"([^"]+)"',
+    caseSensitive: false,
+  );
+
+  static final RegExp _fallbackVersionRegExp = RegExp(r'"([0-9._-]+)"');
 
   // 每个设置间的间距
   static const _itemsPadding = Padding(
     padding: EdgeInsets.symmetric(vertical: kDefaultPadding / 2),
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentJavaPathFromPrefs();
+    _refresh();
+  }
+
+  ///
+  /// 刷新 Java 列表与系统默认 Java
+  ///
+  Future<void> _refresh() async {
+    setState(() {
+      _systemDefaultJavaInfo = _getSystemDefaultJavaInfo();
+      _javaRuntimesFuture = JavaManager.searchPotentialJavaExecutables();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,40 +76,58 @@ class JavaPageState extends State<JavaPage> {
           // 确保FutureBuilder占满剩余空间
           Expanded(
             child: FutureBuilder<List<dynamic>>(
-              future: Future.wait([_systemDefaultJavaInfo, _future]),
+              future: Future.wait([
+                _systemDefaultJavaInfo,
+                _javaRuntimesFuture,
+              ]),
 
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
+              builder: (context, snapshot) {
+                // 加载中显示CircularProgressIndicator
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                if (snap.hasError) {
-                  return Center(child: Text('检测失败：${snap.error}'));
+                // 加载失败显示错误信息
+                // TODO: 包装一个表示错误的组件
+                if (snapshot.hasError) {
+                  return Center(child: Text('检测失败：${snapshot.error}'));
                 }
 
-                final data = snap.data ?? [];
+                // Index0: _systemDefaultJavaInfo 的结果（JavaInfo?）
+                // Index1: _javaRuntimesFuture 的结果（List<JavaRuntime>）
+                final results = snapshot.data ?? [];
 
-                final JavaInfo? sys = data.isNotEmpty
-                    ? data[0] as JavaInfo?
+                // 提取系统默认 Java 信息
+                final JavaInfo? systemJava = results.isNotEmpty
+                    ? results[0] as JavaInfo?
                     : null;
 
-                final List<JavaRuntime> list = data.length > 1
-                    ? (data[1] as List).cast<JavaRuntime>()
-                    : [];
+                // 检测系统默认Java是否存在
+                final systemJavaExists = systemJava != null;
 
-                final int sysCount = sys != null ? 1 : 0;
-                final total = sysCount + list.length;
+                // 提取扫描到的Java运行时列表
+                List<JavaRuntime> javaRuntimes = [];
+                if (results.length > 1) {
+                  javaRuntimes = (results[1] as List).cast<JavaRuntime>();
+                }
 
-                if (total == 0) {
+                final totalItems = systemJavaExists
+                    ? javaRuntimes.length + 1
+                    : javaRuntimes.length;
+
+                if (totalItems == 0) {
                   return const Center(child: Text('未检测到 Java'));
                 }
 
                 return ListView.separated(
-                  itemCount: total,
+                  itemCount: totalItems,
+
                   separatorBuilder: (_, _) => const Divider(height: 1),
+
                   itemBuilder: (context, index) {
-                    if (sysCount == 1 && index == 0) {
-                      final info = sys!;
+                    if (systemJavaExists && index == 0) {
+                      final info = systemJava;
+                      // 当为系统默认时构建Card
                       return Card(
                         // 裁剪掉ListTile超出圆角的部分
                         clipBehavior: Clip.antiAlias,
@@ -100,14 +143,18 @@ class JavaPageState extends State<JavaPage> {
 
                         child: ListTile(
                           title: Text(info.version),
+
                           subtitle: Text(
                             info.path.isNotEmpty ? info.path : '路径未知',
                           ),
+
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Chip(label: Text('系统默认')),
-                              const SizedBox(width: 8),
+
+                              const SizedBox(width: kDefaultPadding / 2),
+
                               Chip(label: Text(info.vendor ?? 'Unknown')),
                             ],
                           ),
@@ -117,9 +164,9 @@ class JavaPageState extends State<JavaPage> {
                       );
                     }
 
-                    final idx = index - sysCount;
-                    final jt = list[idx];
-                    return _buildJavaItem(jt);
+                    // 构建非系统默认的Java的卡片
+                    final realIndex = systemJavaExists ? index - 1 : index;
+                    return _buildJavaItem(javaRuntimes[realIndex]);
                   },
                 );
               },
@@ -130,75 +177,98 @@ class JavaPageState extends State<JavaPage> {
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _getCurrentJavaPath();
-    _systemDefaultJavaInfo = _getSystemDefaultJavaInfo();
-    _refresh();
-  }
-
-  // 当前选择 Java
-  Future<void> _getCurrentJavaPath() async {
+  ///
+  /// 从SharedPreferences读取选择的Java
+  ///
+  Future<void> _getCurrentJavaPathFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
+
     setState(() {
       _currentJavaPath = prefs.getString('java');
     });
   }
 
-  // 设置当前 Java
-  Future<void> _setCurrentJavaPath(String path) async {
+  ///
+  /// 写入当前 Java
+  ///
+  Future<void> _setCurrentJavaPathToPrefs(String path) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('java', path);
+
     setState(() {
       _currentJavaPath = path;
     });
   }
 
-  // 设置为系统 Java
+  ///
+  /// 设置为系统 Java
+  ///
   Future<void> _setSystemJava() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('java');
+
     setState(() {
       _currentJavaPath = 'java';
     });
   }
 
+  //
   // 获取系统默认 Java 信息
+  //
   Future<JavaInfo?> _getSystemDefaultJavaInfo() async {
     try {
-      final result = await Process.run('java', ['-version']);
-      if (result.exitCode != 0) {
-        LogUtil.log('获取系统默认 Java 信息失败，退出码：${result.exitCode}', level: 'WARN');
+      final javaVersionProcess = await Process.run('java', ['-version']);
+
+      if (javaVersionProcess.exitCode != 0) {
+        LogUtil.log(
+          '获取系统默认 Java 信息失败，退出码：${javaVersionProcess.exitCode}',
+          level: 'WARN',
+        );
       }
-      final output = (result.stderr as String).isNotEmpty
-          ? result.stderr as String
-          : result.stdout as String;
-      final parsed = _parseVersionOutput(output);
-      if (parsed == null) {
+
+      final versionOutput = (javaVersionProcess.stderr as String).isNotEmpty
+          ? javaVersionProcess.stderr as String
+          : javaVersionProcess.stdout as String;
+
+      final parsedVersion = _parseVersionOutput(versionOutput);
+
+      if (parsedVersion == null) {
         LogUtil.log('无法解析系统默认 Java 版本信息', level: 'WARN');
         return null;
       }
-      String path = '';
+
+      String executablePath = '';
+
       try {
         if (Platform.isWindows) {
           final where = await Process.run('where', ['java']);
+
           if (where.exitCode == 0) {
-            path = (where.stdout as String).toString().split('\n').first.trim();
+            executablePath = (where.stdout as String)
+                .toString()
+                .split('\n')
+                .first
+                .trim();
           }
         } else {
           final which = await Process.run('which', ['java']);
+
           if (which.exitCode == 0) {
-            path = (which.stdout as String).toString().split('\n').first.trim();
+            executablePath = (which.stdout as String)
+                .toString()
+                .split('\n')
+                .first
+                .trim();
           }
         }
       } catch (e) {
         LogUtil.log('获取系统默认 Java 路径时出错：$e', level: 'WARN');
       }
+
       return JavaInfo(
-        version: parsed['version'] ?? 'unknown',
-        vendor: parsed['vendor'],
-        path: path,
+        version: parsedVersion['version'] ?? 'unknown',
+        vendor: parsedVersion['vendor'],
+        path: executablePath,
         os: Platform.operatingSystem,
         arch: Platform.version,
       );
@@ -208,46 +278,45 @@ class JavaPageState extends State<JavaPage> {
     }
   }
 
-  // 解析 "java -version" 输出
-  static Map<String, String?>? _parseVersionOutput(String out) {
-    final lines = out.split('\n');
-    for (final l in lines) {
-      final s = l.trim();
+  ///
+  /// 解析 "java -version" 输出
+  ///
+  static Map<String, String?>? _parseVersionOutput(String output) {
+    // 分割每行
+    final lines = output.split('\n');
 
-      if (s.isEmpty) continue;
+    for (final line in lines) {
+      final trimmedLine = line.trim();
 
-      final matches = RegExp(
-        r'(?:(OpenJDK|java|IBM|AdoptOpenJDK|Microsoft).*?)?version\s+"([^"]+)"',
-        caseSensitive: false,
-      ).firstMatch(s);
+      if (trimmedLine.isEmpty) continue;
+
+      final matches = _vendorVersionRegExp.firstMatch(trimmedLine);
 
       if (matches != null) {
         String? vendor;
+
         if (matches.group(1) == 'java') {
           vendor = 'Oracle';
         } else {
           vendor = matches.group(1);
         }
+
         final version = matches.group(2);
         return {'version': version ?? '', 'vendor': vendor};
       }
 
-      final alt = RegExp(r'"([0-9._-]+)"').firstMatch(s);
+      final fallbackMatch = _fallbackVersionRegExp.firstMatch(line);
 
-      if (alt != null) return {'version': alt.group(1) ?? '', 'vendor': null};
+      if (fallbackMatch != null) {
+        return {'version': fallbackMatch.group(1) ?? '', 'vendor': null};
+      }
     }
     return null;
   }
 
-  // 刷新 Java 列表与系统默认 Java
-  Future<void> _refresh() async {
-    setState(() {
-      _systemDefaultJavaInfo = _getSystemDefaultJavaInfo();
-      _future = JavaManager.searchPotentialJavaExecutables();
-    });
-  }
-
-  // 构建 Java 条目
+  ///
+  /// 构建 Java 条目
+  ///
   Widget _buildJavaItem(JavaRuntime javaRuntime) {
     return Card(
       // 裁剪掉ListTile超出圆角的部分
@@ -282,7 +351,7 @@ class JavaPageState extends State<JavaPage> {
           ],
         ),
 
-        onTap: () => _setCurrentJavaPath(javaRuntime.executable),
+        onTap: () => _setCurrentJavaPathToPrefs(javaRuntime.executable),
       ),
     );
   }
