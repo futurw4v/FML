@@ -16,50 +16,55 @@ class AboutPageState extends State<AboutPage> {
       body: ListView(
         children: [
           Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Center(
-                child: Column(
+            clipBehavior: Clip.antiAlias,
+
+            elevation: 0,
+
+            shape: RoundedRectangleBorder(
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+
+            margin: const EdgeInsets.symmetric(horizontal: kDefaultPadding),
+
+            child: Column(
+              children: [
+                Text(
+                  '\n本项目使用GPL3.0协议开源,使用过程中请遵守GPL3.0协议\n',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      '\n本项目使用GPL3.0协议开源,使用过程中请遵守GPL3.0协议\n',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                    Flexible(
+                      child: Image.asset(
+                        'assets/img/icon/logo_transparent.png',
+                        height: 150,
                       ),
-                      textAlign: TextAlign.center,
                     ),
 
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Flexible(
-                          child: Image.asset(
-                            'assets/img/icon/logo_transparent.png',
-                            height: 150,
-                          ),
-                        ),
-                        const SizedBox(width: 70),
-                        Flexible(
-                          child: Image.asset(
-                            'assets/img/logo/flutter.png',
-                            height: 150,
-                          ),
-                        ),
-                      ],
-                    ),
+                    const SizedBox(width: 70),
 
-                    const SizedBox(height: kDefaultPadding),
-
-                    Text(
-                      '$kAppName Version $gAppVersion',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
+                    Flexible(
+                      child: Image.asset(
+                        'assets/img/logo/flutter.png',
+                        height: 150,
                       ),
-                      textAlign: TextAlign.center,
                     ),
+                  ],
+                ),
+
+                const SizedBox(height: kDefaultPadding),
+
+                Text(
+                  '$kAppName Version $gAppVersion',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
 
                     Text(
                       'Copyright © 2026 lxdklp. All rights reserved\n',
@@ -75,48 +80,48 @@ class AboutPageState extends State<AboutPage> {
             ),
           ),
 
-          Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ListTile(
-              title: const Text('官网'),
-              subtitle: const Text(AppUrls.officialWebsite),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () => _launchURL(AppUrls.officialWebsite),
-            ),
+          _buildCardWithListTile(
+            title: '官网',
+            subtitle: AppUrls.officialWebsite,
+            onTap: () => _launchURL(AppUrls.officialWebsite),
+          ),
+
+          _buildCardWithListTile(
+            title: 'GitHub',
+            subtitle: AppUrls.githubProject,
+            onTap: () => _launchURL(AppUrls.githubProject),
+          ),
+
+          _buildCardWithListTile(
+            title: 'BUG反馈与建议',
+            subtitle: '${AppUrls.githubProject}/issues',
+            onTap: () => _launchURL('${AppUrls.githubProject}/issues'),
+          ),
+
+          _buildCardWithListTile(
+            title: '许可',
+            subtitle: '感谢各位依赖库的贡献者',
+            onTap: () => showLicensePage(context: context),
           ),
 
           Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ListTile(
-              title: const Text('GitHub'),
-              subtitle: const Text(AppUrls.githubProject),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () => _launchURL(AppUrls.githubProject),
+            margin: const EdgeInsets.only(
+              left: kDefaultPadding,
+              right: kDefaultPadding,
+              bottom: kDefaultPadding,
             ),
-          ),
 
-          Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ListTile(
-              title: const Text('BUG反馈与建议'),
-              subtitle: const Text('${AppUrls.githubProject}/issues'),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () => _launchURL('${AppUrls.githubProject}/issues'),
+            clipBehavior: Clip.antiAlias,
+
+            elevation: 0,
+
+            shape: RoundedRectangleBorder(
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+              borderRadius: BorderRadius.circular(12),
             ),
-          ),
 
-          Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ListTile(
-              title: Text('许可'),
-              subtitle: Text('感谢各位依赖库的贡献者'),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () => showLicensePage(context: context),
-            ),
-          ),
-
-          Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Column(
               children: [
                 const ListTile(title: Text('鸣谢'), subtitle: Text('排名不分先后顺序')),
@@ -249,6 +254,32 @@ class AboutPageState extends State<AboutPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Card _buildCardWithListTile({
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+
+      elevation: 0,
+
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(12),
+      ),
+
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+
+      child: ListTile(
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.open_in_new),
+        onTap: onTap,
       ),
     );
   }
