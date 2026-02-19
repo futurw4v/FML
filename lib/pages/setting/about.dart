@@ -66,17 +66,12 @@ class AboutPageState extends State<AboutPage> {
                   textAlign: TextAlign.center,
                 ),
 
-                    Text(
-                      'Copyright © 2026 lxdklp. All rights reserved\n',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                Text(
+                  'Copyright © 2026 lxdklp. All rights reserved\n',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
                 ),
-              ),
+              ],
             ),
           ),
 
