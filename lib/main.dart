@@ -12,11 +12,11 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'package:fml/constants.dart';
 import 'package:fml/function/log.dart';
-import 'package:fml/pages/download.dart';
-import 'package:fml/pages/home.dart';
-import 'package:fml/pages/online.dart';
+import 'package:fml/pages/download_page.dart';
+import 'package:fml/pages/home_page.dart';
+import 'package:fml/pages/online_page.dart';
 import 'package:fml/pages/online/owner.dart';
-import 'package:fml/pages/setting.dart';
+import 'package:fml/pages/setting_page.dart';
 import 'package:window_manager/window_manager.dart';
 
 void main() async {
@@ -32,6 +32,7 @@ void main() async {
   WindowOptions windowOptions = WindowOptions(
     center: true,
     title: "$kAppName v$gAppVersion ($gAppBuildNumber)",
+    minimumSize: const Size(600, 600),
   );
 
   windowManager.waitUntilReadyToShow(windowOptions, () async {
@@ -240,26 +241,19 @@ class MainStartPageState extends State<MainStartPage> {
   int _selectedIndex = 0;
   bool? _javaInstalled;
 
+  // 使页面仅被初始化一次
+  final List<Widget> _mainPages = const [
+    HomePage(),
+    OnlinePage(),
+    DownloadPage(),
+    SettingPage(),
+  ];
+
   @override
   void initState() {
     super.initState();
     _checkJavaInstalled();
     _checkUpdate();
-  }
-
-  // 构建页面
-  Widget _buildPage(int index) {
-    switch (index) {
-      case 1:
-        return const OnlinePage();
-      case 2:
-        return const DownloadPage();
-      case 3:
-        return const SettingPage();
-      case 0:
-      default:
-        return const HomePage();
-    }
   }
 
   // 检查是否安装Java
@@ -431,7 +425,11 @@ class MainStartPageState extends State<MainStartPage> {
               ),
             ],
           ),
-          Expanded(child: Center(child: _buildPage(_selectedIndex))),
+
+          // 显示当前页面
+          Expanded(
+            child: IndexedStack(index: _selectedIndex, children: _mainPages),
+          ),
         ],
       ),
     );
