@@ -237,6 +237,10 @@ class LogViewerPageState extends State<LogViewerPage> {
 
       if (!mounted) return;
 
+      setState(() {
+        _logsFuture = LogUtil.getLogs();
+      });
+
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('日志已清除')));
