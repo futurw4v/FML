@@ -268,7 +268,10 @@ class AboutPageState extends State<AboutPage> {
         borderRadius: BorderRadius.circular(12),
       ),
 
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(
+        horizontal: kDefaultPadding,
+        vertical: kDefaultPadding / 2,
+      ),
 
       child: ListTile(
         title: Text(title),

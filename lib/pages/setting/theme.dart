@@ -130,7 +130,7 @@ class ThemePageState extends State<ThemePage> {
                   return GestureDetector(
                     onTap: changeColor,
                     child: Container(
-                      margin: const EdgeInsets.all(4),
+                      margin: const EdgeInsets.all(kDefaultPadding / 4),
 
                       // 添加选中时的框
                       decoration: BoxDecoration(

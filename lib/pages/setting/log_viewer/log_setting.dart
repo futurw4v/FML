@@ -48,7 +48,7 @@ class LogSettingPageState extends State<LogSettingPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('日志设置')),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(kDefaultPadding),
         child: Column(
           children: [
             Card(

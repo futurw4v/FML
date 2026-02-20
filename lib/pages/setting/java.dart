@@ -329,7 +329,10 @@ class JavaPageState extends State<JavaPage> {
         borderRadius: BorderRadius.circular(12),
       ),
 
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(
+        horizontal: kDefaultPadding,
+        vertical: kDefaultPadding / 2,
+      ),
 
       color: javaRuntime.executable == _currentJavaPath
           ? Theme.of(context).colorScheme.primaryContainer
@@ -346,7 +349,7 @@ class JavaPageState extends State<JavaPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Chip(label: Text(javaRuntime.isJdk ? 'JDK' : 'JRE')),
-            SizedBox(width: 8),
+            SizedBox(width: kDefaultPadding / 2),
             Chip(label: Text(javaRuntime.info.vendor ?? 'Unknown')),
           ],
         ),
