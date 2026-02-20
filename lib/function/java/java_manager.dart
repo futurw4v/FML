@@ -11,8 +11,12 @@ class JavaManager {
   static Future<List<JavaRuntime>> searchPotentialJavaExecutables() async {
     final Set<String> found = {};
     final List<JavaRuntime> result = [];
+
     // PATH
-    final pathEntries = Platform.environment['PATH']?.split(Platform.pathSeparator) ?? [];
+    final pathSeparator = Platform.isWindows ? ';' : ':';
+    final pathEntries =
+        Platform.environment['PATH']?.split(pathSeparator) ?? [];
+
     for (final entry in pathEntries) {
       if (entry.trim().isEmpty) continue;
       final javaPath = _join(entry, _javaExecutableName());
@@ -20,12 +24,15 @@ class JavaManager {
         found.add(await File(javaPath).resolveSymbolicLinks());
       }
     }
+
     // 常用系统目录
     final List<Directory> candidates = [];
+
     if (Platform.isWindows) {
       final env = Platform.environment;
       final prog = env['ProgramFiles'] ?? 'C:\\Program Files';
       final progx86 = env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)';
+
       candidates.add(Directory(prog));
       candidates.add(Directory(progx86));
     } else if (Platform.isLinux) {
@@ -33,15 +40,24 @@ class JavaManager {
       candidates.add(Directory('/usr/lib/jvm'));
       candidates.add(Directory('/usr/lib32/jvm'));
       candidates.add(Directory('/usr/lib64/jvm'));
+
       final home = Platform.environment['HOME'];
-      if (home != null) candidates.add(Directory('$home/.sdkman/candidates/java'));
+
+      if (home != null) {
+        candidates.add(Directory('$home/.sdkman/candidates/java'));
+      }
     } else if (Platform.isMacOS) {
       candidates.add(Directory('/Library/Java/JavaVirtualMachines'));
+
       final home = Platform.environment['HOME'];
-      if (home != null) candidates.add(Directory('$home/Library/Java/JavaVirtualMachines'));
+      if (home != null) {
+        candidates.add(Directory('$home/Library/Java/JavaVirtualMachines'));
+      }
     }
+
     // 用户jdks
     final home = Platform.environment['HOME'];
+
     if (home != null) candidates.add(Directory('$home/.jdks'));
     for (final dir in candidates) {
       if (!await dir.exists()) continue;
@@ -61,6 +77,7 @@ class JavaManager {
         LogUtil.log('查找 Java 可执行文件时出错：$e', level: 'WARN');
       }
     }
+
     // 同时检查每个候选目录下常见的顶级 JDK 名称
     for (final exe in found) {
       try {
@@ -74,12 +91,8 @@ class JavaManager {
       }
     }
 
-    // 通过可执行路径确保唯一性
-    final unique = <String, JavaRuntime>{};
-    for (final r in result) {
-      unique[r.executable] = r;
-    }
-    return unique.values.toList();
+    // 去重返回
+    return result.toSet().toList();
   }
 
   // 路径拼接
@@ -97,7 +110,9 @@ class JavaManager {
   static List<String> _possibleExecutablePaths(String javaHome) {
     final List<String> probes = [];
     if (Platform.isMacOS) {
-      probes.add('$javaHome/jre.bundle/Contents/Home/bin/${_javaExecutableName()}');
+      probes.add(
+        '$javaHome/jre.bundle/Contents/Home/bin/${_javaExecutableName()}',
+      );
       probes.add('$javaHome/Contents/Home/bin/${_javaExecutableName()}');
     }
     probes.add('$javaHome/bin/${_javaExecutableName()}');
@@ -109,7 +124,9 @@ class JavaManager {
   static Future<bool> _looksLikeJdk(String exe) async {
     try {
       final bin = File(exe).parent;
-      final javac = File('${bin.path}${Platform.pathSeparator}javac${Platform.isWindows ? '.exe' : ''}');
+      final javac = File(
+        '${bin.path}${Platform.pathSeparator}javac${Platform.isWindows ? '.exe' : ''}',
+      );
       return await javac.exists();
     } catch (_) {
       return false;
@@ -149,7 +166,8 @@ class JavaManager {
           if (idx > 0) {
             final k = l.substring(0, idx).trim();
             var v = l.substring(idx + 1).trim();
-            if (v.startsWith('"') && v.endsWith('"')) v = v.substring(1, v.length - 1);
+            if (v.startsWith('"') && v.endsWith('"'))
+              v = v.substring(1, v.length - 1);
             map[k] = v;
           }
         }
@@ -176,7 +194,10 @@ class JavaManager {
     for (final l in lines) {
       final s = l.trim();
       if (s.isEmpty) continue;
-      final matches = RegExp(r'(?:(OpenJDK|java|IBM|AdoptOpenJDK|Microsoft).*?)?version\s+"([^"]+)"', caseSensitive: false).firstMatch(s);
+      final matches = RegExp(
+        r'(?:(OpenJDK|java|IBM|AdoptOpenJDK|Microsoft).*?)?version\s+"([^"]+)"',
+        caseSensitive: false,
+      ).firstMatch(s);
       if (matches != null) {
         String? vendor;
         if (matches.group(1) == 'java') {
