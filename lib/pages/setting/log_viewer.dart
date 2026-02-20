@@ -177,6 +177,8 @@ class LogViewerPageState extends State<LogViewerPage> {
                           ),
 
                           trailing: Container(
+                            padding: const EdgeInsets.all(kDefaultPadding / 4),
+
                             decoration: BoxDecoration(
                               color: _getLevelColor(
                                 level,
