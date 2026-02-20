@@ -20,13 +20,6 @@ class JavaPageState extends State<JavaPage> {
 
   String? _currentJavaPath;
 
-  static final RegExp _vendorVersionRegExp = RegExp(
-    r'(?:(OpenJDK|java|IBM|AdoptOpenJDK|Microsoft).*?)?version\s+"([^"]+)"',
-    caseSensitive: false,
-  );
-
-  static final RegExp _fallbackVersionRegExp = RegExp(r'"([0-9._-]+)"');
-
   // 每个设置间的间距
   static const _itemsPadding = Padding(
     padding: EdgeInsets.symmetric(vertical: kDefaultPadding / 2),
@@ -230,7 +223,7 @@ class JavaPageState extends State<JavaPage> {
           ? javaVersionProcess.stderr as String
           : javaVersionProcess.stdout as String;
 
-      final parsedVersion = _parseVersionOutput(versionOutput);
+      final parsedVersion = JavaManager.parseVersionOutput(versionOutput);
 
       if (parsedVersion == null) {
         LogUtil.log('无法解析系统默认 Java 版本信息', level: 'WARN');
@@ -276,42 +269,6 @@ class JavaPageState extends State<JavaPage> {
       LogUtil.log('执行 "java -version" 时出错：$e', level: 'WARN');
       return null;
     }
-  }
-
-  ///
-  /// 解析 "java -version" 输出
-  ///
-  static Map<String, String?>? _parseVersionOutput(String output) {
-    // 分割每行
-    final lines = output.split('\n');
-
-    for (final line in lines) {
-      final trimmedLine = line.trim();
-
-      if (trimmedLine.isEmpty) continue;
-
-      final matches = _vendorVersionRegExp.firstMatch(trimmedLine);
-
-      if (matches != null) {
-        String? vendor;
-
-        if (matches.group(1) == 'java') {
-          vendor = 'Oracle';
-        } else {
-          vendor = matches.group(1);
-        }
-
-        final version = matches.group(2);
-        return {'version': version ?? '', 'vendor': vendor};
-      }
-
-      final fallbackMatch = _fallbackVersionRegExp.firstMatch(line);
-
-      if (fallbackMatch != null) {
-        return {'version': fallbackMatch.group(1) ?? '', 'vendor': null};
-      }
-    }
-    return null;
   }
 
   ///
