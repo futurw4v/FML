@@ -73,7 +73,7 @@ class LogSettingPageState extends State<LogSettingPage> {
                   children: [
                     Text('日志等级', style: Theme.of(context).textTheme.bodyLarge),
 
-                    Spacer(),
+                    const Spacer(),
 
                     DropdownButton<int>(
                       hint: const Text('日志等级'),

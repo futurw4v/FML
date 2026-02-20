@@ -48,7 +48,7 @@ class LogViewerPageState extends State<LogViewerPage> {
                 Text('日志', style: Theme.of(context).textTheme.headlineMedium),
 
                 // 将按钮推到右边
-                Spacer(),
+                const Spacer(),
 
                 Row(
                   // 使按钮组紧贴
@@ -58,7 +58,7 @@ class LogViewerPageState extends State<LogViewerPage> {
                       icon: const Icon(Icons.settings),
                       onPressed: () => Navigator.push(
                         context,
-                        SlidePageRoute(page: LogSettingPage()),
+                        SlidePageRoute(page: const LogSettingPage()),
                       ),
                     ),
 
