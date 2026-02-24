@@ -91,17 +91,24 @@ class JavaPageState extends State<JavaPage> {
                 final results = snapshot.data ?? [];
 
                 // 提取系统默认 Java 信息
-                final JavaInfo? systemJava = results.isNotEmpty
+                final JavaInfo? systemJavaInfo = results.isNotEmpty
                     ? results[0] as JavaInfo?
                     : null;
 
                 // 检测系统默认Java是否存在
-                final systemJavaExists = systemJava != null;
+                final systemJavaExists = systemJavaInfo != null;
 
                 // 提取扫描到的Java运行时列表
                 List<JavaRuntime> javaRuntimes = [];
                 if (results.length > 1) {
                   javaRuntimes = (results[1] as List).cast<JavaRuntime>();
+                }
+
+                // 如果系统默认存在且路径不为空，移除扫描列表中与系统默认路径相同的项
+                if (systemJavaExists && systemJavaInfo.path.isNotEmpty) {
+                  javaRuntimes.removeWhere(
+                    (runtime) => runtime.executable == systemJavaInfo.path,
+                  );
                 }
 
                 final totalItems = systemJavaExists
@@ -112,20 +119,24 @@ class JavaPageState extends State<JavaPage> {
                   return const Center(child: Text('未检测到 Java'));
                 }
 
-                return ListView.separated(
+                return ListView.builder(
                   itemCount: totalItems,
-
-                  separatorBuilder: (_, _) => const Divider(height: 1),
 
                   itemBuilder: (context, index) {
                     if (systemJavaExists && index == 0) {
-                      final info = systemJava;
                       // 当为系统默认时构建Card
                       return Card(
                         // 裁剪掉ListTile超出圆角的部分
                         clipBehavior: Clip.antiAlias,
 
                         elevation: 0,
+
+                        // 为当前Java或者未选择任何Java时高亮
+                        color:
+                            _currentJavaPath == 'default' ||
+                                _currentJavaPath == null
+                            ? Theme.of(context).colorScheme.secondaryContainer
+                            : null,
 
                         shape: RoundedRectangleBorder(
                           side: BorderSide(
@@ -135,10 +146,12 @@ class JavaPageState extends State<JavaPage> {
                         ),
 
                         child: ListTile(
-                          title: Text(info.version),
+                          title: Text(systemJavaInfo.version),
 
                           subtitle: Text(
-                            info.path.isNotEmpty ? info.path : '路径未知',
+                            systemJavaInfo.path.isNotEmpty
+                                ? systemJavaInfo.path
+                                : '路径未知',
                           ),
 
                           trailing: Row(
@@ -148,7 +161,9 @@ class JavaPageState extends State<JavaPage> {
 
                               const SizedBox(width: kDefaultPadding / 2),
 
-                              Chip(label: Text(info.vendor ?? 'Unknown')),
+                              Chip(
+                                label: Text(systemJavaInfo.vendor ?? 'Unknown'),
+                              ),
                             ],
                           ),
 
@@ -201,7 +216,7 @@ class JavaPageState extends State<JavaPage> {
     await prefs.remove('java');
 
     setState(() {
-      _currentJavaPath = 'java';
+      _currentJavaPath = 'default';
     });
   }
 
@@ -286,21 +301,15 @@ class JavaPageState extends State<JavaPage> {
         borderRadius: BorderRadius.circular(12),
       ),
 
-      margin: const EdgeInsets.symmetric(
-        horizontal: kDefaultPadding,
-        vertical: kDefaultPadding / 2,
-      ),
-
-      color: javaRuntime.executable == _currentJavaPath
-          ? Theme.of(context).colorScheme.primaryContainer
+      // 为当前Java时高亮
+      color: _currentJavaPath == javaRuntime.executable
+          ? Theme.of(context).colorScheme.secondaryContainer
           : null,
 
       child: ListTile(
         title: Text(javaRuntime.info.version),
 
         subtitle: Text(javaRuntime.executable),
-
-        isThreeLine: true,
 
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
