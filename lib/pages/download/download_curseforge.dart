@@ -108,8 +108,10 @@ class DownloadCurseforgeState extends State<DownloadCurseforge> {
           seen.add(id);
           return true;
         }).toList();
+        _projectsList = allProjects;
+        await _applyTranslations();
+        if (!mounted) return;
         setState(() {
-          _projectsList = allProjects;
           _isLoading = false;
         });
       } else {
@@ -163,8 +165,10 @@ class DownloadCurseforgeState extends State<DownloadCurseforge> {
       );
       if (response.statusCode == 200) {
         LogUtil.log('成功获取搜索结果', level: 'INFO');
+        _projectsList = response.data['data'] ?? [];
+        await _applyTranslations();
+        if (!mounted) return;
         setState(() {
-          _projectsList = response.data['data'] ?? [];
           _isLoading = false;
         });
       } else {
@@ -182,6 +186,50 @@ class DownloadCurseforgeState extends State<DownloadCurseforge> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  // 批量获取翻译并更新列表描述
+  Future<void> _applyTranslations() async {
+    if (_projectsList.isEmpty) return;
+    try {
+      final ids = _projectsList
+          .map((p) => p['id'])
+          .where((id) => id != null)
+          .cast<int>()
+          .toList();
+      if (ids.isEmpty) return;
+      LogUtil.log('正在批量获取CurseForge翻译', level: 'INFO');
+      final transResponse = await DioClient().dio.post(
+        'https://mod.mcimirror.top/translate/curseforge',
+        data: {'modids': ids},
+        options: Options(
+          headers: {
+            'x-api-key': kCurseforgeApiKey,
+            'User-Agent': gAppModrinthUserAgent,
+          },
+          validateStatus: (status) => status != null,
+        ),
+      );
+      if (transResponse.statusCode == 200 && transResponse.data is List) {
+        final translations = transResponse.data as List;
+        final Map<int, String> transMap = {};
+        for (final t in translations) {
+          if (t['modid'] != null && t['translated'] != null) {
+            transMap[t['modid'] as int] = t['translated'].toString();
+          }
+        }
+        if (transMap.isEmpty) return;
+        for (final project in _projectsList) {
+          final id = project['id'] as int?;
+          if (id != null && transMap.containsKey(id)) {
+            project['summary'] = transMap[id];
+          }
+        }
+        LogUtil.log('批量翻译应用成功', level: 'INFO');
+      }
+    } catch (e) {
+      LogUtil.log('批量获取翻译失败: $e', level: 'WARNING');
     }
   }
 

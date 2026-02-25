@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:fml/constants.dart';
 import 'package:fml/pages/download/download_resources.dart';
 import 'package:fml/pages/download/download_version.dart';
-import 'package:fml/models/page/navigation_drawer_item.dart';
 
 class DownloadPage extends StatefulWidget {
   const DownloadPage({super.key});
@@ -13,21 +12,16 @@ class DownloadPage extends StatefulWidget {
 
 class DownloadPageState extends State<DownloadPage> {
   int _selectedIndex = 0;
+  bool _resourcesPageInitialized = false;
 
-  final List<NavigationDrawerItem> _downloadPageItems = const [
-    NavigationDrawerItem(
-      page: DownloadVersionPage(),
-      destination: NavigationDrawerDestination(
-        icon: Icon(Icons.code),
-        label: Text('游戏'),
-      ),
+  static const List<NavigationDrawerDestination> _destinations = [
+    NavigationDrawerDestination(
+      icon: Icon(Icons.code),
+      label: Text('游戏'),
     ),
-    NavigationDrawerItem(
-      page: DownloadResources(),
-      destination: NavigationDrawerDestination(
-        icon: Icon(Icons.extension),
-        label: Text('资源'),
-      ),
+    NavigationDrawerDestination(
+      icon: Icon(Icons.extension),
+      label: Text('资源'),
     ),
   ];
 
@@ -66,9 +60,10 @@ class DownloadPageState extends State<DownloadPage> {
                       if (_selectedIndex == index) return;
                       // 移除当前上下文中的所有焦点，避免视觉残留
                       FocusScope.of(context).unfocus();
-
                       setState(() {
                         _selectedIndex = index;
+                        // 首次切换到资源页时才初始化，避免启动时提前发起网络请求
+                        if (index == 1) _resourcesPageInitialized = true;
                       });
                     },
 
@@ -88,7 +83,7 @@ class DownloadPageState extends State<DownloadPage> {
                       ),
 
                       // Destinations
-                      for (var item in _downloadPageItems) item.destination,
+                      for (var dest in _destinations) dest,
                     ],
                   ),
                 ),
@@ -98,9 +93,14 @@ class DownloadPageState extends State<DownloadPage> {
               Expanded(
                 child: IndexedStack(
                   index: _selectedIndex,
-                  children: _downloadPageItems
-                      .map((item) => item.page)
-                      .toList(),
+                  children: [
+                    const DownloadVersionPage(),
+                    // 资源页懒初始化：首次切换到该 tab 时才创建 widget，
+                    // 避免打开下载页时就发起资源相关的网络请求
+                    _resourcesPageInitialized
+                        ? const DownloadResources()
+                        : const SizedBox.shrink(),
+                  ],
                 ),
               ),
             ],

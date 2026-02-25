@@ -155,6 +155,14 @@ class AboutPageState extends State<AboutPage> {
                   onTap: () => _launchURL('https://bmclapidoc.bangbang93.com'),
                 ),
                 ListTile(
+                  title: const Text('MCIM'),
+                  subtitle: const Text(
+                    '资源简介翻译\nhttps://github.com/mcmod-info-mirror',
+                  ),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () => _launchURL('https://github.com/mcmod-info-mirror'),
+                ),
+                ListTile(
                   title: const Text('gh-proxy.com'),
                   subtitle: const Text('GitHub 加速下载\nhttps://gh-proxy.com'),
                   trailing: const Icon(Icons.open_in_new),

@@ -68,11 +68,15 @@ class InfoPageState extends State<InfoPage> {
         options: Options(headers: {'User-Agent': gAppModrinthUserAgent}),
       );
       if (response.statusCode == 200) {
+        final Map<String, dynamic> details =
+            Map<String, dynamic>.from(response.data);
+        LogUtil.log('成功获取模组详情', level: 'INFO');
+        // 尝试获取翻译
+        await _applyTranslation(details);
         setState(() {
-          projectDetails = response.data;
+          projectDetails = details;
           isLoading = false;
         });
-        LogUtil.log('成功获取模组详情', level: 'INFO');
       } else {
         setState(() {
           error = '请求失败: ${response.statusCode}';
@@ -86,6 +90,39 @@ class InfoPageState extends State<InfoPage> {
         isLoading = false;
       });
       LogUtil.log('获取模组详情错误: $e', level: 'ERROR');
+    }
+  }
+
+  // 尝试从 MCIM API 获取翻译并应用，失败则保留原内容
+  Future<void> _applyTranslation(Map<String, dynamic> details) async {
+    final projectId = details['id'];
+    if (projectId == null || projectId.toString().isEmpty) return;
+    try {
+      LogUtil.log('正在获取翻译: $projectId', level: 'INFO');
+      final transResponse = await DioClient().dio.get(
+        'https://mod.mcimirror.top/translate/modrinth/$projectId',
+        options: Options(
+          headers: {'User-Agent': gAppModrinthUserAgent},
+          validateStatus: (status) => status != null,
+        ),
+      );
+      if (transResponse.statusCode == 200 &&
+          transResponse.data is Map<String, dynamic>) {
+        final transData =
+            transResponse.data as Map<String, dynamic>;
+        final translated = transData['translated']?.toString();
+        if (translated != null && translated.isNotEmpty) {
+          details['description'] = translated;
+          LogUtil.log('翻译应用成功', level: 'INFO');
+        }
+      } else {
+        LogUtil.log(
+          '翻译不可用 (${transResponse.statusCode})，使用原始内容',
+          level: 'INFO',
+        );
+      }
+    } catch (e) {
+      LogUtil.log('获取翻译失败，使用原始内容: $e', level: 'WARNING');
     }
   }
 

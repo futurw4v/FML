@@ -111,19 +111,48 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
         final text = document.body?.text ?? '';
         setState(() {
           _description = text;
-          isLoading = false;
         });
         LogUtil.log('成功获取项目描述', level: 'INFO');
-      } else {
-        setState(() {
-          isLoading = false;
-        });
       }
     } catch (e) {
       LogUtil.log('获取项目描述错误: $e', level: 'ERROR');
-      setState(() {
-        isLoading = false;
-      });
+    }
+    // 尝试获取翻译
+    await _applyTranslation();
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  // 尝试从 MCIM API 获取翻译并应用，失败则保留原始内容
+  Future<void> _applyTranslation() async {
+    try {
+      LogUtil.log('正在获取翻译: ${widget.modId}', level: 'INFO');
+      final transResponse = await DioClient().dio.get(
+        'https://mod.mcimirror.top/translate/curseforge/${widget.modId}',
+        options: Options(
+          headers: {'User-Agent': gAppModrinthUserAgent},
+          validateStatus: (status) => status != null,
+        ),
+      );
+      if (transResponse.statusCode == 200 &&
+          transResponse.data is Map<String, dynamic>) {
+        final transData = transResponse.data as Map<String, dynamic>;
+        final translated = transData['translated']?.toString();
+        if (translated != null && translated.isNotEmpty) {
+          setState(() {
+            projectDetails['summary'] = translated;
+          });
+          LogUtil.log('翻译应用成功', level: 'INFO');
+        }
+      } else {
+        LogUtil.log(
+          '翻译不可用 (${transResponse.statusCode})，使用原始内容',
+          level: 'INFO',
+        );
+      }
+    } catch (e) {
+      LogUtil.log('获取翻译失败，使用原始内容: $e', level: 'WARNING');
     }
   }
 

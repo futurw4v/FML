@@ -102,8 +102,10 @@ class DownloadResourcesState extends State<DownloadResources> {
       );
       if (response.statusCode == 200) {
         LogUtil.log('成功获取Modrinth项目', level: 'INFO');
+        _projectsList = response.data;
+        await _applyTranslations();
+        if (!mounted) return;
         setState(() {
-          _projectsList = response.data;
           _isLoading = false;
         });
       } else {
@@ -144,8 +146,10 @@ class DownloadResourcesState extends State<DownloadResources> {
       );
       if (response.statusCode == 200) {
         LogUtil.log('成功获取CurseForge项目', level: 'INFO');
+        _projectsList = response.data['data'] ?? [];
+        await _applyTranslations();
+        if (!mounted) return;
         setState(() {
-          _projectsList = response.data['data'] ?? [];
           _isLoading = false;
         });
       } else {
@@ -204,8 +208,10 @@ class DownloadResourcesState extends State<DownloadResources> {
       );
       if (response.statusCode == 200) {
         LogUtil.log('成功获取搜索结果', level: 'INFO');
+        _projectsList = response.data['hits'] ?? [];
+        await _applyTranslations();
+        if (!mounted) return;
         setState(() {
-          _projectsList = response.data['hits'] ?? [];
           _isLoading = false;
         });
       } else {
@@ -255,8 +261,10 @@ class DownloadResourcesState extends State<DownloadResources> {
       );
       if (response.statusCode == 200) {
         LogUtil.log('成功获取搜索结果', level: 'INFO');
+        _projectsList = response.data['data'] ?? [];
+        await _applyTranslations();
+        if (!mounted) return;
         setState(() {
-          _projectsList = response.data['data'] ?? [];
           _isLoading = false;
         });
       } else {
@@ -274,6 +282,97 @@ class DownloadResourcesState extends State<DownloadResources> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  // 调度翻译（根据当前数据源）
+  Future<void> _applyTranslations() async {
+    if (_dataSource == 'modrinth') {
+      await _applyModrinthTranslations();
+    } else {
+      await _applyCurseforgeTranslations();
+    }
+  }
+
+  // Modrinth 批量翻译
+  Future<void> _applyModrinthTranslations() async {
+    if (_projectsList.isEmpty) return;
+    try {
+      final ids = _projectsList
+          .map((p) => (p['id'] ?? p['project_id'])?.toString())
+          .where((id) => id != null)
+          .toList();
+      if (ids.isEmpty) return;
+      LogUtil.log('正在批量获取Modrinth翻译', level: 'INFO');
+      final transResponse = await DioClient().dio.post(
+        'https://mod.mcimirror.top/translate/modrinth',
+        data: {'project_ids': ids},
+        options: Options(
+          headers: {'User-Agent': gAppModrinthUserAgent},
+          validateStatus: (status) => status != null,
+        ),
+      );
+      if (transResponse.statusCode == 200 && transResponse.data is List) {
+        final Map<String, String> transMap = {};
+        for (final t in transResponse.data as List) {
+          if (t['project_id'] != null && t['translated'] != null) {
+            transMap[t['project_id'].toString()] = t['translated'].toString();
+          }
+        }
+        if (transMap.isEmpty) return;
+        for (final project in _projectsList) {
+          final id = (project['id'] ?? project['project_id'])?.toString();
+          if (id != null && transMap.containsKey(id)) {
+            project['description'] = transMap[id];
+          }
+        }
+        LogUtil.log('Modrinth批量翻译应用成功', level: 'INFO');
+      }
+    } catch (e) {
+      LogUtil.log('Modrinth批量翻译失败: $e', level: 'WARNING');
+    }
+  }
+
+  // CurseForge 批量翻译
+  Future<void> _applyCurseforgeTranslations() async {
+    if (_projectsList.isEmpty) return;
+    try {
+      final ids = _projectsList
+          .map((p) => p['id'])
+          .where((id) => id != null)
+          .cast<int>()
+          .toList();
+      if (ids.isEmpty) return;
+      LogUtil.log('正在批量获取CurseForge翻译', level: 'INFO');
+      final transResponse = await DioClient().dio.post(
+        'https://mod.mcimirror.top/translate/curseforge',
+        data: {'modids': ids},
+        options: Options(
+          headers: {
+            'x-api-key': kCurseforgeApiKey,
+            'User-Agent': gAppModrinthUserAgent,
+          },
+          validateStatus: (status) => status != null,
+        ),
+      );
+      if (transResponse.statusCode == 200 && transResponse.data is List) {
+        final Map<int, String> transMap = {};
+        for (final t in transResponse.data as List) {
+          if (t['modid'] != null && t['translated'] != null) {
+            transMap[t['modid'] as int] = t['translated'].toString();
+          }
+        }
+        if (transMap.isEmpty) return;
+        for (final project in _projectsList) {
+          final id = project['id'] as int?;
+          if (id != null && transMap.containsKey(id)) {
+            project['summary'] = transMap[id];
+          }
+        }
+        LogUtil.log('CurseForge批量翻译应用成功', level: 'INFO');
+      }
+    } catch (e) {
+      LogUtil.log('CurseForge批量翻译失败: $e', level: 'WARNING');
     }
   }
 
