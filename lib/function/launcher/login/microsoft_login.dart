@@ -26,6 +26,9 @@ Future<String> _getMsToken(refreshToken) async {
     try {
       final response = await DioClient().dio.post(
         'https://login.microsoftonline.com/consumers/oauth2/v2.0/token',
+        options: Options(
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        ),
         data: {
           'client_id': '3847de77-c7ca-4daa-a0b7-50850446d58c',
           'grant_type': 'refresh_token',
@@ -313,7 +316,6 @@ Future<String> _getMcToken(xstsToken) async {
 
 // 登录
 Future<String> login(String refreshToken) async {
-  LogUtil.log(refreshToken, level: 'INFO');
   String msToken = await _getMsToken(refreshToken);
   String xblToken = await _getXboxLiveToken(msToken);
   List<String> xstsToken = await _getXSTSToken(xblToken);

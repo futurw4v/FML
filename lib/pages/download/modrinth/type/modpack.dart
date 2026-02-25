@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:fml/function/dio_client.dart';
+import 'package:dio/dio.dart';
 
+import 'package:fml/function/dio_client.dart';
+import 'package:fml/constants.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/slide_page_route.dart';
 import 'package:fml/pages/download/modrinth/type/download_modpack/donwnload_info.dart';
@@ -43,6 +45,7 @@ class ModpackPageState extends State<ModpackPage> {
       });
       final response = await DioClient().dio.get(
         'https://api.modrinth.com/v2/project/${widget.projectId}/version',
+        options: Options(headers: {'User-Agent': gAppModrinthUserAgent}),
       );
       if (response.statusCode == 200) {
         final allVersions = response.data as List;

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:dio/dio.dart';
+
 import 'package:fml/function/slide_page_route.dart';
 import 'package:fml/function/dio_client.dart';
-import 'package:url_launcher/url_launcher.dart';
-
+import 'package:fml/constants.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/download/modrinth/type/mod.dart';
 import 'package:fml/pages/download/modrinth/type/modpack.dart';
@@ -63,6 +65,7 @@ class InfoPageState extends State<InfoPage> {
       LogUtil.log('正在获取模组详情: ${widget.slug}', level: 'INFO');
       final response = await DioClient().dio.get(
         'https://api.modrinth.com/v2/project/${widget.slug}',
+        options: Options(headers: {'User-Agent': gAppModrinthUserAgent}),
       );
       if (response.statusCode == 200) {
         setState(() {

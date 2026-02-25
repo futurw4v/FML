@@ -6,6 +6,7 @@ import 'package:fml/function/dio_client.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/download/modrinth/info.dart';
 import 'package:fml/pages/download/curseforge/info.dart';
+import 'package:fml/constants.dart';
 
 class DownloadResources extends StatefulWidget {
   const DownloadResources({super.key});
@@ -23,8 +24,6 @@ class DownloadResourcesState extends State<DownloadResources> {
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
   String _dataSource = 'modrinth';
-  static const String _curseforgeApiKey =
-      r'$2a$10$2nu.vP1qQjDgInxe1xsyzuxR73iqaJ23TzFshO4Z0yRfS93d1gDTm';
   static const int minecraftGameId = 432;
   String? _modrinthProjectType;
   final Map<String, String> modrinthProjectTypes = {
@@ -72,7 +71,12 @@ class DownloadResourcesState extends State<DownloadResources> {
 
   // CurseForge 请求头
   Options _getCurseforgeOptions() {
-    return Options(headers: {'x-api-key': _curseforgeApiKey});
+    return Options(
+      headers: {
+        'x-api-key': kCurseforgeApiKey,
+        'User-Agent': gAppModrinthUserAgent,
+      },
+    );
   }
 
   // 获取项目（根据数据源）
@@ -94,6 +98,7 @@ class DownloadResourcesState extends State<DownloadResources> {
       LogUtil.log('开始请求Modrinth随机项目', level: 'INFO');
       final response = await DioClient().dio.get(
         'https://api.modrinth.com/v2/projects_random?count=50',
+        options: Options(headers: {'User-Agent': gAppModrinthUserAgent})
       );
       if (response.statusCode == 200) {
         LogUtil.log('成功获取Modrinth项目', level: 'INFO');
@@ -194,6 +199,7 @@ class DownloadResourcesState extends State<DownloadResources> {
       );
       final response = await DioClient().dio.get(
         'https://api.modrinth.com/v2/search',
+        options: Options(headers: {'User-Agent': gAppModrinthUserAgent}),
         queryParameters: queryParams,
       );
       if (response.statusCode == 200) {
@@ -591,7 +597,6 @@ class DownloadResourcesState extends State<DownloadResources> {
             page: CurseforgeInfoPage(
               modId: project['id'],
               projectInfo: Map<String, dynamic>.from(project),
-              apiKey: _curseforgeApiKey,
             ),
           ),
         ),

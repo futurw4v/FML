@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+
 import 'package:fml/function/dio_client.dart';
 import 'package:fml/function/slide_page_route.dart';
-
+import 'package:fml/constants.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/download/modrinth/info.dart';
 
@@ -68,6 +70,7 @@ class DownloadModrinthState extends State<DownloadModrinth> {
       LogUtil.log('开始请求Modrinth随机项目', level: 'INFO');
       final response = await DioClient().dio.get(
         'https://api.modrinth.com/v2/projects_random?count=$_count',
+        options: Options(headers: {'User-Agent': gAppModrinthUserAgent}),
       );
       if (response.statusCode == 200) {
         LogUtil.log('成功获取Modrinth项目', level: 'INFO');
@@ -115,6 +118,7 @@ class DownloadModrinthState extends State<DownloadModrinth> {
       );
       final response = await DioClient().dio.get(
         'https://api.modrinth.com/v2/search',
+        options: Options(headers: {'User-Agent': gAppModrinthUserAgent}),
         queryParameters: queryParams,
       );
       if (response.statusCode == 200) {

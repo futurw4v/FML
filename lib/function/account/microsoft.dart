@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:fml/function/dio_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
+
 import 'package:fml/function/log.dart';
 import 'package:fml/function/crypto_util.dart';
+import 'package:fml/function/dio_client.dart';
+import 'package:fml/constants.dart';
 
 // 打开URL
 Future<void> _launchURL() async {
@@ -54,7 +56,7 @@ Future<List<String>> getCode(context) async {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
       ),
       data: {
-        'client_id': '3847de77-c7ca-4daa-a0b7-50850446d58c',
+        'client_id': kMicrosoftClientId,
         'scope': 'XboxLive.signin offline_access',
       },
     );
@@ -140,7 +142,7 @@ Future<List<String>> _getMsToken(
           headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         ),
         data: {
-          'client_id': '3847de77-c7ca-4daa-a0b7-50850446d58c',
+          'client_id': kMicrosoftClientId,
           'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
           'scope': 'XboxLive.signin offline_access',
           'device_code': deviceCode,

@@ -9,12 +9,10 @@ import 'package:fml/pages/download/curseforge/type/download_modpack/loader/curse
 class CurseforgeDownloadInfoPage extends StatefulWidget {
   const CurseforgeDownloadInfoPage(
     this.file, {
-    required this.apiKey,
     super.key,
   });
 
   final Map<String, dynamic> file;
-  final String apiKey;
 
   @override
   CurseforgeDownloadInfoPageState createState() =>
@@ -185,7 +183,6 @@ class CurseforgeDownloadInfoPageState
                 page: CurseforgeFabricModpackPage(
                   name: _gameName!,
                   url: _downloadUrl!,
-                  apiKey: widget.apiKey,
                 ),
               ),
             );
@@ -195,7 +192,6 @@ class CurseforgeDownloadInfoPageState
                 page: CurseforgeNeoForgeModpackPage(
                   name: _gameName!,
                   url: _downloadUrl!,
-                  apiKey: widget.apiKey,
                 ),
               ),
             );

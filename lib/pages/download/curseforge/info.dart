@@ -5,7 +5,7 @@ import 'package:fml/function/slide_page_route.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:share_plus/share_plus.dart';
-
+import 'package:fml/constants.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/download/curseforge/type/mod.dart';
 import 'package:fml/pages/download/curseforge/type/modpack.dart';
@@ -15,13 +15,11 @@ import 'package:fml/pages/download/curseforge/type/shader.dart';
 class CurseforgeInfoPage extends StatefulWidget {
   final int modId;
   final Map<String, dynamic> projectInfo;
-  final String apiKey;
 
   const CurseforgeInfoPage({
     super.key,
     required this.modId,
     required this.projectInfo,
-    required this.apiKey,
   });
 
   @override
@@ -61,7 +59,12 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
 
   // 获取请求选项
   Options _getRequestOptions() {
-    return Options(headers: {'x-api-key': widget.apiKey});
+    return Options(
+      headers: {
+        'x-api-key': kCurseforgeApiKey,
+        'User-Agent': gAppModrinthUserAgent,
+      },
+    );
   }
 
   // 获取模组详情
@@ -489,7 +492,6 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
                           projectDetails['name'] ??
                           widget.projectInfo['name'] ??
                           '',
-                      apiKey: widget.apiKey,
                     ),
                   ),
                 );
@@ -504,7 +506,6 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
                           projectDetails['name'] ??
                           widget.projectInfo['name'] ??
                           '',
-                      apiKey: widget.apiKey,
                     ),
                   ),
                 );
@@ -519,7 +520,6 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
                           projectDetails['name'] ??
                           widget.projectInfo['name'] ??
                           '',
-                      apiKey: widget.apiKey,
                     ),
                   ),
                 );
@@ -534,7 +534,6 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
                           projectDetails['name'] ??
                           widget.projectInfo['name'] ??
                           '',
-                      apiKey: widget.apiKey,
                     ),
                   ),
                 );

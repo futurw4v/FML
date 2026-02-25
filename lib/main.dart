@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,14 +22,9 @@ import 'package:window_manager/window_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await windowManager.ensureInitialized();
-
   await initVersionInfo();
-
   // 设置窗口标题
-  // e.g. Flutter Minecraft Launcher v1.8.0 (11)
-  // Windows下窗口标题的+疑似有渲染问题（后面会有空隙），故用了括号包裹buildNumber
   WindowOptions windowOptions = WindowOptions(
     center: true,
     title: "$kAppName v$gAppVersion ($gAppBuildNumber)",
@@ -50,8 +46,9 @@ Future<void> initVersionInfo() async {
   final packageInfo = await PackageInfo.fromPlatform();
 
   gAppVersion = packageInfo.version;
-  gAppUserAgent = 'FML/$gAppVersion';
   gAppBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
+  gAppDefaultUserAgent = 'FML/$gAppVersion';
+  gAppModrinthUserAgent = 'lxdklp/FML/$gAppVersion (fml.lxdklp.top)';
 
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString('version', gAppVersion);
@@ -301,13 +298,13 @@ class MainStartPageState extends State<MainStartPage> {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        if (!mounted) return; // 添加 mounted 检查
+        if (!mounted) return;
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('无法打开链接: $url')));
       }
     } catch (e) {
-      if (!mounted) return; // 添加 mounted 检查
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('发生错误: $e')));
@@ -318,9 +315,12 @@ class MainStartPageState extends State<MainStartPage> {
   Future<void> _checkUpdate() async {
     try {
       LogUtil.log('正在检查更新', level: 'INFO');
-
-      final response = await DioClient().dio.get(AppUrls.latestVersionApi);
-
+      final response = await DioClient().dio.get(
+        AppUrls.latestVersionApi,
+        options: Options(
+          headers: {'User-Agent': '$kAppNameAbb/${Platform.operatingSystem}/$gAppVersion+$gAppBuildNumber ${kDebugMode ? 'debug' : ''}'},
+        ),
+        );
       if (response.statusCode == 200) {
         String rawVersionData = response.data.toString();
         String cleanedVersionString = rawVersionData
@@ -329,7 +329,6 @@ class MainStartPageState extends State<MainStartPage> {
         final int latestVersion =
             int.tryParse(cleanedVersionString) ?? gAppBuildNumber;
         LogUtil.log('最新版本: $latestVersion');
-
         if (latestVersion > gAppBuildNumber && mounted) {
           _showUpdateDialog(latestVersion.toString());
         }
@@ -343,7 +342,6 @@ class MainStartPageState extends State<MainStartPage> {
   Future<List<String>> _getUpdateInfo() async {
     try {
       final response = await DioClient().dio.get(AppUrls.githubReleasesApi);
-
       if (response.statusCode == 200) {
         Map<String, dynamic> loaderData = response.data[0];
         return [loaderData['name'], loaderData['body']];
@@ -425,7 +423,6 @@ class MainStartPageState extends State<MainStartPage> {
               ),
             ],
           ),
-
           // 显示当前页面
           Expanded(
             child: IndexedStack(index: _selectedIndex, children: _mainPages),
