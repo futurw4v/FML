@@ -3,9 +3,15 @@ import 'dart:io';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/java/models/java_info.dart';
 import 'package:fml/function/java/models/java_runtime.dart';
+import 'package:path/path.dart' as path;
 
 class JavaManager {
   JavaManager._();
+
+  ///
+  /// Java 可执行文件名称
+  ///
+  static String kJavaExecutableName = Platform.isWindows ? 'java.exe' : 'java';
 
   static final RegExp _vendorVersionRegExp = RegExp(
     r'(?:(OpenJDK|java|IBM|AdoptOpenJDK|Microsoft).*?)?version\s+"([^"]+)"',
@@ -17,7 +23,9 @@ class JavaManager {
   ///
   /// 寻找 Java 可执行文件
   ///
-  static Future<List<JavaRuntime>> searchPotentialJavaExecutables() async {
+  static Future<List<JavaRuntime>> searchPotentialJavaExecutables({
+    int searchDepth = 4,
+  }) async {
     final Set<String> found = {};
     final List<JavaRuntime> result = [];
 
@@ -29,7 +37,7 @@ class JavaManager {
     for (final entry in pathEntries) {
       if (entry.trim().isEmpty) continue;
 
-      final javaPath = _join(entry, _javaExecutableName());
+      final javaPath = _join(entry, kJavaExecutableName);
 
       if (await File(javaPath).exists()) {
         found.add(await File(javaPath).resolveSymbolicLinks());
@@ -106,23 +114,107 @@ class JavaManager {
       }
     }
 
-    // 去重返回
-    return result.toSet().toList();
+    final roots = <Directory>[];
+
+    if (Platform.isWindows) {
+      // Windows枚举
+      for (int i = 0; i < 26; i++) {
+        // CharCode 68（排除A,B,C）
+        final drive = '${String.fromCharCode(68 + i)}:\\';
+        final dir = Directory(drive);
+
+        try {
+          if (dir.existsSync()) {
+            roots.add(dir);
+          }
+        } catch (_) {
+          // 忽略无法访问的驱动器
+        }
+      }
+
+      final stopwatch = Stopwatch()..start();
+      for (final rootDir in roots) {
+        final javaRuntimes = await _searchJavaInDirRecursive(
+          dir: rootDir,
+          searchDepth: searchDepth,
+        );
+
+        result.addAll(javaRuntimes);
+      }
+      stopwatch.stop();
+
+      print('timeee: ${stopwatch.elapsedMilliseconds} ms, $result');
+    }
+
+    // 去重返回（按 executable 路径去重）
+    final Map<String, JavaRuntime> uniqueByExecutable = {};
+
+    for (final runtime in result) {
+      // 后出现的同一路径会覆盖先前的，确保最终列表中每个 executable 唯一
+      uniqueByExecutable[runtime.executable] = runtime;
+    }
+
+    return uniqueByExecutable.values.toList();
   }
 
   ///
-  /// 路径拼接
+  /// 递归搜索Java运行时
   ///
-  static String _join(String a, String b) {
-    if (a.endsWith(Platform.pathSeparator)) return '$a$b';
-    return a + Platform.pathSeparator + b;
-  }
+  /// [dir]           要搜索的根目录
+  /// [searchDepth]   最大允许的递归深度
+  /// [currentDepth]  当前递归深度（内部调用使用）
+  ///
+  static Future<List<JavaRuntime>> _searchJavaInDirRecursive({
+    required Directory dir,
+    required int searchDepth,
+    int currentDepth = 0,
+  }) async {
+    List<JavaRuntime> result = [];
 
-  ///
-  /// Java 可执行文件名称
-  ///
-  static String _javaExecutableName() {
-    return Platform.isWindows ? 'java.exe' : 'java';
+    if (currentDepth > searchDepth) return result;
+
+    try {
+      // 检查当前目录下的文件
+      final dirs = dir.list(followLinks: false);
+
+      await for (final entity in dirs) {
+        final name = path.basename(entity.path);
+
+        // 排除 . 开头目录
+        if (name.startsWith('.')) continue;
+
+        if (entity is File) {
+          final lowerFileName = name.toLowerCase();
+
+          if (lowerFileName == kJavaExecutableName) {
+            // 创建JavaRuntime逻辑
+            final exePath = entity.path;
+            final info = await _probeJavaExecutable(exePath);
+
+            if (info != null) {
+              final isJdk = await _looksLikeJdk(exePath);
+
+              result.add(
+                JavaRuntime(info: info, executable: exePath, isJdk: isJdk),
+              );
+            }
+          }
+        } else if (entity is Directory) {
+          // 递归搜索子目录（深度+1）
+          result.addAll(
+            await _searchJavaInDirRecursive(
+              dir: entity,
+              currentDepth: currentDepth + 1,
+              searchDepth: searchDepth,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // 忽略权限错误或无法访问的目录
+    }
+
+    return result;
   }
 
   ///
@@ -132,15 +224,13 @@ class JavaManager {
     final List<String> probes = [];
 
     if (Platform.isMacOS) {
-      probes.add(
-        '$javaHome/jre.bundle/Contents/Home/bin/${_javaExecutableName()}',
-      );
+      probes.add('$javaHome/jre.bundle/Contents/Home/bin/$kJavaExecutableName');
 
-      probes.add('$javaHome/Contents/Home/bin/${_javaExecutableName()}');
+      probes.add('$javaHome/Contents/Home/bin/$kJavaExecutableName');
     }
 
-    probes.add('$javaHome/bin/${_javaExecutableName()}');
-    probes.add('$javaHome/jre/bin/${_javaExecutableName()}');
+    probes.add('$javaHome/bin/$kJavaExecutableName');
+    probes.add('$javaHome/jre/bin/$kJavaExecutableName');
     return probes;
   }
 
@@ -261,5 +351,13 @@ class JavaManager {
       }
     }
     return null;
+  }
+
+  ///
+  /// 路径拼接
+  ///
+  static String _join(String a, String b) {
+    if (a.endsWith(Platform.pathSeparator)) return '$a$b';
+    return a + Platform.pathSeparator + b;
   }
 }
