@@ -124,57 +124,43 @@ class JavaPageState extends State<JavaPage> {
 
                   itemBuilder: (context, index) {
                     if (systemJavaExists && index == 0) {
-                      // 当为系统默认时构建Card
-                      return Card(
-                        // 裁剪掉ListTile超出圆角的部分
-                        clipBehavior: Clip.antiAlias,
+                      final isCurrentJava =
+                          _currentJavaPath == 'default' ||
+                          _currentJavaPath == null;
 
-                        elevation: 0,
+                      // 构建系统默认Card
+                      return _buildJavaCard(
+                        javaInfo: systemJavaInfo,
 
-                        // 为当前Java或者未选择任何Java时高亮
-                        color:
-                            _currentJavaPath == 'default' ||
-                                _currentJavaPath == null
-                            ? Theme.of(context).colorScheme.secondaryContainer
-                            : null,
+                        typeChipLabel: '系统默认',
 
-                        shape: RoundedRectangleBorder(
-                          side: BorderSide(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        vendor: systemJavaInfo.vendor,
 
-                        child: ListTile(
-                          title: Text(systemJavaInfo.version),
+                        isCurrent: isCurrentJava,
 
-                          subtitle: Text(
-                            systemJavaInfo.path.isNotEmpty
-                                ? systemJavaInfo.path
-                                : '路径未知',
-                          ),
-
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Chip(label: Text('系统默认')),
-
-                              const SizedBox(width: kDefaultPadding / 2),
-
-                              Chip(
-                                label: Text(systemJavaInfo.vendor ?? 'Unknown'),
-                              ),
-                            ],
-                          ),
-
-                          onTap: () => _setSystemJava(),
-                        ),
+                        onTap: _setSystemJava,
                       );
                     }
 
                     // 构建非系统默认的Java的卡片
                     final realIndex = systemJavaExists ? index - 1 : index;
-                    return _buildJavaItem(javaRuntimes[realIndex]);
+                    final javaRuntime = javaRuntimes[realIndex];
+
+                    final isCurrentJava =
+                        _currentJavaPath == javaRuntime.executable;
+
+                    return _buildJavaCard(
+                      javaInfo: javaRuntime.info,
+
+                      typeChipLabel: javaRuntime.isJdk ? 'JDK' : 'JRE',
+
+                      vendor: javaRuntime.info.vendor,
+
+                      isCurrent: isCurrentJava,
+
+                      onTap: () =>
+                          _setCurrentJavaPathToPrefs(javaRuntime.executable),
+                    );
                   },
                 );
               },
@@ -286,10 +272,13 @@ class JavaPageState extends State<JavaPage> {
     }
   }
 
-  ///
-  /// 构建 Java 条目
-  ///
-  Widget _buildJavaItem(JavaRuntime javaRuntime) {
+  Widget _buildJavaCard({
+    required JavaInfo javaInfo,
+    required String typeChipLabel,
+    String? vendor,
+    required bool isCurrent,
+    required VoidCallback onTap,
+  }) {
     return Card(
       // 裁剪掉ListTile超出圆角的部分
       clipBehavior: Clip.antiAlias,
@@ -302,25 +291,32 @@ class JavaPageState extends State<JavaPage> {
       ),
 
       // 为当前Java时高亮
-      color: _currentJavaPath == javaRuntime.executable
+      color: isCurrent
           ? Theme.of(context).colorScheme.secondaryContainer
           : null,
 
       child: ListTile(
-        title: Text(javaRuntime.info.version),
+        title: Text(javaInfo.version),
 
-        subtitle: Text(javaRuntime.executable),
+        subtitle: Text(javaInfo.path.isNotEmpty ? javaInfo.path : '路径未知'),
 
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
+
           children: [
-            Chip(label: Text(javaRuntime.isJdk ? 'JDK' : 'JRE')),
+            if (isCurrent) ...[
+              Chip(label: Text('当前')),
+
+              SizedBox(width: kDefaultPadding / 2),
+            ],
+            Chip(label: Text(typeChipLabel)),
+
             SizedBox(width: kDefaultPadding / 2),
-            Chip(label: Text(javaRuntime.info.vendor ?? 'Unknown')),
+
+            Chip(label: Text(vendor ?? 'Unknown')),
           ],
         ),
-
-        onTap: () => _setCurrentJavaPathToPrefs(javaRuntime.executable),
+        onTap: onTap,
       ),
     );
   }
