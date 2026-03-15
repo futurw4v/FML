@@ -1,9 +1,9 @@
+import 'dart:io';
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/material.dart';
 import 'package:fml/constants.dart';
-import 'dart:io';
-import 'dart:async';
 import 'package:fml/function/log.dart';
 
 /// 下载任务结果
@@ -99,9 +99,9 @@ class DownloadUtils {
   /// 获取对应 URL 的 User-Agent
   static String _getUserAgent(String url) {
     if (url.contains('bmclapi2.bangbang93.com')) {
-      return gAppUserAgent;
+      return gAppDefaultUserAgent;
     } else {
-      return 'lxdklp/$gAppUserAgent (fml.lxdklp.top)';
+      return gAppModrinthUserAgent;
     }
   }
 

@@ -1,15 +1,17 @@
-import 'package:flutter/material.dart';
-import 'package:fml/function/dio_client.dart';
-import 'package:fml/function/download.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:archive/archive.dart';
 import 'package:dio/dio.dart';
 import 'package:system_info2/system_info2.dart';
 
+import 'package:fml/constants.dart';
+import 'package:fml/function/dio_client.dart';
+import 'package:fml/function/download.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/extract_natives.dart';
 
@@ -18,12 +20,10 @@ class CurseforgeNeoForgeModpackPage extends StatefulWidget {
     super.key,
     required this.name,
     required this.url,
-    required this.apiKey,
   });
 
   final String name;
   final String url;
-  final String apiKey;
 
   @override
   CurseforgeNeoForgeModpackPageState createState() =>
@@ -75,6 +75,16 @@ class CurseforgeNeoForgeModpackPageState
   List<String> lwjglNativePaths = [];
   List<String> neoForgeLibrariesPath = [];
   List<String> neoForgeLibrariesURL = [];
+
+  // 获取请求选项
+  Options _getRequestOptions() {
+    return Options(
+      headers: {
+        'x-api-key': kCurseforgeApiKey,
+        'User-Agent': gAppModrinthUserAgent,
+      },
+    );
+  }
 
   // BMCLAPI 镜像
   String replaceWithMirror(String url) {
@@ -267,7 +277,7 @@ class CurseforgeNeoForgeModpackPageState
     try {
       final response = await DioClient().dio.get(
         'https://api.curseforge.com/v1/mods/$projectId/files/$fileId/download-url',
-        options: Options(headers: {'x-api-key': widget.apiKey}),
+        options: _getRequestOptions()
       );
       if (response.statusCode == 200 && response.data['data'] != null) {
         return response.data['data'];
@@ -289,7 +299,7 @@ class CurseforgeNeoForgeModpackPageState
     try {
       final response = await DioClient().dio.get(
         'https://api.curseforge.com/v1/mods/$projectId/files/$fileId',
-        options: Options(headers: {'x-api-key': widget.apiKey}),
+        options: _getRequestOptions()
       );
       if (response.statusCode == 200 && response.data['data'] != null) {
         return response.data['data'];

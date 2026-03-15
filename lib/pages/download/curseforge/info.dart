@@ -5,7 +5,7 @@ import 'package:fml/function/slide_page_route.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:share_plus/share_plus.dart';
-
+import 'package:fml/constants.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/download/curseforge/type/mod.dart';
 import 'package:fml/pages/download/curseforge/type/modpack.dart';
@@ -15,13 +15,11 @@ import 'package:fml/pages/download/curseforge/type/shader.dart';
 class CurseforgeInfoPage extends StatefulWidget {
   final int modId;
   final Map<String, dynamic> projectInfo;
-  final String apiKey;
 
   const CurseforgeInfoPage({
     super.key,
     required this.modId,
     required this.projectInfo,
-    required this.apiKey,
   });
 
   @override
@@ -61,7 +59,12 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
 
   // 获取请求选项
   Options _getRequestOptions() {
-    return Options(headers: {'x-api-key': widget.apiKey});
+    return Options(
+      headers: {
+        'x-api-key': kCurseforgeApiKey,
+        'User-Agent': gAppModrinthUserAgent,
+      },
+    );
   }
 
   // 获取模组详情
@@ -108,19 +111,48 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
         final text = document.body?.text ?? '';
         setState(() {
           _description = text;
-          isLoading = false;
         });
         LogUtil.log('成功获取项目描述', level: 'INFO');
-      } else {
-        setState(() {
-          isLoading = false;
-        });
       }
     } catch (e) {
       LogUtil.log('获取项目描述错误: $e', level: 'ERROR');
-      setState(() {
-        isLoading = false;
-      });
+    }
+    // 尝试获取翻译
+    await _applyTranslation();
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  // 尝试从 MCIM API 获取翻译并应用，失败则保留原始内容
+  Future<void> _applyTranslation() async {
+    try {
+      LogUtil.log('正在获取翻译: ${widget.modId}', level: 'INFO');
+      final transResponse = await DioClient().dio.get(
+        'https://mod.mcimirror.top/translate/curseforge/${widget.modId}',
+        options: Options(
+          headers: {'User-Agent': gAppModrinthUserAgent},
+          validateStatus: (status) => status != null,
+        ),
+      );
+      if (transResponse.statusCode == 200 &&
+          transResponse.data is Map<String, dynamic>) {
+        final transData = transResponse.data as Map<String, dynamic>;
+        final translated = transData['translated']?.toString();
+        if (translated != null && translated.isNotEmpty) {
+          setState(() {
+            projectDetails['summary'] = translated;
+          });
+          LogUtil.log('翻译应用成功', level: 'INFO');
+        }
+      } else {
+        LogUtil.log(
+          '翻译不可用 (${transResponse.statusCode})，使用原始内容',
+          level: 'INFO',
+        );
+      }
+    } catch (e) {
+      LogUtil.log('获取翻译失败，使用原始内容: $e', level: 'WARNING');
     }
   }
 
@@ -489,7 +521,6 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
                           projectDetails['name'] ??
                           widget.projectInfo['name'] ??
                           '',
-                      apiKey: widget.apiKey,
                     ),
                   ),
                 );
@@ -504,7 +535,6 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
                           projectDetails['name'] ??
                           widget.projectInfo['name'] ??
                           '',
-                      apiKey: widget.apiKey,
                     ),
                   ),
                 );
@@ -519,7 +549,6 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
                           projectDetails['name'] ??
                           widget.projectInfo['name'] ??
                           '',
-                      apiKey: widget.apiKey,
                     ),
                   ),
                 );
@@ -534,7 +563,6 @@ class CurseforgeInfoPageState extends State<CurseforgeInfoPage> {
                           projectDetails['name'] ??
                           widget.projectInfo['name'] ??
                           '',
-                      apiKey: widget.apiKey,
                     ),
                   ),
                 );

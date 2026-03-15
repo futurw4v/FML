@@ -6,11 +6,18 @@ const kAppNameAbb = 'FML';
 const kDefaultPadding = 16.0;
 
 ///
+/// API KEY
+///
+const String kCurseforgeApiKey = r'$2a$10$2nu.vP1qQjDgInxe1xsyzuxR73iqaJ23TzFshO4Z0yRfS93d1gDTm';
+const String kMicrosoftClientId = r'3847de77-c7ca-4daa-a0b7-50850446d58c';
+
+///
 /// 启动时获取的常量
 ///
 late final String gAppVersion;
-late final String gAppUserAgent;
 late final int gAppBuildNumber;
+late final String gAppDefaultUserAgent;
+late final String gAppModrinthUserAgent;
 
 ///
 /// 字体字重

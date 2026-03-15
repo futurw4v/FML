@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:fml/constants.dart';
 import 'package:fml/function/dio_client.dart';
 import 'package:fml/function/slide_page_route.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fml/function/log.dart';
 import 'package:fml/pages/download/curseforge/info.dart';
@@ -18,14 +18,12 @@ class DownloadCurseforgeState extends State<DownloadCurseforge> {
   List<dynamic> _projectsList = [];
   bool _isLoading = true;
   String? _error;
-  String _apiKey = '';
   final ScrollController _scrollController = ScrollController();
   bool _showScrollToTop = false;
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _apiKeyController = TextEditingController();
   int? _selectedClassId;
   bool _isSearching = false;
-  bool _apiKeyConfigured = false;
 
   // Minecraft 游戏ID
   static const int minecraftGameId = 432;
@@ -41,7 +39,6 @@ class DownloadCurseforgeState extends State<DownloadCurseforge> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
     _scrollController.addListener(() {
       setState(() {
         _showScrollToTop = _scrollController.offset > 200;
@@ -66,32 +63,18 @@ class DownloadCurseforgeState extends State<DownloadCurseforge> {
     );
   }
 
-  // 读取设置
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    final apiKey = prefs.getString('curseforge_api_key') ?? '';
-    setState(() {
-      _apiKey = apiKey;
-      _apiKeyController.text = apiKey;
-      _apiKeyConfigured = apiKey.isNotEmpty;
-    });
-    if (_apiKeyConfigured) {
-      _fetchFeaturedProjects();
-    } else {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
   // 获取请求选项
   Options _getRequestOptions() {
-    return Options(headers: {'x-api-key': _apiKey});
+    return Options(
+      headers: {
+        'x-api-key': kCurseforgeApiKey,
+        'User-Agent': gAppModrinthUserAgent,
+      },
+    );
   }
 
   // 获取精选/热门项目
   Future<void> _fetchFeaturedProjects() async {
-    if (!_apiKeyConfigured) return;
     try {
       setState(() {
         _isLoading = true;
@@ -125,8 +108,10 @@ class DownloadCurseforgeState extends State<DownloadCurseforge> {
           seen.add(id);
           return true;
         }).toList();
+        _projectsList = allProjects;
+        await _applyTranslations();
+        if (!mounted) return;
         setState(() {
-          _projectsList = allProjects;
           _isLoading = false;
         });
       } else {
@@ -149,7 +134,6 @@ class DownloadCurseforgeState extends State<DownloadCurseforge> {
 
   // 搜索
   Future<void> _searchProjects(String query) async {
-    if (!_apiKeyConfigured) return;
     if (query.isEmpty && _selectedClassId == null) {
       _fetchFeaturedProjects();
       return;
@@ -181,8 +165,10 @@ class DownloadCurseforgeState extends State<DownloadCurseforge> {
       );
       if (response.statusCode == 200) {
         LogUtil.log('成功获取搜索结果', level: 'INFO');
+        _projectsList = response.data['data'] ?? [];
+        await _applyTranslations();
+        if (!mounted) return;
         setState(() {
-          _projectsList = response.data['data'] ?? [];
           _isLoading = false;
         });
       } else {
@@ -200,6 +186,50 @@ class DownloadCurseforgeState extends State<DownloadCurseforge> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  // 批量获取翻译并更新列表描述
+  Future<void> _applyTranslations() async {
+    if (_projectsList.isEmpty) return;
+    try {
+      final ids = _projectsList
+          .map((p) => p['id'])
+          .where((id) => id != null)
+          .cast<int>()
+          .toList();
+      if (ids.isEmpty) return;
+      LogUtil.log('正在批量获取CurseForge翻译', level: 'INFO');
+      final transResponse = await DioClient().dio.post(
+        'https://mod.mcimirror.top/translate/curseforge',
+        data: {'modids': ids},
+        options: Options(
+          headers: {
+            'x-api-key': kCurseforgeApiKey,
+            'User-Agent': gAppModrinthUserAgent,
+          },
+          validateStatus: (status) => status != null,
+        ),
+      );
+      if (transResponse.statusCode == 200 && transResponse.data is List) {
+        final translations = transResponse.data as List;
+        final Map<int, String> transMap = {};
+        for (final t in translations) {
+          if (t['modid'] != null && t['translated'] != null) {
+            transMap[t['modid'] as int] = t['translated'].toString();
+          }
+        }
+        if (transMap.isEmpty) return;
+        for (final project in _projectsList) {
+          final id = project['id'] as int?;
+          if (id != null && transMap.containsKey(id)) {
+            project['summary'] = transMap[id];
+          }
+        }
+        LogUtil.log('批量翻译应用成功', level: 'INFO');
+      }
+    } catch (e) {
+      LogUtil.log('批量获取翻译失败: $e', level: 'WARNING');
     }
   }
 
@@ -377,7 +407,6 @@ class DownloadCurseforgeState extends State<DownloadCurseforge> {
             page: CurseforgeInfoPage(
               modId: project['id'],
               projectInfo: project,
-              apiKey: _apiKey,
             ),
           ),
         ),
@@ -415,15 +444,6 @@ class DownloadCurseforgeState extends State<DownloadCurseforge> {
                   : _fetchFeaturedProjects(),
               child: const Text('重试'),
             ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _apiKeyConfigured = false;
-                });
-              },
-              child: const Text('重新配置API Key'),
-            ),
           ],
         ),
       );
@@ -458,27 +478,26 @@ class DownloadCurseforgeState extends State<DownloadCurseforge> {
     }
     return Scaffold(
       body: body,
-      floatingActionButton: _apiKeyConfigured
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_showScrollToTop)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10.0),
-                    child: FloatingActionButton(
-                      heroTag: 'cfScrollToTopButton',
-                      onPressed: _scrollToTop,
-                      child: const Icon(Icons.arrow_upward),
-                    ),
-                  ),
-                FloatingActionButton(
-                  heroTag: 'cfRefreshButton',
-                  onPressed: _clearSearch,
-                  child: const Icon(Icons.refresh),
+      floatingActionButton:
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_showScrollToTop)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10.0),
+                child: FloatingActionButton(
+                  heroTag: 'cfScrollToTopButton',
+                  onPressed: _scrollToTop,
+                  child: const Icon(Icons.arrow_upward),
                 ),
-              ],
-            )
-          : null,
+              ),
+            FloatingActionButton(
+              heroTag: 'cfRefreshButton',
+              onPressed: _clearSearch,
+              child: const Icon(Icons.refresh),
+            ),
+          ],
+        )
     );
   }
 }

@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:fml/function/download.dart';
-import 'package:flutter/foundation.dart';
+import 'package:fml/function/log.dart';
 
 import 'package:fml/constants.dart';
 
@@ -34,18 +34,36 @@ class DioClient {
     // UA拦截器
     dio.interceptors.add(_getUserAgentInterceptor());
 
-    // 在Debug模式添加日志输出
-    if (kDebugMode) {
-      dio.interceptors.add(
-        LogInterceptor(
-          request: false,
-          requestHeader: false,
-          requestBody: false,
-          responseHeader: false,
-          error: true,
-        ),
-      );
-    }
+    // LogUtil日志拦截器（全模式）
+    dio.interceptors.add(_getLogInterceptor());
+  }
+
+  ///
+  /// LogUtil 日志拦截器
+  ///
+  InterceptorsWrapper _getLogInterceptor() {
+    return InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        LogUtil.log('Dio ${options.method} ${options.uri}');
+        return handler.next(options);
+      },
+      onResponse: (response, handler) async {
+        final uri = response.requestOptions.uri;
+        final status = response.statusCode;
+        LogUtil.log('HTTP请求 [$status] $uri');
+        return handler.next(response);
+      },
+      onError: (DioException e, handler) async {
+        final uri = e.requestOptions.uri;
+        final status = e.response?.statusCode;
+        final msg = e.message ?? e.type.name;
+        LogUtil.log(
+          'HTTP请求失败 [$status] $uri - $msg',
+          level: 'ERROR',
+        );
+        return handler.next(e);
+      },
+    );
   }
 
   ///
@@ -57,8 +75,7 @@ class DioClient {
         final existingUserAgent = options.headers['User-Agent'];
         if (existingUserAgent == null ||
             (existingUserAgent is String && existingUserAgent.isEmpty)) {
-          //'$kAppNameAbb/${Platform.operatingSystem}/$_appVersion ${kDebugMode ? 'debug' : ''}';
-          final userAgent = gAppUserAgent;
+          final userAgent = gAppDefaultUserAgent;
           options.headers['User-Agent'] = userAgent;
         }
         return handler.next(options);

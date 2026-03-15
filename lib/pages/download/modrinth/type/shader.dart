@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:fml/function/dio_client.dart';
 import 'package:path/path.dart' as path;
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:fml/function/dio_client.dart';
+import 'package:fml/constants.dart';
 import 'package:fml/function/log.dart';
 import 'package:fml/function/download.dart';
 
@@ -49,6 +50,7 @@ class ShaderPageState extends State<ShaderPage> {
 
       final response = await DioClient().dio.get(
         'https://api.modrinth.com/v2/project/${widget.projectId}/version',
+        options: Options(headers: {'User-Agent': gAppModrinthUserAgent}),
       );
 
       if (response.statusCode == 200) {
