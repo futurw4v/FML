@@ -107,7 +107,7 @@ class LogViewerPageState extends State<LogViewerPage> {
                     return Text('加载失败：${snapshot.error}');
                   }
 
-                  logs = snapshot.data ?? [];
+                  final logs = (snapshot.data ?? []).reversed.toList();
 
                   if (logs.isEmpty) {
                     return Padding(
