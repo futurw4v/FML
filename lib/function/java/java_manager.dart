@@ -132,7 +132,7 @@ class JavaManager {
         }
       }
 
-      final stopwatch = Stopwatch()..start();
+      //final stopwatch = Stopwatch()..start();
       for (final rootDir in roots) {
         final javaRuntimes = await _searchJavaInDirRecursive(
           dir: rootDir,
@@ -141,9 +141,9 @@ class JavaManager {
 
         result.addAll(javaRuntimes);
       }
-      stopwatch.stop();
+      //stopwatch.stop();
 
-      print('timeee: ${stopwatch.elapsedMilliseconds} ms, $result');
+      //print('timeee: ${stopwatch.elapsedMilliseconds} ms, $result');
     }
 
     // 去重返回（按 executable 路径去重）
