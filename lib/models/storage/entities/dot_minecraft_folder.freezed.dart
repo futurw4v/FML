@@ -17,7 +17,7 @@ mixin _$DotMinecraftFolder {
 
 /// UI 上显示的名称
  String get name;/// 本地物理绝对路径
- String get path;
+ String get path; String get selectedVersionFolderName; List<MinecraftGame> get versions;
 /// Create a copy of DotMinecraftFolder
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -30,16 +30,16 @@ $DotMinecraftFolderCopyWith<DotMinecraftFolder> get copyWith => _$DotMinecraftFo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is DotMinecraftFolder&&(identical(other.name, name) || other.name == name)&&(identical(other.path, path) || other.path == path));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is DotMinecraftFolder&&(identical(other.name, name) || other.name == name)&&(identical(other.path, path) || other.path == path)&&(identical(other.selectedVersionFolderName, selectedVersionFolderName) || other.selectedVersionFolderName == selectedVersionFolderName)&&const DeepCollectionEquality().equals(other.versions, versions));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,name,path);
+int get hashCode => Object.hash(runtimeType,name,path,selectedVersionFolderName,const DeepCollectionEquality().hash(versions));
 
 @override
 String toString() {
-  return 'DotMinecraftFolder(name: $name, path: $path)';
+  return 'DotMinecraftFolder(name: $name, path: $path, selectedVersionFolderName: $selectedVersionFolderName, versions: $versions)';
 }
 
 
@@ -50,7 +50,7 @@ abstract mixin class $DotMinecraftFolderCopyWith<$Res>  {
   factory $DotMinecraftFolderCopyWith(DotMinecraftFolder value, $Res Function(DotMinecraftFolder) _then) = _$DotMinecraftFolderCopyWithImpl;
 @useResult
 $Res call({
- String name, String path
+ String name, String path, String selectedVersionFolderName, List<MinecraftGame> versions
 });
 
 
@@ -67,11 +67,13 @@ class _$DotMinecraftFolderCopyWithImpl<$Res>
 
 /// Create a copy of DotMinecraftFolder
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? name = null,Object? path = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? name = null,Object? path = null,Object? selectedVersionFolderName = null,Object? versions = null,}) {
   return _then(_self.copyWith(
 name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,path: null == path ? _self.path : path // ignore: cast_nullable_to_non_nullable
-as String,
+as String,selectedVersionFolderName: null == selectedVersionFolderName ? _self.selectedVersionFolderName : selectedVersionFolderName // ignore: cast_nullable_to_non_nullable
+as String,versions: null == versions ? _self.versions : versions // ignore: cast_nullable_to_non_nullable
+as List<MinecraftGame>,
   ));
 }
 
@@ -156,10 +158,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String name,  String path)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String name,  String path,  String selectedVersionFolderName,  List<MinecraftGame> versions)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _DotMinecraftFolder() when $default != null:
-return $default(_that.name,_that.path);case _:
+return $default(_that.name,_that.path,_that.selectedVersionFolderName,_that.versions);case _:
   return orElse();
 
 }
@@ -177,10 +179,10 @@ return $default(_that.name,_that.path);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String name,  String path)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String name,  String path,  String selectedVersionFolderName,  List<MinecraftGame> versions)  $default,) {final _that = this;
 switch (_that) {
 case _DotMinecraftFolder():
-return $default(_that.name,_that.path);case _:
+return $default(_that.name,_that.path,_that.selectedVersionFolderName,_that.versions);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -197,10 +199,10 @@ return $default(_that.name,_that.path);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String name,  String path)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String name,  String path,  String selectedVersionFolderName,  List<MinecraftGame> versions)?  $default,) {final _that = this;
 switch (_that) {
 case _DotMinecraftFolder() when $default != null:
-return $default(_that.name,_that.path);case _:
+return $default(_that.name,_that.path,_that.selectedVersionFolderName,_that.versions);case _:
   return null;
 
 }
@@ -212,13 +214,21 @@ return $default(_that.name,_that.path);case _:
 @JsonSerializable()
 
 class _DotMinecraftFolder extends DotMinecraftFolder {
-  const _DotMinecraftFolder({this.name = '', this.path = ''}): super._();
+  const _DotMinecraftFolder({this.name = '', this.path = '', this.selectedVersionFolderName = '', final  List<MinecraftGame> versions = const []}): _versions = versions,super._();
   factory _DotMinecraftFolder.fromJson(Map<String, dynamic> json) => _$DotMinecraftFolderFromJson(json);
 
 /// UI 上显示的名称
 @override@JsonKey() final  String name;
 /// 本地物理绝对路径
 @override@JsonKey() final  String path;
+@override@JsonKey() final  String selectedVersionFolderName;
+ final  List<MinecraftGame> _versions;
+@override@JsonKey() List<MinecraftGame> get versions {
+  if (_versions is EqualUnmodifiableListView) return _versions;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_versions);
+}
+
 
 /// Create a copy of DotMinecraftFolder
 /// with the given fields replaced by the non-null parameter values.
@@ -233,16 +243,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _DotMinecraftFolder&&(identical(other.name, name) || other.name == name)&&(identical(other.path, path) || other.path == path));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _DotMinecraftFolder&&(identical(other.name, name) || other.name == name)&&(identical(other.path, path) || other.path == path)&&(identical(other.selectedVersionFolderName, selectedVersionFolderName) || other.selectedVersionFolderName == selectedVersionFolderName)&&const DeepCollectionEquality().equals(other._versions, _versions));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,name,path);
+int get hashCode => Object.hash(runtimeType,name,path,selectedVersionFolderName,const DeepCollectionEquality().hash(_versions));
 
 @override
 String toString() {
-  return 'DotMinecraftFolder(name: $name, path: $path)';
+  return 'DotMinecraftFolder(name: $name, path: $path, selectedVersionFolderName: $selectedVersionFolderName, versions: $versions)';
 }
 
 
@@ -253,7 +263,7 @@ abstract mixin class _$DotMinecraftFolderCopyWith<$Res> implements $DotMinecraft
   factory _$DotMinecraftFolderCopyWith(_DotMinecraftFolder value, $Res Function(_DotMinecraftFolder) _then) = __$DotMinecraftFolderCopyWithImpl;
 @override @useResult
 $Res call({
- String name, String path
+ String name, String path, String selectedVersionFolderName, List<MinecraftGame> versions
 });
 
 
@@ -270,11 +280,13 @@ class __$DotMinecraftFolderCopyWithImpl<$Res>
 
 /// Create a copy of DotMinecraftFolder
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? name = null,Object? path = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? name = null,Object? path = null,Object? selectedVersionFolderName = null,Object? versions = null,}) {
   return _then(_DotMinecraftFolder(
 name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,path: null == path ? _self.path : path // ignore: cast_nullable_to_non_nullable
-as String,
+as String,selectedVersionFolderName: null == selectedVersionFolderName ? _self.selectedVersionFolderName : selectedVersionFolderName // ignore: cast_nullable_to_non_nullable
+as String,versions: null == versions ? _self._versions : versions // ignore: cast_nullable_to_non_nullable
+as List<MinecraftGame>,
   ));
 }
 

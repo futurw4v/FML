@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:fmcl/models/game/minecraft_game.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:path/path.dart' as p;
 
@@ -16,6 +17,10 @@ abstract class DotMinecraftFolder with _$DotMinecraftFolder {
 
     /// 本地物理绝对路径
     @Default('') String path,
+
+    @Default('') String selectedVersionFolderName,
+
+    @Default([]) List<MinecraftGame> versions,
   }) = _DotMinecraftFolder;
 
   Future<void> ensureStructureExists() async {
