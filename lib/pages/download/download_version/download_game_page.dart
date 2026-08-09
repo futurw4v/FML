@@ -1,16 +1,17 @@
-import 'package:flutter/material.dart';
-import 'package:fmcl/constants.dart';
-import 'package:fmcl/utils/dio_client.dart';
-import 'package:fmcl/utils/slide_page_route.dart';
-import 'package:fmcl/models/game/minecraft_version.dart';
-import 'package:fmcl/widgets/app_card.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 
-import 'package:fmcl/utils/log_util.dart';
-import 'package:fmcl/pages/download/download_version/loader/download_vanilla_page.dart';
+import 'package:flutter/material.dart';
+import 'package:fmcl/constants.dart';
+import 'package:fmcl/models/game/minecraft_version.dart';
 import 'package:fmcl/pages/download/download_version/loader/download_fabric_page.dart';
 import 'package:fmcl/pages/download/download_version/loader/download_neoforge_page.dart';
+import 'package:fmcl/pages/download/download_version/loader/download_vanilla_page.dart';
+import 'package:fmcl/storage/storage_service.dart';
+import 'package:fmcl/utils/dio_client.dart';
+import 'package:fmcl/utils/log_util.dart';
+import 'package:fmcl/utils/slide_page_route.dart';
+import 'package:fmcl/widgets/app_card.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DownloadGamePage extends StatefulWidget {
   const DownloadGamePage({super.key, required this.version});
@@ -360,7 +361,7 @@ class DownloadGamePageState extends State<DownloadGamePage> {
   // 读取版本列表
   Future<void> _loadVersionList() async {
     final prefs = await SharedPreferences.getInstance();
-    final selectedPath = prefs.getString('SelectedPath') ?? '';
+    final selectedPath = StorageService.pathsConfig.selectedFolder;
     final gameList = prefs.getStringList('Game_$selectedPath') ?? [];
 
     if (!mounted) return;

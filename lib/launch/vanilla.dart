@@ -4,10 +4,10 @@ import 'dart:io';
 
 import 'package:fmcl/constants.dart';
 import 'package:fmcl/java/java_service.dart';
-import 'package:fmcl/launch/login/external_login.dart' as external_login;
-import 'package:fmcl/launch/login/microsoft_login.dart' as microsoft_login;
+import 'package:fmcl/models/storage/entities/account.dart';
+import 'package:fmcl/storage/storage_service.dart';
 import 'package:fmcl/utils/log_util.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path/path.dart' as p;
 
 typedef ProgressCallback = void Function(String message);
 typedef ErrorCallback = void Function(String error);
@@ -74,151 +74,157 @@ Future<String?> getAssetIndex(String versionJsonPath) async {
   return null;
 }
 
-// 登录模式
-String _getLoginMode(String loginMode) {
-  switch (loginMode) {
-    case '0':
-      return 'offline';
-    case '1':
-      return 'online';
-    case '2':
-      return 'external';
-    default:
-      return 'unknown';
-  }
-}
-
-// 启动Vanilla
 Future<void> vanillaLauncher({
   ProgressCallback? onProgress,
   ErrorCallback? onError,
 }) async {
   onProgress?.call('正在准备启动');
-  final prefs = await SharedPreferences.getInstance();
+
   // 游戏参数
-  final java = JavaService.javaSelectedPath;
-  final selectedPath = prefs.getString('SelectedPath') ?? '';
-  final gamePath = prefs.getString('Path_$selectedPath') ?? '';
-  final game = prefs.getString('SelectedGame') ?? '';
-  final nativesPath =
-      '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}natives';
-  final cfg = prefs.getStringList('Config_${selectedPath}_$game') ?? [];
-  final jsonPath =
-      '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}$game.json';
-  final libraries = await loadLibraryArtifactPaths(jsonPath, gamePath);
+  final currentFolder = StorageService.pathsConfig.selectedFolder;
+
+  if (currentFolder == null) {
+    LogUtil.log('未选择游戏文件夹，无法启动', level: 'ERROR');
+    return;
+  }
+
+  final dotMinecraftFolderPath = currentFolder.path;
+  final selectedVersionFolderName = currentFolder.selectedVersionFolderName;
+  final selectedGame = currentFolder.getVersionByFolderName(
+    selectedVersionFolderName,
+  );
+  final assetsDirPath = p.join(dotMinecraftFolderPath, 'assets');
+
+  if (selectedVersionFolderName == '' || selectedGame == null) {
+    LogUtil.log('未选择游戏版本，无法启动', level: 'ERROR');
+    return;
+  }
+
+  // 版本根目录
+  final versionDir = p.join(
+    dotMinecraftFolderPath,
+    'versions',
+    selectedVersionFolderName,
+  );
+
+  final jsonPath = p.join(versionDir, '$selectedVersionFolderName.json');
+  final gameJar = p.join(versionDir, '$selectedVersionFolderName.jar');
+  final nativesPath = p.join(versionDir, 'natives');
+
+  // 依赖
+  final libraries = await loadLibraryArtifactPaths(
+    jsonPath,
+    dotMinecraftFolderPath,
+  );
   final separator = Platform.isWindows ? ';' : ':';
   final classPath = libraries.join(separator);
-  final gameJar =
-      '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game${Platform.pathSeparator}$game.jar';
-  final assetIndex = await getAssetIndex(jsonPath) ?? '';
   final cp = '$classPath$separator$gameJar';
-  final accountName = prefs.getString('SelectedAccountName') ?? '';
-  final accountType = prefs.getString('SelectedAccountType') ?? '';
-  final accountInfo =
-      prefs.getStringList(
-        '${_getLoginMode(accountType)}_account_$accountName',
-      ) ??
-      [];
+
+  final assetIndex = await getAssetIndex(jsonPath) ?? '';
+
+  final selectedAccount = StorageService.accountsConfig.selectedAccount;
+
+  if (selectedAccount == null) {
+    LogUtil.log('未选择登录账号，无法启动', level: 'ERROR');
+    return;
+  }
+  final java = JavaService.javaSelectedPath;
+
+  // TODO: Java
+  // final java = (selectedGame?.javaExecutablePath.isNotEmpty == true)
+  //     ? selectedGame!.javaExecutablePath
+  //     : (JavaService.javaSelectedPath.isNotEmpty
+  //           ? StorageService.settingsConfig.javaSelectedPath
+  //           : JavaService.javaSelectedPath);
+
+  // TODO
+  // final maxMemory = (selectedGame != null && selectedGame.customMaxMemory > 0)
+  //     ? selectedGame.customMaxMemory
+  //     : StorageService.settingsConfig.defaultMaxMemory;
+
   // 账号信息
   String uuid = '';
   String token = '';
+
   onProgress?.call('正在获取账号信息');
-  if (accountInfo[0] == '0') {
-    if (accountInfo[2] == '1') {
-      uuid = accountInfo[3];
-    } else {
-      uuid = accountInfo[1];
-    }
-  }
-  if (accountInfo[0] == '1') {
-    uuid = accountInfo[1];
-    token = await microsoft_login.login(accountInfo[2]);
-  }
-  if (accountInfo[0] == '2') {
-    if (await external_login.checkAuthlibInjector(gamePath)) {
-      onProgress?.call('AuthlibInjector已存在');
-    } else {
-      onProgress?.call('正在下载AuthlibInjector');
-      await external_login.downloadAuthlibInjector(gamePath);
-    }
-    uuid = accountInfo[1];
-    onProgress?.call('正在检查令牌');
-    if (await external_login.checkToken(
-      accountInfo[2],
-      accountInfo[5],
-      accountInfo[6],
-    )) {
-      token = accountInfo[5];
-    } else {
-      token = await external_login.refreshToken(
-        accountInfo[2],
-        accountInfo[5],
-        accountInfo[6],
-        accountName,
-        uuid,
-      );
-    }
-  }
+
+  // TODO: 微软登录与外置登录
+  await selectedAccount.when(
+    offline: (name, accountUuid, skin) async {
+      uuid = accountUuid;
+      token = name;
+      LogUtil.log('离线账号启动: $name (UUID: $uuid)', level: 'INFO');
+    },
+    microsoft: (name, uuid, skin, refreshToken) async {},
+    external: (name, uuid, skin, authServerUrl) async {},
+  );
+
   // 启动参数
   onProgress?.call('正在准备启动参数');
   final args = <String>[
-    '-Xmx${cfg[0]}M',
+    '-Xmx4096M', // TODO
     '-XX:+UseG1GC',
     '-XX:-OmitStackTraceInFastThrow',
     '-Dfml.ignoreInvalidMinecraftCertificates=true',
     '-Dfml.ignorePatchDiscrepancies=true',
     '-Dminecraft.launcher.brand=$kAppNameAbb',
+
     if (Platform.isMacOS) '-XstartOnFirstThread',
     '-Djava.library.path=$nativesPath',
     '-Djna.tmpdir=$nativesPath',
-    if (accountInfo[0] == '2')
-      '-javaagent:$gamePath${Platform.pathSeparator}authlib-injector.jar=${accountInfo[2]}',
+
     '-cp',
     cp,
-    'net.minecraft.client.main.Main',
+
+    selectedGame.mainClass,
     '--username',
-    accountName,
+    selectedAccount.name,
+
     '--version',
-    game,
+    selectedVersionFolderName,
+
     '--gameDir',
-    '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game',
+    versionDir,
+
     '--assetsDir',
-    '$gamePath${Platform.pathSeparator}assets',
+    assetsDirPath,
+
     '--assetIndex',
     assetIndex,
+
     '--uuid',
     uuid,
-    if (accountInfo[0] == '0') '--accessToken',
-    accountInfo[0],
-    if (accountInfo[0] == '0') '--clientId',
+
+    '--accessToken',
+    selectedAccount.name,
+
+    '--clientId',
     '"\${clientid}"',
-    if (accountInfo[0] == '1' || accountInfo[0] == '2') '--accessToken',
-    token,
-    if (accountInfo[0] == '1' || accountInfo[0] == '2') '--userType',
-    'mojang',
-    if (accountInfo[0] == '2') '--clientId',
-    token,
+
     '--versionType',
     '"$kAppNameAbb $gAppVersion"',
     '--xuid',
     '"\${auth_xuid}"',
+
     '--width',
-    cfg[2],
+    '800', // TODO
+
     '--height',
-    cfg[3],
-    if (cfg[1] == '1') '--fullscreen',
+    '600', // TODO
+    //'--fullscreen',
   ];
+
   LogUtil.log('使用的Java: $java', level: 'INFO');
   onProgress?.call('正在启动游戏');
-  final out = await Process.start(
-    java,
-    args,
-    workingDirectory:
-        '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}$game',
-  );
+
+  final out = await Process.start(java, args, workingDirectory: versionDir);
+
+  onProgress?.call('游戏启动完成');
+
   out.stdout.listen((_) {});
   out.stderr.listen((_) {});
-  onProgress?.call('游戏启动完成');
-  final code = await out.exitCode;
-  LogUtil.log('退出码: $code', level: 'INFO');
+
+  out.exitCode.then((code) {
+    LogUtil.log('游戏进程已退出，退出码: $code', level: 'INFO');
+  });
 }

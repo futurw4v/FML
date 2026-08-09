@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import 'package:fmcl/utils/log_util.dart';
-import 'package:fmcl/launch/fabric.dart';
 import 'package:fmcl/launch/vanilla.dart';
-import 'package:fmcl/launch/neoforge.dart';
+import 'package:fmcl/utils/log_util.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PlayPage extends StatefulWidget {
   const PlayPage({super.key});
@@ -36,40 +33,6 @@ class PlayPageState extends State<PlayPage> {
     });
     if (type == 'Vanilla') {
       await vanillaLauncher(
-        onProgress: (String message) {
-          setState(() {
-            _message = message;
-          });
-          if (message == '游戏启动完成') {
-            setState(() {
-              _launching = true;
-            });
-          }
-        },
-        onError: (String error) {
-          setState(() {});
-        },
-      );
-    }
-    if (type == 'Fabric') {
-      await fabricLauncher(
-        onProgress: (String message) {
-          setState(() {
-            _message = message;
-          });
-          if (message == '游戏启动完成') {
-            setState(() {
-              _launching = true;
-            });
-          }
-        },
-        onError: (String error) {
-          setState(() {});
-        },
-      );
-    }
-    if (type == 'NeoForge') {
-      await neoforgeLauncher(
         onProgress: (String message) {
           setState(() {
             _message = message;
