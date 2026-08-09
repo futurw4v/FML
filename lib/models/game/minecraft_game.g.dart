@@ -8,6 +8,7 @@ part of 'minecraft_game.dart';
 
 _MinecraftGame _$MinecraftGameFromJson(Map<String, dynamic> json) =>
     _MinecraftGame(
+      label: json['label'] as String,
       id: json['id'] as String,
       folderName: json['folderName'] as String,
       type: $enumDecode(_$MinecraftVersionTypeEnumMap, json['type']),
@@ -20,6 +21,7 @@ _MinecraftGame _$MinecraftGameFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$MinecraftGameToJson(_MinecraftGame instance) =>
     <String, dynamic>{
+      'label': instance.label,
       'id': instance.id,
       'folderName': instance.folderName,
       'type': _$MinecraftVersionTypeEnumMap[instance.type]!,

@@ -33,7 +33,7 @@ class HomePageState extends State<HomePage> {
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: ListTile(
                 title: Text('当前文件夹'),
-                subtitle: Text(pathsConfig.selectedPath),
+                subtitle: Text(pathsConfig.selectedFolderPath),
                 leading: const Icon(Icons.view_list),
                 onTap: () {
                   Navigator.push(

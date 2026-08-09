@@ -15,8 +15,9 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$MinecraftGame {
 
-// 版本JSON内的原生ID
- String get id;// 真实的文件夹名字
+/// UI显示的名称
+ String get label;/// 版本JSON内的原生ID
+ String get id;/// 真实的文件夹名字
  String get folderName; MinecraftVersionType get type; ModLoaderType get modLoaderType; String get assetsIndexId;// 留空为全局默认
  String get javaExecutablePath; String get mainClass;
 /// Create a copy of MinecraftGame
@@ -31,16 +32,16 @@ $MinecraftGameCopyWith<MinecraftGame> get copyWith => _$MinecraftGameCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is MinecraftGame&&(identical(other.id, id) || other.id == id)&&(identical(other.folderName, folderName) || other.folderName == folderName)&&(identical(other.type, type) || other.type == type)&&(identical(other.modLoaderType, modLoaderType) || other.modLoaderType == modLoaderType)&&(identical(other.assetsIndexId, assetsIndexId) || other.assetsIndexId == assetsIndexId)&&(identical(other.javaExecutablePath, javaExecutablePath) || other.javaExecutablePath == javaExecutablePath)&&(identical(other.mainClass, mainClass) || other.mainClass == mainClass));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is MinecraftGame&&(identical(other.label, label) || other.label == label)&&(identical(other.id, id) || other.id == id)&&(identical(other.folderName, folderName) || other.folderName == folderName)&&(identical(other.type, type) || other.type == type)&&(identical(other.modLoaderType, modLoaderType) || other.modLoaderType == modLoaderType)&&(identical(other.assetsIndexId, assetsIndexId) || other.assetsIndexId == assetsIndexId)&&(identical(other.javaExecutablePath, javaExecutablePath) || other.javaExecutablePath == javaExecutablePath)&&(identical(other.mainClass, mainClass) || other.mainClass == mainClass));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,folderName,type,modLoaderType,assetsIndexId,javaExecutablePath,mainClass);
+int get hashCode => Object.hash(runtimeType,label,id,folderName,type,modLoaderType,assetsIndexId,javaExecutablePath,mainClass);
 
 @override
 String toString() {
-  return 'MinecraftGame(id: $id, folderName: $folderName, type: $type, modLoaderType: $modLoaderType, assetsIndexId: $assetsIndexId, javaExecutablePath: $javaExecutablePath, mainClass: $mainClass)';
+  return 'MinecraftGame(label: $label, id: $id, folderName: $folderName, type: $type, modLoaderType: $modLoaderType, assetsIndexId: $assetsIndexId, javaExecutablePath: $javaExecutablePath, mainClass: $mainClass)';
 }
 
 
@@ -51,7 +52,7 @@ abstract mixin class $MinecraftGameCopyWith<$Res>  {
   factory $MinecraftGameCopyWith(MinecraftGame value, $Res Function(MinecraftGame) _then) = _$MinecraftGameCopyWithImpl;
 @useResult
 $Res call({
- String id, String folderName, MinecraftVersionType type, ModLoaderType modLoaderType, String assetsIndexId, String javaExecutablePath, String mainClass
+ String label, String id, String folderName, MinecraftVersionType type, ModLoaderType modLoaderType, String assetsIndexId, String javaExecutablePath, String mainClass
 });
 
 
@@ -68,9 +69,10 @@ class _$MinecraftGameCopyWithImpl<$Res>
 
 /// Create a copy of MinecraftGame
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? folderName = null,Object? type = null,Object? modLoaderType = null,Object? assetsIndexId = null,Object? javaExecutablePath = null,Object? mainClass = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? label = null,Object? id = null,Object? folderName = null,Object? type = null,Object? modLoaderType = null,Object? assetsIndexId = null,Object? javaExecutablePath = null,Object? mainClass = null,}) {
   return _then(_self.copyWith(
-id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+label: null == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
+as String,id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,folderName: null == folderName ? _self.folderName : folderName // ignore: cast_nullable_to_non_nullable
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
 as MinecraftVersionType,modLoaderType: null == modLoaderType ? _self.modLoaderType : modLoaderType // ignore: cast_nullable_to_non_nullable
@@ -162,10 +164,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String folderName,  MinecraftVersionType type,  ModLoaderType modLoaderType,  String assetsIndexId,  String javaExecutablePath,  String mainClass)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String label,  String id,  String folderName,  MinecraftVersionType type,  ModLoaderType modLoaderType,  String assetsIndexId,  String javaExecutablePath,  String mainClass)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _MinecraftGame() when $default != null:
-return $default(_that.id,_that.folderName,_that.type,_that.modLoaderType,_that.assetsIndexId,_that.javaExecutablePath,_that.mainClass);case _:
+return $default(_that.label,_that.id,_that.folderName,_that.type,_that.modLoaderType,_that.assetsIndexId,_that.javaExecutablePath,_that.mainClass);case _:
   return orElse();
 
 }
@@ -183,10 +185,10 @@ return $default(_that.id,_that.folderName,_that.type,_that.modLoaderType,_that.a
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String folderName,  MinecraftVersionType type,  ModLoaderType modLoaderType,  String assetsIndexId,  String javaExecutablePath,  String mainClass)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String label,  String id,  String folderName,  MinecraftVersionType type,  ModLoaderType modLoaderType,  String assetsIndexId,  String javaExecutablePath,  String mainClass)  $default,) {final _that = this;
 switch (_that) {
 case _MinecraftGame():
-return $default(_that.id,_that.folderName,_that.type,_that.modLoaderType,_that.assetsIndexId,_that.javaExecutablePath,_that.mainClass);case _:
+return $default(_that.label,_that.id,_that.folderName,_that.type,_that.modLoaderType,_that.assetsIndexId,_that.javaExecutablePath,_that.mainClass);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -203,10 +205,10 @@ return $default(_that.id,_that.folderName,_that.type,_that.modLoaderType,_that.a
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String folderName,  MinecraftVersionType type,  ModLoaderType modLoaderType,  String assetsIndexId,  String javaExecutablePath,  String mainClass)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String label,  String id,  String folderName,  MinecraftVersionType type,  ModLoaderType modLoaderType,  String assetsIndexId,  String javaExecutablePath,  String mainClass)?  $default,) {final _that = this;
 switch (_that) {
 case _MinecraftGame() when $default != null:
-return $default(_that.id,_that.folderName,_that.type,_that.modLoaderType,_that.assetsIndexId,_that.javaExecutablePath,_that.mainClass);case _:
+return $default(_that.label,_that.id,_that.folderName,_that.type,_that.modLoaderType,_that.assetsIndexId,_that.javaExecutablePath,_that.mainClass);case _:
   return null;
 
 }
@@ -218,12 +220,14 @@ return $default(_that.id,_that.folderName,_that.type,_that.modLoaderType,_that.a
 @JsonSerializable()
 
 class _MinecraftGame implements MinecraftGame {
-  const _MinecraftGame({required this.id, required this.folderName, required this.type, required this.modLoaderType, required this.assetsIndexId, this.javaExecutablePath = '', this.mainClass = 'net.minecraft.client.main.Main'});
+  const _MinecraftGame({required this.label, required this.id, required this.folderName, required this.type, required this.modLoaderType, required this.assetsIndexId, this.javaExecutablePath = '', this.mainClass = 'net.minecraft.client.main.Main'});
   factory _MinecraftGame.fromJson(Map<String, dynamic> json) => _$MinecraftGameFromJson(json);
 
-// 版本JSON内的原生ID
+/// UI显示的名称
+@override final  String label;
+/// 版本JSON内的原生ID
 @override final  String id;
-// 真实的文件夹名字
+/// 真实的文件夹名字
 @override final  String folderName;
 @override final  MinecraftVersionType type;
 @override final  ModLoaderType modLoaderType;
@@ -245,16 +249,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MinecraftGame&&(identical(other.id, id) || other.id == id)&&(identical(other.folderName, folderName) || other.folderName == folderName)&&(identical(other.type, type) || other.type == type)&&(identical(other.modLoaderType, modLoaderType) || other.modLoaderType == modLoaderType)&&(identical(other.assetsIndexId, assetsIndexId) || other.assetsIndexId == assetsIndexId)&&(identical(other.javaExecutablePath, javaExecutablePath) || other.javaExecutablePath == javaExecutablePath)&&(identical(other.mainClass, mainClass) || other.mainClass == mainClass));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MinecraftGame&&(identical(other.label, label) || other.label == label)&&(identical(other.id, id) || other.id == id)&&(identical(other.folderName, folderName) || other.folderName == folderName)&&(identical(other.type, type) || other.type == type)&&(identical(other.modLoaderType, modLoaderType) || other.modLoaderType == modLoaderType)&&(identical(other.assetsIndexId, assetsIndexId) || other.assetsIndexId == assetsIndexId)&&(identical(other.javaExecutablePath, javaExecutablePath) || other.javaExecutablePath == javaExecutablePath)&&(identical(other.mainClass, mainClass) || other.mainClass == mainClass));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,folderName,type,modLoaderType,assetsIndexId,javaExecutablePath,mainClass);
+int get hashCode => Object.hash(runtimeType,label,id,folderName,type,modLoaderType,assetsIndexId,javaExecutablePath,mainClass);
 
 @override
 String toString() {
-  return 'MinecraftGame(id: $id, folderName: $folderName, type: $type, modLoaderType: $modLoaderType, assetsIndexId: $assetsIndexId, javaExecutablePath: $javaExecutablePath, mainClass: $mainClass)';
+  return 'MinecraftGame(label: $label, id: $id, folderName: $folderName, type: $type, modLoaderType: $modLoaderType, assetsIndexId: $assetsIndexId, javaExecutablePath: $javaExecutablePath, mainClass: $mainClass)';
 }
 
 
@@ -265,7 +269,7 @@ abstract mixin class _$MinecraftGameCopyWith<$Res> implements $MinecraftGameCopy
   factory _$MinecraftGameCopyWith(_MinecraftGame value, $Res Function(_MinecraftGame) _then) = __$MinecraftGameCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String folderName, MinecraftVersionType type, ModLoaderType modLoaderType, String assetsIndexId, String javaExecutablePath, String mainClass
+ String label, String id, String folderName, MinecraftVersionType type, ModLoaderType modLoaderType, String assetsIndexId, String javaExecutablePath, String mainClass
 });
 
 
@@ -282,9 +286,10 @@ class __$MinecraftGameCopyWithImpl<$Res>
 
 /// Create a copy of MinecraftGame
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? folderName = null,Object? type = null,Object? modLoaderType = null,Object? assetsIndexId = null,Object? javaExecutablePath = null,Object? mainClass = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? label = null,Object? id = null,Object? folderName = null,Object? type = null,Object? modLoaderType = null,Object? assetsIndexId = null,Object? javaExecutablePath = null,Object? mainClass = null,}) {
   return _then(_MinecraftGame(
-id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+label: null == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
+as String,id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,folderName: null == folderName ? _self.folderName : folderName // ignore: cast_nullable_to_non_nullable
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
 as MinecraftVersionType,modLoaderType: null == modLoaderType ? _self.modLoaderType : modLoaderType // ignore: cast_nullable_to_non_nullable

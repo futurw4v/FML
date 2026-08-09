@@ -8,10 +8,13 @@ part 'minecraft_game.g.dart';
 @freezed
 abstract class MinecraftGame with _$MinecraftGame {
   const factory MinecraftGame({
-    // 版本JSON内的原生ID
+    /// UI显示的名称
+    required String label,
+
+    /// 版本JSON内的原生ID
     required String id,
 
-    // 真实的文件夹名字
+    /// 真实的文件夹名字
     required String folderName,
 
     required MinecraftVersionType type,

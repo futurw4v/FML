@@ -45,7 +45,7 @@ class StorageService {
       officialFolder.ensureStructureExists();
 
       return PathsConfig(
-        selectedPath: FileManager.defaultMinecraftPath,
+        selectedFolderPath: FileManager.defaultMinecraftPath,
         paths: [defaultFolder, if (!FileManager.portableMode) officialFolder],
       );
     },

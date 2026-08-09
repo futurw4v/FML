@@ -17,7 +17,9 @@ mixin _$DotMinecraftFolder {
 
 /// UI 上显示的名称
  String get name;/// 本地物理绝对路径
- String get path; String get selectedVersionFolderName; List<MinecraftGame> get versions;
+ String get path;/// 所选择的版本，游戏与文件夹同名，故为[selectedVersionFolderName]（所选版本的文件夹名）
+ String get selectedVersionFolderName;/// 文件夹内所包含的游戏，此处使用[versions]与物理文件夹同名
+ List<MinecraftGame> get versions;
 /// Create a copy of DotMinecraftFolder
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -221,8 +223,11 @@ class _DotMinecraftFolder extends DotMinecraftFolder {
 @override@JsonKey() final  String name;
 /// 本地物理绝对路径
 @override@JsonKey() final  String path;
+/// 所选择的版本，游戏与文件夹同名，故为[selectedVersionFolderName]（所选版本的文件夹名）
 @override@JsonKey() final  String selectedVersionFolderName;
+/// 文件夹内所包含的游戏，此处使用[versions]与物理文件夹同名
  final  List<MinecraftGame> _versions;
+/// 文件夹内所包含的游戏，此处使用[versions]与物理文件夹同名
 @override@JsonKey() List<MinecraftGame> get versions {
   if (_versions is EqualUnmodifiableListView) return _versions;
   // ignore: implicit_dynamic_type

@@ -29,7 +29,8 @@ class VersionPageState extends State<VersionPage> {
               itemCount: dotMinecraftFolders.length,
               itemBuilder: (context, index) {
                 final folder = dotMinecraftFolders[index];
-                final isSelected = folder.path == pathsConfig.selectedPath;
+                final isSelected =
+                    folder.path == pathsConfig.selectedFolderPath;
 
                 return AppCard(
                   margin: const EdgeInsets.symmetric(
