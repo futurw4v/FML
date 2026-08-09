@@ -1,12 +1,14 @@
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'package:fmcl/pages/home/management/game_settings_tab.dart';
 import 'package:fmcl/pages/home/management/mod_management_tab.dart';
 import 'package:fmcl/pages/home/management/resourcepack_management_tab.dart';
-import 'package:fmcl/pages/home/management/shaderpack_management_tab.dart';
-import 'package:fmcl/pages/home/management/schematic_management_tab.dart';
 import 'package:fmcl/pages/home/management/saves_management_tab.dart';
+import 'package:fmcl/pages/home/management/schematic_management_tab.dart';
+import 'package:fmcl/pages/home/management/shaderpack_management_tab.dart';
+import 'package:fmcl/storage/storage_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ManagementPage extends StatefulWidget {
   const ManagementPage({super.key});
@@ -53,7 +55,7 @@ class ManagementPageState extends State<ManagementPage>
   // 加载游戏路径
   Future<void> _loadGamePath() async {
     final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString('SelectedPath') ?? '';
+    final path = StorageService.pathsConfig.selectedFolderPath;
     final game = prefs.getString('SelectedGame') ?? '';
     final gamePath = prefs.getString('Path_$path') ?? '';
     final fullPath =
@@ -79,7 +81,7 @@ class ManagementPageState extends State<ManagementPage>
   // 检查各个管理文件夹
   Future<void> _checkDirectory() async {
     final prefs = await SharedPreferences.getInstance();
-    final selectedPath = prefs.getString('SelectedPath') ?? '';
+    final selectedPath = StorageService.pathsConfig.selectedFolderPath;
     final game = prefs.getString('SelectedGame') ?? '';
     final gamePath = prefs.getString('Path_$selectedPath') ?? '';
     final path =

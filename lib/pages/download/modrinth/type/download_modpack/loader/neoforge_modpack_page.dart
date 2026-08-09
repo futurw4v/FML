@@ -1,20 +1,20 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
-import 'package:fmcl/constants.dart';
-import 'package:fmcl/widgets/app_card.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'dart:convert';
 import 'package:archive/archive.dart';
 import 'package:dio/dio.dart';
-import 'package:system_info2/system_info2.dart';
-
+import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:fmcl/constants.dart';
+import 'package:fmcl/storage/storage_service.dart';
 import 'package:fmcl/utils/dio_client.dart';
 import 'package:fmcl/utils/download.dart';
-import 'package:fmcl/utils/log_util.dart';
 import 'package:fmcl/utils/extract_natives.dart';
+import 'package:fmcl/utils/log_util.dart';
+import 'package:fmcl/widgets/app_card.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:system_info2/system_info2.dart';
 
 class NeoForgeModpackPage extends StatefulWidget {
   const NeoForgeModpackPage({super.key, required this.name, required this.url});
@@ -145,7 +145,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
   // 文件夹创建
   Future<void> _createGameDirectories() async {
     final prefs = await SharedPreferences.getInstance();
-    final selectedGamePath = prefs.getString('SelectedPath') ?? '';
+    final selectedGamePath = StorageService.pathsConfig.selectedFolderPath;
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     final directory = Directory(
       '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}',
@@ -515,7 +515,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
-    final selectedGamePath = prefs.getString('SelectedPath') ?? '';
+    final selectedGamePath = StorageService.pathsConfig.selectedFolderPath;
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     List<Map<String, String>> downloadTasks = [];
     for (int i = 0; i < librariesURL.length; i++) {
@@ -553,7 +553,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
   // 下载资源
   Future<void> _downloadAssets() async {
     final prefs = await SharedPreferences.getInstance();
-    final selectedGamePath = prefs.getString('SelectedPath') ?? '';
+    final selectedGamePath = StorageService.pathsConfig.selectedFolderPath;
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     List<Map<String, String>> downloadTasks = [];
     for (int i = 0; i < _assetHash.length; i++) {
@@ -687,7 +687,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
-    final selectedGamePath = prefs.getString('SelectedPath') ?? '';
+    final selectedGamePath = StorageService.pathsConfig.selectedFolderPath;
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     final nativesDir =
         '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}${Platform.pathSeparator}natives';
@@ -740,7 +740,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
     try {
       // 读取JAR文件
       final prefs = await SharedPreferences.getInstance();
-      final selectedGamePath = prefs.getString('SelectedPath') ?? '';
+      final selectedGamePath = StorageService.pathsConfig.selectedFolderPath;
       final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
       final neoForgePath =
           '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}${Platform.pathSeparator}neoforge-installer.jar';
@@ -843,7 +843,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
-    final selectedGamePath = prefs.getString('SelectedPath') ?? '';
+    final selectedGamePath = StorageService.pathsConfig.selectedFolderPath;
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     List<Map<String, String>> downloadTasks = [];
     final libraryDir = Directory('$gamePath${Platform.pathSeparator}libraries');
@@ -885,7 +885,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
   // 执行 NeoForge 安装器
   Future<void> _executeNeoForgeInstaller() async {
     final prefs = await SharedPreferences.getInstance();
-    final selectedGamePath = prefs.getString('SelectedPath') ?? '';
+    final selectedGamePath = StorageService.pathsConfig.selectedFolderPath;
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     final installerPath =
         '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}${Platform.pathSeparator}neoforge-installer.jar';
@@ -1052,7 +1052,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
   // 游戏配置文件创建
   Future<void> _writeGameConfig() async {
     final prefs = await SharedPreferences.getInstance();
-    _name = prefs.getString('SelectedPath') ?? '';
+    _name = StorageService.pathsConfig.selectedFolderPath;
     List<String> gameList = prefs.getStringList('Game_$_name') ?? [];
     // 默认配置
     List<String> defaultConfig = [
@@ -1079,7 +1079,7 @@ class NeoForgeModpackPageState extends State<NeoForgeModpackPage> {
   // 下载逻辑
   Future<void> _startDownload() async {
     final prefs = await SharedPreferences.getInstance();
-    final selectedGamePath = prefs.getString('SelectedPath') ?? '';
+    final selectedGamePath = StorageService.pathsConfig.selectedFolderPath;
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     final versionPath =
         '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}';

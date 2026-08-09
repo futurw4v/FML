@@ -11,7 +11,6 @@ import 'package:fmcl/utils/dio_client.dart';
 import 'package:fmcl/utils/log_util.dart';
 import 'package:fmcl/utils/slide_page_route.dart';
 import 'package:fmcl/widgets/app_card.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class DownloadGamePage extends StatefulWidget {
   const DownloadGamePage({super.key, required this.version});
@@ -360,14 +359,13 @@ class DownloadGamePageState extends State<DownloadGamePage> {
 
   // 读取版本列表
   Future<void> _loadVersionList() async {
-    final prefs = await SharedPreferences.getInstance();
-    final selectedPath = StorageService.pathsConfig.selectedFolder;
-    final gameList = prefs.getStringList('Game_$selectedPath') ?? [];
+    final selectedPath = StorageService.pathsConfig.selectedFolder!;
+    final gameList = selectedPath.versions;
 
     if (!mounted) return;
 
     setState(() {
-      _versionList = gameList;
+      _versionList = gameList.map((game) => game.folderName).toList();
       _isFormValid = _formKey.currentState?.validate() ?? false;
     });
   }

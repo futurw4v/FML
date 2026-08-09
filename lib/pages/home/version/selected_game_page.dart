@@ -1,9 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:fmcl/storage/storage_service.dart';
+import 'package:fmcl/utils/log_util.dart';
 import 'package:fmcl/widgets/app_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:fmcl/utils/log_util.dart';
 
 class SelectedGamePage extends StatefulWidget {
   final String path;
@@ -76,7 +77,7 @@ class SelectedGamePageState extends State<SelectedGamePage> {
   Future<void> _deletePath() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final path = prefs.getString('SelectedPath') ?? '';
+      final path = StorageService.pathsConfig.selectedFolderPath;
       final gamePath = prefs.getString('Path_$path') ?? '';
       final pathList = prefs.getStringList('PathList') ?? [];
       pathList.remove(widget.path);

@@ -1,17 +1,19 @@
-import 'dart:io';
 import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:fmcl/utils/slide_page_route.dart';
-import 'package:fmcl/utils/dio_client.dart';
-import 'package:fmcl/widgets/app_card.dart';
-import 'package:system_info2/system_info2.dart';
+import 'dart:io';
+
 import 'package:archive/archive.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:fmcl/utils/log_util.dart';
-import 'package:fmcl/utils/download.dart';
-import 'package:fmcl/pages/online/owner_page.dart';
+import 'package:flutter/material.dart';
 import 'package:fmcl/pages/online/member_page.dart';
+import 'package:fmcl/pages/online/owner_page.dart';
+import 'package:fmcl/storage/storage_service.dart' show StorageService;
+import 'package:fmcl/utils/dio_client.dart';
+import 'package:fmcl/utils/download.dart';
+import 'package:fmcl/utils/log_util.dart';
+import 'package:fmcl/utils/slide_page_route.dart';
+import 'package:fmcl/widgets/app_card.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:system_info2/system_info2.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class OnlinePage extends StatefulWidget {
   const OnlinePage({super.key});
@@ -53,7 +55,7 @@ class OnlinePageState extends State<OnlinePage> {
   // 检查核心是否存在
   Future<void> _checkCoreExists() async {
     final prefs = await SharedPreferences.getInstance();
-    final name = prefs.getString('SelectedPath') ?? '';
+    final name = StorageService.pathsConfig.selectedFolderPath;
     final path = prefs.getString('Path_$name') ?? '';
     if (Platform.isWindows) {
       final File core = File(
@@ -75,7 +77,7 @@ class OnlinePageState extends State<OnlinePage> {
   // 检测核心版本
   Future<void> _checkCoreVersion() async {
     final prefs = await SharedPreferences.getInstance();
-    final name = prefs.getString('SelectedPath') ?? '';
+    final name = StorageService.pathsConfig.selectedFolderPath;
     final path = prefs.getString('Path_$name') ?? '';
     final String core =
         ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-core');
@@ -321,7 +323,7 @@ class OnlinePageState extends State<OnlinePage> {
     downloadUrl = 'https://edgeone.gh-proxy.org/$downloadUrl';
     LogUtil.log('开始下载: $downloadUrl', level: 'INFO');
     final prefs = await SharedPreferences.getInstance();
-    final name = prefs.getString('SelectedPath') ?? '';
+    final name = StorageService.pathsConfig.selectedFolderPath;
     final path = prefs.getString('Path_$name') ?? '';
     final Directory easytierDir = Directory(
       '$path${Platform.pathSeparator}easytier',

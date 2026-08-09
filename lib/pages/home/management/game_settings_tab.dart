@@ -1,10 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:fmcl/storage/storage_service.dart';
 import 'package:fmcl/utils/log_util.dart';
 import 'package:fmcl/widgets/app_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:io';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:system_info2/system_info2.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class GameSettingsTab extends StatefulWidget {
   final String gamePath;
@@ -83,7 +85,7 @@ class GameSettingsTabState extends State<GameSettingsTab> {
   // 加载游戏配置
   Future<void> _loadGameConfig() async {
     final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString('SelectedPath') ?? '';
+    final path = StorageService.pathsConfig.selectedFolderPath;
     final game = prefs.getString('SelectedGame') ?? '';
     final gameName = '_$game';
     final cfg = prefs.getStringList('Config_$path$gameName') ?? [];
@@ -109,7 +111,7 @@ class GameSettingsTabState extends State<GameSettingsTab> {
   // 保存游戏配置
   Future<void> _saveGameConfig() async {
     final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString('SelectedPath') ?? '';
+    final path = StorageService.pathsConfig.selectedFolderPath;
     final game = prefs.getString('SelectedGame') ?? '';
     final gameName = '_$game';
 
@@ -147,7 +149,7 @@ class GameSettingsTabState extends State<GameSettingsTab> {
   Future<void> _deleteVersion() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final path = prefs.getString('SelectedPath') ?? '';
+      final path = StorageService.pathsConfig.selectedFolderPath;
       final game = prefs.getString('SelectedGame') ?? '';
       final gamePath = prefs.getString('Path_$path') ?? '';
       final gameName = '_$game';

@@ -1,15 +1,20 @@
-import 'package:flutter/material.dart';
-import 'package:fmcl/constants.dart';
-import 'package:fmcl/widgets/app_card.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'dart:io';
 import 'dart:convert';
-import 'package:system_info2/system_info2.dart';
+import 'dart:io';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:fmcl/constants.dart';
+import 'package:fmcl/models/enums/minecraft_version_type.dart';
+import 'package:fmcl/models/enums/mod_loader_type.dart';
+import 'package:fmcl/models/game/minecraft_game.dart';
+import 'package:fmcl/storage/storage_service.dart' show StorageService;
 import 'package:fmcl/utils/download.dart';
 import 'package:fmcl/utils/extract_natives.dart';
 import 'package:fmcl/utils/log_util.dart';
+import 'package:fmcl/widgets/app_card.dart';
+import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:system_info2/system_info2.dart';
 
 class DownloadVanillaPage extends StatefulWidget {
   const DownloadVanillaPage({
@@ -41,9 +46,6 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
   bool _extractedLwjglNativesPath = false;
   bool _extractedLwjglNatives = false;
   bool _writeConfig = false;
-  int _mem = 1;
-  String _name = '';
-
   String? assetIndexURL;
   String? clientURL;
   String? assetIndexId;
@@ -114,7 +116,7 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
   // 文件夹创建
   Future<void> _createGameDirectories() async {
     final prefs = await SharedPreferences.getInstance();
-    final selectedGamePath = prefs.getString('SelectedPath') ?? '';
+    final selectedGamePath = StorageService.pathsConfig.selectedFolderPath;
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     final directory = Directory(
       '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}',
@@ -230,7 +232,7 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
-    final selectedGamePath = prefs.getString('SelectedPath') ?? '';
+    final selectedGamePath = StorageService.pathsConfig.selectedFolderPath;
     final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
     List<Map<String, String>> downloadTasks = [];
     for (int i = 0; i < librariesURL.length; i++) {
@@ -273,26 +275,32 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
 
   // 下载资源
   Future<void> _downloadAssets() async {
-    final prefs = await SharedPreferences.getInstance();
-    final selectedGamePath = prefs.getString('SelectedPath') ?? '';
-    final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
+    final gamePath = StorageService.pathsConfig.selectedFolderPath;
+    final versionPath = p.join(gamePath, 'versions', widget.name);
+    final assetsDir = p.join(gamePath, 'assets');
+    final librariesDir = p.join(gamePath, 'libraries');
+
     List<Map<String, String>> downloadTasks = [];
     for (int i = 0; i < _assetHash.length; i++) {
       final hash = _assetHash[i];
       final hashPrefix = hash.substring(0, 2);
-      final assetDir =
-          '$gamePath${Platform.pathSeparator}assets${Platform.pathSeparator}objects${Platform.pathSeparator}$hashPrefix';
-      final assetPath = '$assetDir${Platform.pathSeparator}$hash';
+
+      final assetDir = p.join(assetsDir, 'objects', hashPrefix);
+      final assetPath = p.join(assetDir, hash);
+
       final directory = Directory(assetDir);
+
       if (!directory.existsSync()) {
         directory.createSync(recursive: true);
       }
+
       final file = File(assetPath);
       if (!file.existsSync()) {
         final url = 'https://bmclapi2.bangbang93.com/assets/$hashPrefix/$hash';
         downloadTasks.add({'url': url, 'path': assetPath});
       }
     }
+
     if (downloadTasks.isEmpty) {
       await LogUtil.log('所有资源文件已存在,无需下载', level: 'INFO');
       setState(() {
@@ -300,6 +308,7 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
       });
       return;
     }
+
     final result = await DownloadUtils.batchDownload(
       tasks: downloadTasks,
       onProgress: (progress) {
@@ -309,12 +318,14 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
       },
       fileType: '资源文件',
     );
+
     if (!result.success) {
       await LogUtil.log(
         '资源文件下载完成,失败 ${result.failedList.length} 个',
         level: 'WARNING',
       );
     }
+
     setState(() {
       _downloadAsset = true;
     });
@@ -406,12 +417,11 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
       });
       return;
     }
-    final prefs = await SharedPreferences.getInstance();
-    final selectedGamePath = prefs.getString('SelectedPath') ?? '';
-    final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
-    final nativesDir =
-        '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}${Platform.pathSeparator}natives';
+    final gamePath = StorageService.pathsConfig.selectedFolderPath;
+
+    final nativesDir = p.join(gamePath, 'versions', widget.name, 'natives');
     final nativesDirObj = Directory(nativesDir);
+
     if (!await nativesDirObj.exists()) {
       await nativesDirObj.create(recursive: true);
       await LogUtil.log('创建natives目录: $nativesDir', level: 'INFO');
@@ -494,31 +504,39 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
     if (bytes > (1024 * 1024 * 1024 * 1024) && bytes % 16384 == 0) {
       bytes = bytes ~/ 16384;
     }
-    final physicalMemory = bytes ~/ (1024 * 1024);
-    setState(() {
-      _mem = physicalMemory;
-    });
   }
 
   // 游戏配置文件创建
   Future<void> _writeGameConfig() async {
-    final prefs = await SharedPreferences.getInstance();
-    _name = prefs.getString('SelectedPath') ?? '';
-    List<String> gameList = prefs.getStringList('Game_$_name') ?? [];
-    // 默认配置
-    List<String> defaultConfig = [
-      '${_mem ~/ 2}',
-      '0',
-      '854',
-      '480',
-      'Vanilla',
-      '',
-    ];
-    final key = 'Config_${_name}_${widget.name}';
-    await prefs.setStringList(key, defaultConfig);
-    gameList.add(widget.name);
-    await prefs.setStringList('Game_$_name', gameList);
-    LogUtil.log('已将 ${widget.name} 添加到游戏列表,当前列表: $gameList', level: 'INFO');
+    final currentFolder = StorageService.pathsConfig.selectedFolder;
+
+    if (currentFolder == null) return;
+
+    final newGame = MinecraftGame(
+      id: widget.name,
+      folderName: widget.name,
+      type: MinecraftVersionType.release,
+      modLoaderType: ModLoaderType.vanilla,
+      assetsIndexId: assetIndexId ?? '',
+      label: widget.name,
+    );
+
+    final updatedVersions = [...currentFolder.versions, newGame];
+    final updatedFolder = currentFolder.copyWith(versions: updatedVersions);
+
+    final updatedPaths = StorageService.pathsConfig.paths.map((folder) {
+      return folder.path == currentFolder.path ? updatedFolder : folder;
+    }).toList();
+
+    await StorageService.pathsJson.update(
+      StorageService.pathsConfig.copyWith(paths: updatedPaths),
+    );
+
+    LogUtil.log(
+      '已将 ${widget.name} 添加到游戏列表,当前列表: $updatedVersions',
+      level: 'INFO',
+    );
+
     setState(() {
       _writeConfig = true;
     });
@@ -534,12 +552,17 @@ class DownloadVanillaPageState extends State<DownloadVanillaPage> {
 
   // 下载逻辑
   Future<void> _startDownload() async {
-    final prefs = await SharedPreferences.getInstance();
-    final selectedGamePath = prefs.getString('SelectedPath') ?? '';
-    final gamePath = prefs.getString('Path_$selectedGamePath') ?? '';
-    final versionPath =
-        '$gamePath${Platform.pathSeparator}versions${Platform.pathSeparator}${widget.name}';
+    final gamePath = StorageService.pathsConfig.selectedFolderPath;
+
+    if (gamePath.isEmpty) {
+      LogUtil.log('未选择游戏路径，无法开始下载', level: 'ERROR');
+      return;
+    }
+
+    final versionPath = p.join(gamePath, 'versions', widget.name);
+
     final gameJsonURL = replaceWithMirror(widget.url);
+
     try {
       await LogUtil.log('开始下载 ${widget.name} 版本', level: 'INFO');
       await _showNotification(

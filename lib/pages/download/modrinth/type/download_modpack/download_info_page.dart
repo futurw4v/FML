@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:fmcl/pages/download/modrinth/type/download_modpack/loader/fabric_modpack_page.dart';
+import 'package:fmcl/pages/download/modrinth/type/download_modpack/loader/neoforge_modpack_page.dart';
+import 'package:fmcl/storage/storage_service.dart';
+import 'package:fmcl/utils/log_util.dart';
 import 'package:fmcl/utils/slide_page_route.dart';
 import 'package:fmcl/widgets/app_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import 'package:fmcl/utils/log_util.dart';
-import 'package:fmcl/pages/download/modrinth/type/download_modpack/loader/fabric_modpack_page.dart';
-import 'package:fmcl/pages/download/modrinth/type/download_modpack/loader/neoforge_modpack_page.dart';
 
 class DownloadInfoPage extends StatefulWidget {
   const DownloadInfoPage(this.version, {super.key});
@@ -56,7 +56,7 @@ class DownloadInfoPageState extends State<DownloadInfoPage> {
   // 读取版本列表
   Future<void> _loadVersionList() async {
     final prefs = await SharedPreferences.getInstance();
-    final selectedPath = prefs.getString('SelectedPath') ?? '';
+    final selectedPath = StorageService.pathsConfig.selectedFolderPath;
     final gameList = prefs.getStringList('Game_$selectedPath') ?? [];
     setState(() {
       _versionList = gameList;

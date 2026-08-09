@@ -10,6 +10,7 @@ import 'package:fmcl/constants.dart';
 import 'package:fmcl/models/online/easy_tier_peer.dart';
 import 'package:fmcl/online/fakeserver.dart';
 import 'package:fmcl/online/scaffolding/client.dart';
+import 'package:fmcl/storage/storage_service.dart';
 import 'package:fmcl/utils/log_util.dart';
 import 'package:fmcl/widgets/app_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -129,7 +130,7 @@ class MemberPageState extends State<MemberPage> {
       _fakeServer = FakeServer(port: fakeServerPort);
       await _fakeServer!.start();
       final prefs = await SharedPreferences.getInstance();
-      final name = prefs.getString('SelectedPath') ?? '';
+      final name = StorageService.pathsConfig.selectedFolderPath;
       final path = prefs.getString('Path_$name') ?? '';
       final String cliPath =
           ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
@@ -179,7 +180,7 @@ class MemberPageState extends State<MemberPage> {
     }
     try {
       final prefs = await SharedPreferences.getInstance();
-      final name = prefs.getString('SelectedPath') ?? '';
+      final name = StorageService.pathsConfig.selectedFolderPath;
       final path = prefs.getString('Path_$name') ?? '';
       final String cliPath =
           ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
@@ -396,7 +397,7 @@ class MemberPageState extends State<MemberPage> {
     }
     try {
       final prefs = await SharedPreferences.getInstance();
-      final name = prefs.getString('SelectedPath') ?? '';
+      final name = StorageService.pathsConfig.selectedFolderPath;
       final path = prefs.getString('Path_$name') ?? '';
       final String core =
           ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-core');
@@ -515,7 +516,7 @@ class MemberPageState extends State<MemberPage> {
     if (!_isEasyTierRunning) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final name = prefs.getString('SelectedPath') ?? '';
+      final name = StorageService.pathsConfig.selectedFolderPath;
       final path = prefs.getString('Path_$name') ?? '';
       final String cliPath =
           ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
@@ -607,7 +608,7 @@ class MemberPageState extends State<MemberPage> {
   // 检测核心版本
   Future<String> _checkCoreVersion() async {
     final prefs = await SharedPreferences.getInstance();
-    final name = prefs.getString('SelectedPath') ?? '';
+    final name = StorageService.pathsConfig.selectedFolderPath;
     final path = prefs.getString('Path_$name') ?? '';
     final String core =
         ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-core');
@@ -1230,7 +1231,7 @@ class MemberPageState extends State<MemberPage> {
     if (!_isEasyTierRunning) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final name = prefs.getString('SelectedPath') ?? '';
+      final name = StorageService.pathsConfig.selectedFolderPath;
       final path = prefs.getString('Path_$name') ?? '';
       final String cli =
           ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
@@ -1293,7 +1294,7 @@ class MemberPageState extends State<MemberPage> {
     if (!_isEasyTierRunning) return '';
     try {
       final prefs = await SharedPreferences.getInstance();
-      final name = prefs.getString('SelectedPath') ?? '';
+      final name = StorageService.pathsConfig.selectedFolderPath;
       final path = prefs.getString('Path_$name') ?? '';
       final String cli =
           ('$path${Platform.pathSeparator}easytier${Platform.pathSeparator}easytier-cli');
